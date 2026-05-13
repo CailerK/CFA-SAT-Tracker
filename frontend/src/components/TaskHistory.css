@@ -1,0 +1,528 @@
+/* Task History Page - Matching LD Growth Design */
+
+.task-history-page {
+  min-height: 100vh;
+  background: #f9fafb;
+  padding: 24px 32px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Header */
+.history-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.history-back-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #e5e7eb;
+  background: white;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.history-back-button:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.history-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.history-subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 2px 0 0 0;
+}
+
+/* Stats Card */
+.stats-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.stats-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.stats-percentage {
+  font-size: 14px;
+  font-weight: 600;
+  color: #E51636;
+}
+
+.stats-progress-bar {
+  height: 6px;
+  background: #f3f4f6;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.stats-progress-fill {
+  height: 100%;
+  background: #E51636;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.stats-breakdown {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-icon {
+  font-size: 14px;
+}
+
+.stat-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.stat-total .stat-value {
+  color: #6b7280;
+  font-weight: 400;
+}
+
+/* Date Range Section */
+.date-range-section {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.date-range-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.date-range-header svg {
+  color: #9ca3af;
+}
+
+.date-range-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.range-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.range-button {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: none;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.range-button:hover {
+  background: #e5e7eb;
+}
+
+.range-button.active {
+  background: #E51636;
+  color: white;
+}
+
+.date-picker-wrapper {
+  position: relative;
+}
+
+.date-picker-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: white;
+  color: #374151;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.date-picker-button:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.date-picker-button svg {
+  color: #9ca3af;
+}
+
+/* Calendar Popup */
+.calendar-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  padding: 16px;
+  z-index: 1000;
+  min-width: 280px;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.calendar-nav {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.calendar-nav:hover {
+  background: #f3f4f6;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+}
+
+.calendar-day-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #9ca3af;
+  padding: 8px 0;
+}
+
+.calendar-day {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.calendar-day:hover {
+  background: #f3f4f6;
+}
+
+.calendar-day.other-month {
+  color: #d1d5db;
+}
+
+.calendar-day.selected {
+  background: #fef2f2;
+  color: #E51636;
+}
+
+.calendar-day.today {
+  background: #E51636;
+  color: white;
+}
+
+/* History Tabs */
+.history-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  background: white;
+  padding: 8px;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.history-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 8px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.history-tab:hover {
+  background: #f9fafb;
+}
+
+.history-tab.active {
+  background: #E51636;
+  color: white;
+}
+
+.history-tab-icon {
+  font-size: 16px;
+}
+
+.history-tab-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* History List */
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-day-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.day-card-header {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.day-date-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: #f9fafb;
+  border-radius: 12px;
+  margin-right: 16px;
+}
+
+.day-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+}
+
+.day-number {
+  font-size: 18px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.day-info {
+  flex: 1;
+}
+
+.day-full-date {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.day-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.day-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.day-stat.opening::before {
+  content: '🌅';
+  font-size: 10px;
+}
+
+.day-stat.transition::before {
+  content: '🔄';
+  font-size: 10px;
+}
+
+.day-stat.closing::before {
+  content: '🌙';
+  font-size: 10px;
+}
+
+.day-completion {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+/* Day Tasks */
+.day-tasks {
+  padding: 8px 0;
+}
+
+.day-task-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 12px;
+}
+
+.day-task-item.missed {
+  opacity: 0.7;
+}
+
+.day-task-checkbox {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.day-task-checkbox input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.day-checkmark {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.day-task-checkbox input:checked + .day-checkmark {
+  background: #10b981;
+  border-color: #10b981;
+}
+
+.day-checkmark::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.day-task-checkbox input:checked + .day-checkmark::after {
+  opacity: 1;
+}
+
+.day-task-text {
+  flex: 1;
+  font-size: 13px;
+  color: #374151;
+}
+
+.day-task-item.missed .day-task-text {
+  color: #6b7280;
+}
+
+.day-task-status {
+  color: #f59e0b;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .task-history-page {
+    padding: 16px;
+  }
+
+  .date-range-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .range-buttons {
+    justify-content: center;
+  }
+
+  .history-tabs {
+    flex-wrap: wrap;
+  }
+
+  .history-tab {
+    flex: 1 1 calc(50% - 6px);
+  }
+}

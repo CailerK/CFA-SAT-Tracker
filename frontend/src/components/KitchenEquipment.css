@@ -1,0 +1,484 @@
+/* Kitchen Equipment - LD Growth Match */
+
+/* ========== Summary toolbar (24/24 running + icon buttons) ========== */
+.ke-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.ke-toolbar-running {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ke-running-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.ke-running-num {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.ke-running-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.ke-running-track {
+  flex: 1;
+  min-width: 60px;
+  max-width: 120px;
+  height: 6px;
+  background: #f3f4f6;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.ke-running-fill {
+  height: 100%;
+  background: #10b981;
+  border-radius: 9999px;
+  transition: width 0.5s ease;
+}
+
+.ke-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ke-toolbar-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #4b5563;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.ke-toolbar-btn:hover {
+  background: #f9fafb;
+  color: #111827;
+}
+
+.ke-toolbar-btn:active {
+  transform: scale(0.95);
+}
+
+.ke-toolbar-btn-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.ke-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #E51636;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ========== Category chips ========== */
+.ke-cats-wrap {
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ke-cats-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.ke-cats {
+  display: flex;
+  gap: 8px;
+  min-width: max-content;
+}
+
+@media (min-width: 768px) {
+  .ke-cats {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+}
+
+.ke-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  text-transform: capitalize;
+  transition: all 0.15s ease;
+}
+
+.ke-cat:hover:not(.active) {
+  border-color: rgba(229, 22, 54, 0.3);
+}
+
+.ke-cat:active {
+  transform: scale(0.95);
+}
+
+.ke-cat.active {
+  background: #E51636;
+  color: #ffffff;
+  border-color: #E51636;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.ke-cat-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ke-cat-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 9999px;
+}
+
+.ke-cat.active .ke-cat-count {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.ke-cat-add {
+  border-style: dashed;
+  border-width: 2px;
+  color: #6b7280;
+  background: #f9fafb;
+  gap: 4px;
+}
+
+.ke-cat-add:hover {
+  border-color: #E51636;
+  color: #E51636;
+}
+
+.ke-cat-add-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ========== Equipment grid ========== */
+.ke-grid-wrap {
+  padding-bottom: 16px;
+}
+
+.ke-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .ke-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+}
+
+/* ========== Equipment Card ========== */
+.ke-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s ease;
+}
+
+.ke-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+.ke-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ke-card-icon {
+  padding: 8px;
+  background: #f9fafb;
+  color: #4b5563;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ke-card-icon-svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ke-card-name-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.ke-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ke-status-pill {
+  padding: 2px 8px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+/* ========== Schedule row ========== */
+.ke-schedule {
+  margin-bottom: 12px;
+}
+
+.ke-schedule-row {
+  background: #fffbeb;
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ke-schedule-icon {
+  width: 14px;
+  height: 14px;
+  color: #d97706;
+  flex-shrink: 0;
+}
+
+.ke-schedule-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ke-schedule-task {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ke-schedule-dot {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.ke-schedule-sub {
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.ke-schedule-urgency {
+  font-size: 10px;
+  font-weight: 600;
+  color: #d97706;
+}
+
+.ke-schedule-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ke-schedule-mini {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.ke-schedule-mini:hover {
+  color: #4b5563;
+}
+
+.ke-schedule-mini-delete:hover {
+  color: #ef4444;
+}
+
+.ke-schedule-mini-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.ke-schedule-done {
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: #d97706;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.ke-schedule-done:hover {
+  background: #fef3c7;
+}
+
+.ke-no-schedule {
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+  padding: 8px 0;
+  margin: 0 0 12px 0;
+}
+
+/* ========== Action row ========== */
+.ke-card-actions {
+  display: flex;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+  margin-top: auto;
+}
+
+.ke-action {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.ke-action:active {
+  transform: scale(0.98);
+}
+
+.ke-action-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.ke-action-gray { color: #6b7280; }
+.ke-action-gray:hover { background: #f9fafb; }
+
+.ke-action-amber { color: #d97706; }
+.ke-action-amber:hover { background: #fffbeb; }
+
+.ke-action-blue { color: #2563eb; }
+.ke-action-blue:hover { background: #eff6ff; }
+
+.ke-action-red { color: #ef4444; }
+.ke-action-red:hover { background: #fef2f2; }
+
+.ke-action span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ========== Empty state ========== */
+.ke-empty {
+  background: #ffffff;
+  border: 1px dashed #e5e7eb;
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.ke-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 4px 0;
+}
+
+.ke-empty-sub {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}

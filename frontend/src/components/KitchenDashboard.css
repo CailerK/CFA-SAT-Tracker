@@ -1,0 +1,337 @@
+/* Kitchen Dashboard - LD Growth Match
+   Uses .sst-page/.sst-container/.sst-banner* from SetupSheetTemplates.css */
+
+.kd-container {
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .kd-container {
+    gap: 24px;
+  }
+}
+
+/* ========== 7-tab horizontal nav ========== */
+.kd-nav {
+  margin: 0 -12px;
+  padding: 0 12px;
+}
+
+@media (min-width: 640px) {
+  .kd-nav {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.kd-nav-inner {
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 4px;
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kd-nav-inner::-webkit-scrollbar {
+  height: 4px;
+}
+.kd-nav-inner::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.kd-tab {
+  flex: 1;
+  min-width: max-content;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 10px;
+  line-height: 1.2;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.kd-tab:hover:not(.active) {
+  color: #111827;
+}
+
+.kd-tab.active {
+  background: #ffffff;
+  color: #E51636;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  font-weight: 500;
+}
+
+.kd-tab-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .kd-tab {
+    flex-direction: row;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 14px;
+    min-width: 0;
+  }
+  .kd-nav-inner {
+    overflow-x: visible;
+  }
+}
+
+/* ========== Today's Progress card ========== */
+.kd-progress-card {
+  background: #ffffff;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  padding: 16px;
+}
+
+.kd-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.kd-progress-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kd-progress-title-icon {
+  width: 20px;
+  height: 20px;
+  color: #E51636;
+}
+
+.kd-progress-title-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.kd-progress-percent {
+  font-size: 14px;
+  font-weight: 700;
+  color: #E51636;
+}
+
+.kd-progress-track {
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.kd-progress-fill {
+  height: 100%;
+  background: #E51636;
+  border-radius: 9999px;
+  transition: width 0.5s ease;
+}
+
+.kd-progress-legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ========== Module Cards grid ========== */
+.kd-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .kd-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ========== Module Card ========== */
+.kd-card {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.kd-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+.kd-card:active {
+  transform: scale(0.98);
+}
+
+/* Head row */
+.kd-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.kd-card-icon-tile {
+  height: 44px;
+  width: 44px;
+  border-radius: 12px;
+  background: rgba(229, 22, 54, 0.1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kd-card-icon-emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.kd-card-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.kd-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.kd-card-attention {
+  display: block;
+  font-size: 12px;
+  color: #E51636;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.kd-card-chevron {
+  width: 20px;
+  height: 20px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+/* Stats grid */
+.kd-card-stats {
+  padding: 0 16px 16px 16px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.kd-card-stat {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.kd-stat-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kd-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 2px 0;
+  line-height: 1.2;
+}
+
+.kd-stat-sublabel {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* Alert row */
+.kd-card-alert-wrap {
+  padding: 0 16px 16px 16px;
+}
+
+.kd-card-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.kd-card-alert-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.kd-card-alert-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Footer progress bar */
+.kd-card-footer-track {
+  height: 4px;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+.kd-card-footer-fill {
+  height: 100%;
+  transition: width 0.5s ease, background-color 0.2s ease;
+}
+
+.kd-card-footer-fill.full {
+  background: #E51636;
+}
+
+.kd-card-footer-fill.partial {
+  background: rgba(229, 22, 54, 0.2);
+}

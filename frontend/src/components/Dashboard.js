@@ -1,0 +1,487 @@
+import React, { useState, useRef, useEffect } from 'react';
+import './Dashboard.css';
+import Sidebar from './Sidebar';
+import QuickActions from './QuickActions';
+import CustomizeInsightsModal from './CustomizeInsightsModal';
+import CustomizeActionsModal from './CustomizeActionsModal';
+import FOHTasks from './FOHTasks';
+import CleaningMaintenance from './CleaningMaintenance';
+import WeeklyDigest from './WeeklyDigest';
+import TeamChat from './TeamChat';
+import Calendar from './Calendar';
+import GuestRecovery from './GuestRecovery';
+import Vendors from './Vendors';
+import Settings from './Settings';
+import SetupSheetTemplates from './SetupSheetTemplates';
+import SetupSheetBuilder from './SetupSheetBuilder';
+import SavedSetups from './SavedSetups';
+import ShiftSummary from './ShiftSummary';
+import ShiftSummaryHistory from './ShiftSummaryHistory';
+import KitchenDashboard from './KitchenDashboard';
+import KitchenAnalytics from './KitchenAnalytics';
+import KitchenEquipment from './KitchenEquipment';
+import KitchenFoodSafety from './KitchenFoodSafety';
+import KitchenCleaning from './KitchenCleaning';
+import KitchenChecklists from './KitchenChecklists';
+import KitchenWasteTracker from './KitchenWasteTracker';
+import TeamMembers from './TeamMembers';
+import TeamDocumentation from './TeamDocumentation';
+import TeamEvaluations from './TeamEvaluations';
+import TeamSurveys from './TeamSurveys';
+import TeamTraining from './TeamTraining';
+import TeamQuickLinks from './TeamQuickLinks';
+import TeamDevelopment from './TeamDevelopment';
+import LeadershipDevelopment from './LeadershipDevelopment';
+import Leadership360Evaluations from './Leadership360Evaluations';
+import New360Evaluation from './New360Evaluation';
+
+const Dashboard = ({ user, onLogout }) => {
+  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [notificationCount, setNotificationCount] = useState(42); // Dynamic notification count
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const profileDropdownRef = useRef(null);
+
+  const toggleProfileDropdown = () => {
+    setProfileDropdownOpen(prev => !prev);
+  };
+
+  const closeProfileDropdown = () => {
+    setProfileDropdownOpen(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // State for customize modals
+  const [isCustomizeInsightsOpen, setIsCustomizeInsightsOpen] = useState(false);
+  const [isCustomizeActionsOpen, setIsCustomizeActionsOpen] = useState(false);
+  const [customInsights, setCustomInsights] = useState([]);
+  const [customActions, setCustomActions] = useState([]);
+
+  // Get current date for greeting
+  const getCurrentDate = () => {
+    const options = { 
+      weekday: 'long', 
+      month: 'short', 
+      day: 'numeric' 
+    };
+    return new Date().toLocaleDateString('en-US', options);
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  return (
+    <div className="dashboard-container">
+      {/* Navigation Header */}
+      <div className="nav-header">
+        <div className="nav-content">
+          <div className="nav-left">
+            <button className="company-button" onClick={() => setCurrentPage('dashboard')}>
+              <div className="company-info">
+                <span className="company-name">CFA I-410 & Rigsby</span>
+              </div>
+            </button>
+            <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
+          </div>
+          <div className="nav-right">
+            <div className="notification-container">
+              <svg className="notification-bell" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              {notificationCount > 0 && (
+                <div className="notification-badge">{notificationCount}</div>
+              )}
+            </div>
+            <div className="profile-container" ref={profileDropdownRef}>
+              <button className="profile-button" onClick={toggleProfileDropdown}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </button>
+              {profileDropdownOpen && (
+                <div className="profile-dropdown">
+                  <div className="dropdown-item" onClick={() => { setCurrentPage('weekly-digest'); setProfileDropdownOpen(false); }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14,2 14,8 20,8"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                      <line x1="16" y1="17" x2="8" y2="17"/>
+                      <polyline points="10,9 9,9 8,9"/>
+                    </svg>
+                    Weekly Digest
+                  </div>
+                  <div className="dropdown-item" onClick={() => { setCurrentPage('team-chat'); setProfileDropdownOpen(false); }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Team Chat
+                  </div>
+                  <div className="dropdown-item" onClick={() => { setCurrentPage('calendar'); setProfileDropdownOpen(false); }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                      <line x1="16" y1="2" x2="16" y2="6"/>
+                      <line x1="8" y1="2" x2="8" y2="6"/>
+                      <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    Calendar
+                  </div>
+                  <div className="dropdown-item" onClick={() => { setCurrentPage('guest-recovery'); setProfileDropdownOpen(false); }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                    </svg>
+                    Guest Recovery
+                  </div>
+                  <div className="dropdown-item" onClick={() => { setCurrentPage('vendors'); setProfileDropdownOpen(false); }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                      <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    Vendors
+                  </div>
+                  <div className="dropdown-divider"></div>
+                  <div className="dropdown-item" onClick={() => { setCurrentPage('settings'); setProfileDropdownOpen(false); }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    Settings
+                  </div>
+                  <div className="dropdown-item logout-item" onClick={onLogout}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                      <polyline points="16,17 21,12 16,7"/>
+                      <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    Logout
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <main className="main-content">
+        {/* Red Header Banner - only on dashboard home */}
+        {currentPage === 'dashboard' && (
+          <div className="banner-wrapper">
+            <div className="red-header-banner">
+              <div className="banner-pattern" aria-hidden="true">
+                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <pattern id="hero-pattern" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+                      <circle cx="16" cy="16" r="1.5" fill="white" />
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#hero-pattern)" />
+                </svg>
+              </div>
+              <div className="banner-blur" aria-hidden="true"></div>
+              <div className="banner-content">
+                <div className="banner-top">
+                  <span className="banner-emoji" role="img" aria-label="sun">☀️</span>
+                  <div className="banner-text">
+                    <h1 className="banner-greeting">
+                      {getGreeting()}, <span className="banner-name">{user?.firstName || 'Demo User'}!</span>
+                    </h1>
+                    <p className="banner-date">{getCurrentDate()}</p>
+                  </div>
+                </div>
+                <div className="banner-divider">
+                  <span className="banner-line"></span>
+                  <p className="banner-motivation">Let's make today remarkable</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentPage === 'foh' ? (
+          <FOHTasks onBack={() => setCurrentPage('dashboard')} />
+        ) : currentPage === 'foh-cleaning' ? (
+          <CleaningMaintenance onBack={() => setCurrentPage('dashboard')} />
+        ) : currentPage === 'weekly-digest' ? (
+          <WeeklyDigest onBack={() => setCurrentPage('dashboard')} />
+        ) : currentPage === 'team-chat' ? (
+          <TeamChat onBack={() => setCurrentPage('dashboard')} />
+        ) : currentPage === 'calendar' ? (
+          <Calendar onBack={() => setCurrentPage('dashboard')} />
+        ) : currentPage === 'guest-recovery' ? (
+          <GuestRecovery onBack={() => setCurrentPage('dashboard')} />
+        ) : currentPage === 'vendors' ? (
+          <Vendors onBack={() => setCurrentPage('dashboard')} />
+        ) : currentPage === 'settings' ? (
+          <Settings onBack={() => setCurrentPage('dashboard')} />
+        ) : currentPage === 'setup-sheet-templates' ? (
+          <SetupSheetTemplates 
+            onBack={() => setCurrentPage('dashboard')} 
+            onNavigate={(page, data) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'shift-summary' ? (
+          <ShiftSummary 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'shift-summary-history' ? (
+          <ShiftSummaryHistory 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'setup-sheet-builder' ? (
+          <SetupSheetBuilder 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'saved-setups' ? (
+          <SavedSetups 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'kitchen' ? (
+          <KitchenDashboard 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'kitchen-analytics' ? (
+          <KitchenAnalytics 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'kitchen-equipment' ? (
+          <KitchenEquipment 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'kitchen-safety' ? (
+          <KitchenFoodSafety 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'kitchen-cleaning' ? (
+          <KitchenCleaning 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'kitchen-checklists' ? (
+          <KitchenChecklists 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'kitchen-waste' ? (
+          <KitchenWasteTracker 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'team-members' ? (
+          <TeamMembers 
+            onBack={() => setCurrentPage('dashboard')}
+          />
+        ) : currentPage === 'team-documentation' ? (
+          <TeamDocumentation 
+            user={user}
+            onBack={() => setCurrentPage('dashboard')}
+          />
+        ) : currentPage === 'team-evaluations' ? (
+          <TeamEvaluations 
+            user={user}
+            onBack={() => setCurrentPage('dashboard')}
+          />
+        ) : currentPage === 'team-surveys' ? (
+          <TeamSurveys 
+            user={user}
+            onBack={() => setCurrentPage('dashboard')}
+          />
+        ) : currentPage === 'team-training' ? (
+          <TeamTraining 
+            user={user}
+            onBack={() => setCurrentPage('dashboard')}
+          />
+        ) : currentPage === 'team-quick-links' ? (
+          <TeamQuickLinks 
+            user={user}
+          />
+        ) : currentPage === 'leadership-360' ? (
+          <Leadership360Evaluations 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'new-360-evaluation' ? (
+          <New360Evaluation 
+            onBack={() => setCurrentPage('leadership-360')}
+          />
+        ) : currentPage === 'leadership' ? (
+          <LeadershipDevelopment 
+            user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'team-development' ? (
+          <TeamDevelopment 
+            user={user}
+          />
+        ) : (
+        <div className="content-wrapper">
+          <div className="dashboard-sections">
+            {/* LEFT COLUMN: All Caught Up + Dashboard Insights */}
+            <div className="dashboard-main-col">
+              {/* All Caught Up Status Card */}
+              <div className="status-message">
+                <div className="status-inner">
+                  <div className="status-bg-blur status-bg-blur-1" aria-hidden="true"></div>
+                  <div className="status-bg-blur status-bg-blur-2" aria-hidden="true"></div>
+                  <div className="status-content-wrapper">
+                    <div className="status-icon">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="m9 12 2 2 4-4"/>
+                      </svg>
+                    </div>
+                    <h3 className="status-title">All Caught Up! 🎉</h3>
+                    <p className="status-description">
+                      You have no urgent priorities at the moment. Great job staying on top of things!
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dashboard Insights */}
+              <div className="dashboard-insights">
+                <div className="insights-header">
+                  <h2 className="insights-title">Dashboard Insights</h2>
+                  <button
+                    className="customize-button"
+                    onClick={() => setIsCustomizeInsightsOpen(true)}
+                  >
+                    Customize
+                  </button>
+                </div>
+
+                <div className="insights-grid">
+                  <button
+                    className="insight-card insight-green"
+                    onClick={() => setCurrentPage('foh')}
+                  >
+                    <div className="insight-card-blur" aria-hidden="true"></div>
+                    <div className="insight-card-body">
+                      <div className="insight-icon insight-icon-green">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m9 11 3 3L22 4"/>
+                          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                        </svg>
+                      </div>
+                      <h3 className="insight-value">0%</h3>
+                      <p className="insight-label">FOH Tasks</p>
+                      <p className="insight-subtitle">0/64 today</p>
+                    </div>
+                  </button>
+
+                  <button
+                    className="insight-card insight-emerald"
+                    onClick={() => setCurrentPage('kitchen-checklist')}
+                  >
+                    <div className="insight-card-blur" aria-hidden="true"></div>
+                    <div className="insight-card-body">
+                      <div className="insight-icon insight-icon-emerald">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m9 11 3 3L22 4"/>
+                          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                        </svg>
+                      </div>
+                      <h3 className="insight-value">0%</h3>
+                      <p className="insight-label">Kitchen Checklist</p>
+                      <p className="insight-subtitle">0 completed today</p>
+                    </div>
+                  </button>
+
+                  <button
+                    className="insight-card insight-amber"
+                    onClick={() => setCurrentPage('kitchen-equipment')}
+                  >
+                    <div className="insight-card-blur" aria-hidden="true"></div>
+                    <div className="insight-card-body">
+                      <div className="insight-icon insight-icon-amber">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                        </svg>
+                      </div>
+                      <h3 className="insight-value">0</h3>
+                      <p className="insight-label">Equipment Issues</p>
+                      <p className="insight-subtitle">Need repair</p>
+                    </div>
+                  </button>
+
+                  <button
+                    className="insight-card insight-red"
+                    onClick={() => setCurrentPage('documentation')}
+                  >
+                    <div className="insight-card-blur" aria-hidden="true"></div>
+                    <div className="insight-card-body">
+                      <div className="insight-icon insight-icon-red">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+                          <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+                          <path d="M10 9H8"/>
+                          <path d="M16 13H8"/>
+                          <path d="M16 17H8"/>
+                        </svg>
+                      </div>
+                      <h3 className="insight-value">0</h3>
+                      <p className="insight-label">Documentation</p>
+                      <p className="insight-subtitle">This week</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <QuickActions 
+              onPageChange={setCurrentPage}
+              onCustomize={() => setIsCustomizeActionsOpen(true)}
+              customActions={customActions}
+            />
+          </div>
+        </div>
+        )}
+
+      {/* Customize Insights Modal */}
+      <CustomizeInsightsModal
+        isOpen={isCustomizeInsightsOpen}
+        onClose={() => setIsCustomizeInsightsOpen(false)}
+        onSave={(insights) => {
+          setCustomInsights(insights);
+          setIsCustomizeInsightsOpen(false);
+        }}
+        currentInsights={customInsights}
+      />
+
+      {/* Customize Quick Actions Modal */}
+      <CustomizeActionsModal
+        isOpen={isCustomizeActionsOpen}
+        onClose={() => setIsCustomizeActionsOpen(false)}
+        onSave={(actions) => {
+          setCustomActions(actions);
+          setIsCustomizeActionsOpen(false);
+        }}
+        currentActions={customActions}
+      />
+      </main>
+    </div>
+  );
+};
+
+export default Dashboard;

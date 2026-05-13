@@ -1,0 +1,166 @@
+/* Team Evaluations - LD Growth Match */
+
+.te-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .te-container { gap: 24px; }
+}
+
+/* Page background override (pink → white gradient) */
+.sst-page:has(.te-container) {
+  background: linear-gradient(rgb(254, 247, 247) 0%, rgb(255, 255, 255) 100%);
+}
+
+/* ========== Main 4-tab bar ========== */
+.te-tab-wrap {
+  padding: 0 8px;
+}
+
+@media (min-width: 640px) {
+  .te-tab-wrap { padding: 0; }
+}
+
+.te-tabs {
+  display: flex;
+  padding: 4px;
+  background: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.te-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.te-tab:hover:not(.active) {
+  background: #f9fafb;
+  color: #111827;
+}
+
+.te-tab.active {
+  background: #E51636;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.te-tab-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.te-tab-label {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .te-tab-label { display: inline; }
+}
+
+/* ========== Sub-tab pill selector ========== */
+.te-subtabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 9999px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  width: fit-content;
+}
+
+.te-subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.te-subtab:hover:not(.active) {
+  background: #f9fafb;
+  color: #111827;
+}
+
+.te-subtab.active {
+  background: #E51636;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.te-subtab-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ========== Empty state ========== */
+.te-empty-card {
+  background: #ffffff;
+  border: none;
+  border-radius: 16px;
+  padding: 48px 24px;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.te-empty-icon-wrap {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 24px;
+  background: #f3f4f6;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.te-empty-icon {
+  width: 32px;
+  height: 32px;
+  color: #9ca3af;
+}
+
+.te-empty-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 8px 0;
+}
+
+.te-empty-text {
+  font-size: 14px;
+  color: #6b7280;
+  max-width: 384px;
+  margin: 0 auto;
+  line-height: 1.5;
+}

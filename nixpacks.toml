@@ -1,0 +1,24 @@
+# Tells Railway's Nixpacks builder how to build the full app:
+# 1. Install Node + Python.
+# 2. Install React deps and `npm run build` the frontend.
+# 3. Install Django deps and collect static files (picks up frontend/build/static).
+# 4. Run migrations + start gunicorn (start command lives in Procfile).
+
+[phases.setup]
+nixPkgs = ["python311", "nodejs_20", "gcc"]
+
+[phases.install]
+cmds = [
+  "python -m venv /opt/venv",
+  ". /opt/venv/bin/activate && pip install --upgrade pip && pip install -r backend/requirements.txt",
+  "cd frontend && npm ci"
+]
+
+[phases.build]
+cmds = [
+  "cd frontend && npm run build",
+  ". /opt/venv/bin/activate && cd backend && python manage.py collectstatic --noinput"
+]
+
+[start]
+cmd = ". /opt/venv/bin/activate && cd backend && python manage.py migrate --noinput && gunicorn myproject.wsgi:application --bind 0.0.0.0:$PORT --log-file -"

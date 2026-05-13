@@ -1,0 +1,570 @@
+/* Kitchen Analytics - LD Growth Match
+   Uses sst-page/container/banner + kd-nav/kd-tab from other CSS files */
+
+/* ========== KPI cards ========== */
+.ka-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 1024px) {
+  .ka-kpis {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.ka-kpi-card {
+  background: #ffffff;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.ka-kpi-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ka-kpi-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.ka-kpi-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ka-kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.ka-kpi-value-sm {
+  font-size: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ka-kpi-trend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.ka-kpi-trend-icon {
+  width: 12px;
+  height: 12px;
+  color: #16a34a;
+}
+
+.ka-kpi-trend-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #16a34a;
+}
+
+.ka-kpi-sub {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 4px 0 0 0;
+}
+
+/* ========== Waste Reduction Goals card ========== */
+.ka-goals-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.ka-goals-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px 24px;
+}
+
+.ka-goals-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ka-goals-icon-tile {
+  padding: 8px;
+  background: #f0fdf4;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ka-goals-icon {
+  width: 20px;
+  height: 20px;
+  color: #16a34a;
+}
+
+.ka-goals-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.ka-goals-edit {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.ka-goals-edit:hover {
+  background: #f3f4f6;
+}
+
+.ka-goals-edit-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.ka-goals-body {
+  padding: 0 24px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ka-goal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.ka-goal-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ka-goal-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+}
+
+.ka-goal-check {
+  width: 16px;
+  height: 16px;
+  color: #16a34a;
+}
+
+.ka-goal-amounts {
+  text-align: right;
+}
+
+.ka-goal-amount {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.ka-goal-target {
+  font-size: 14px;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+.ka-goal-percent {
+  font-size: 12px;
+  color: #4b5563;
+  margin: 0;
+}
+
+.ka-goal-track {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  background: linear-gradient(to right, #f3f4f6, #e5e7eb);
+  border-radius: 9999px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.ka-goal-fill {
+  height: 100%;
+  background: linear-gradient(to right, #10b981, #059669, #047857);
+  border-radius: 9999px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: width 0.5s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.ka-goal-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: ka-goal-shimmer 2s infinite;
+  border-radius: 9999px;
+}
+
+@keyframes ka-goal-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.ka-goal-trend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.ka-goal-trend-icon {
+  width: 12px;
+  height: 12px;
+  color: #22c55e;
+}
+
+.ka-goal-trend-text {
+  color: #16a34a;
+  font-weight: 500;
+}
+
+/* ========== Main Card (sub-tabs + chart area) ========== */
+.ka-main-card {
+  background: #ffffff;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.ka-subtabs-wrap {
+  overflow-x: auto;
+  margin: 0 -4px;
+  padding: 0 4px 12px 4px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #f3f4f6;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ka-subtabs-wrap::-webkit-scrollbar {
+  height: 4px;
+}
+.ka-subtabs-wrap::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.ka-subtabs {
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 4px;
+  display: inline-flex;
+  min-width: max-content;
+  gap: 0;
+}
+
+.ka-subtab {
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.ka-subtab:active {
+  transform: scale(0.95);
+}
+
+.ka-subtab.active {
+  background: #E51636;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Range select */
+.ka-range-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+@media (min-width: 640px) {
+  .ka-range-row {
+    flex-direction: row;
+  }
+}
+
+.ka-range-select-wrap {
+  position: relative;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .ka-range-select-wrap {
+    width: 160px;
+  }
+}
+
+.ka-range-select {
+  width: 100%;
+  height: 44px;
+  padding: 0 36px 0 12px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #111827;
+  font-size: 14px;
+  font-family: inherit;
+  border-radius: 12px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.ka-range-select:focus {
+  border-color: #E51636;
+  box-shadow: 0 0 0 3px rgba(229, 22, 54, 0.15);
+}
+
+.ka-range-chev {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #6b7280;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ========== Overview panels grid ========== */
+.ka-overview-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+@media (min-width: 1024px) {
+  .ka-overview-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.ka-panel {
+  background: #ffffff;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.ka-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.ka-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ka-panel-title p {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.ka-panel-head-right {
+  text-align: right;
+}
+
+.ka-panel-head-sub {
+  font-size: 11px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.ka-panel-head-total {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+/* ========== Chart ========== */
+.ka-chart-wrap {
+  padding: 16px;
+  height: 220px;
+}
+
+@media (min-width: 640px) {
+  .ka-chart-wrap {
+    height: 300px;
+  }
+}
+
+.ka-chart-svg {
+  display: block;
+  height: 100%;
+}
+
+/* ========== Top Wasted Items ========== */
+.ka-top-list {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ka-top-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f9fafb;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.ka-top-row:active {
+  background: #f3f4f6;
+}
+
+.ka-top-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.ka-top-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ka-top-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ka-top-items {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.ka-top-right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.ka-top-cost {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.ka-top-pct {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.ka-top-chev {
+  width: 16px;
+  height: 16px;
+  color: #9ca3af;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+/* Empty placeholder for non-overview sub-tabs */
+.ka-empty-panel {
+  background: #f9fafb;
+  border: 1px dashed #e5e7eb;
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.ka-empty-emoji {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.ka-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 4px 0;
+}
+
+.ka-empty-sub {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}

@@ -1,0 +1,473 @@
+/* Kitchen Food Safety Page - Matching LD Growth Design */
+
+.kitchen-safety-page {
+  min-height: 100vh;
+  background: #f9fafb;
+  padding: 24px 32px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+/* Red Header Banner */
+.kitchen-safety-banner {
+  background: linear-gradient(135deg, #E51636 0%, #B91C1C 100%);
+  color: white;
+  padding: 32px;
+  border-radius: 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.kitchen-safety-banner .banner-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.kitchen-safety-banner .banner-content {
+  flex: 1;
+}
+
+.kitchen-safety-banner .banner-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+}
+
+.kitchen-safety-banner .banner-date {
+  font-size: 14px;
+  opacity: 0.9;
+  margin: 0 0 8px 0;
+}
+
+.kitchen-safety-banner .banner-subtitle {
+  font-size: 14px;
+  opacity: 0.85;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Tab Navigation */
+.kitchen-safety-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  background: white;
+  padding: 6px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.safety-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+  justify-content: center;
+}
+
+.safety-tab:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.safety-tab.active {
+  background: #fef2f2;
+  color: #E51636;
+}
+
+.safety-tab .tab-icon {
+  font-size: 14px;
+}
+
+/* Action Buttons */
+.safety-action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.safety-btn-history {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: white;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.safety-btn-history:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.safety-btn-record {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 12px;
+  background: #E51636;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.safety-btn-record:hover {
+  background: #B91C1C;
+}
+
+/* Stats Grid */
+.safety-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.safety-stat-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.stat-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.stat-icon {
+  font-size: 14px;
+}
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.stat-sublabel {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Content Grid */
+.safety-content-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+/* Column Styles */
+.safety-tasks-column,
+.safety-temps-column {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.column-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.5px;
+  margin: 0 0 4px 0;
+}
+
+.column-subtitle {
+  font-size: 13px;
+  color: #111827;
+  margin: 0;
+}
+
+.column-settings-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: #f3f4f6;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.column-settings-btn:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+/* Task Tabs */
+.task-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.task-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+  justify-content: center;
+}
+
+.task-tab:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.task-tab.active {
+  background: #E51636;
+  color: white;
+}
+
+.task-count {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Task List */
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f9fafb;
+  transition: all 0.2s ease;
+}
+
+.task-item.completed {
+  background: #f0fdf4;
+}
+
+.task-checkbox {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.task-content {
+  flex: 1;
+}
+
+.task-text {
+  font-size: 14px;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.task-item.completed .task-text {
+  color: #15803d;
+}
+
+.task-meta {
+  font-size: 12px;
+  color: #10b981;
+  margin-top: 4px;
+}
+
+/* Temp Tabs */
+.temp-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.temp-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+  justify-content: center;
+}
+
+.temp-tab:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.temp-tab.active {
+  background: #E51636;
+  color: white;
+}
+
+.temp-tab svg {
+  stroke: currentColor;
+}
+
+/* Temp List */
+.temp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.temp-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f0fdf4;
+  transition: all 0.2s ease;
+}
+
+.temp-item.warning {
+  background: #fef3c7;
+}
+
+.temp-info {
+  flex: 1;
+}
+
+.temp-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.temp-range {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.temp-reading {
+  text-align: right;
+}
+
+.temp-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #10b981;
+  margin-bottom: 2px;
+}
+
+.temp-item.warning .temp-value {
+  color: #f59e0b;
+}
+
+.temp-time {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .kitchen-safety-page {
+    padding: 16px;
+  }
+
+  .safety-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .safety-content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .kitchen-safety-tabs {
+    flex-wrap: wrap;
+  }
+
+  .safety-tab {
+    flex: 1 1 auto;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .safety-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-tabs,
+  .temp-tabs {
+    flex-wrap: wrap;
+  }
+
+  .task-tab,
+  .temp-tab {
+    flex: 1 1 auto;
+    font-size: 12px;
+  }
+}

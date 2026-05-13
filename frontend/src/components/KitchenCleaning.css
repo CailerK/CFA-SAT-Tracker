@@ -1,0 +1,183 @@
+/* Kitchen Cleaning & Maintenance - LD Growth Match */
+
+/* ========== Page Header (icon + title + action buttons) ========== */
+.kcl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kcl-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.kcl-header-icon {
+  height: 36px;
+  width: 36px;
+  background: #E51636;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kcl-header-icon-svg {
+  width: 16px;
+  height: 16px;
+  color: #ffffff;
+}
+
+.kcl-header-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #27251F;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.kcl-header-sub {
+  font-size: 12px;
+  color: rgba(39, 37, 31, 0.4);
+  margin: 0;
+}
+
+.kcl-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.kcl-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.kcl-btn:active {
+  transform: scale(0.98);
+}
+
+.kcl-btn-outline {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #27251F;
+}
+
+.kcl-btn-outline:hover {
+  background: #f9fafb;
+}
+
+.kcl-btn-primary {
+  background: #E51636;
+  border: 1px solid #E51636;
+  color: #ffffff;
+}
+
+.kcl-btn-primary:hover {
+  background: rgba(229, 22, 54, 0.9);
+}
+
+.kcl-btn-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+}
+
+/* ========== Frequency chips ========== */
+.kcl-chips-wrap {
+  overflow-x: auto;
+  margin: 0 -4px;
+  padding: 2px 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kcl-chips-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.kcl-chips {
+  display: inline-flex;
+  gap: 8px;
+  min-width: max-content;
+}
+
+.kcl-chip {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 9999px;
+  color: rgba(39, 37, 31, 0.6);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 38px;
+  transition: all 0.15s ease;
+}
+
+.kcl-chip:hover:not(.active) {
+  background: #f9fafb;
+}
+
+.kcl-chip.active {
+  background: #27251F;
+  color: #ffffff;
+  border-color: #27251F;
+}
+
+/* ========== Task list + empty state ========== */
+.kcl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kcl-empty {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 40px 16px;
+  text-align: center;
+}
+
+.kcl-empty-emoji {
+  font-size: 32px;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+
+.kcl-empty-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #27251F;
+  margin: 0;
+}
+
+.kcl-empty-sub {
+  font-size: 12px;
+  color: rgba(39, 37, 31, 0.4);
+  margin: 4px 0 0 0;
+}
+
+.kcl-task {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 16px;
+}

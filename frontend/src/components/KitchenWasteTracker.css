@@ -1,0 +1,549 @@
+/* Kitchen Waste Tracker - LD Growth Match */
+
+/* ========== Mode pills (Waste / Donations) ========== */
+.kwt-mode-wrap {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #ffffff;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.kwt-mode-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.kwt-mode-btn:hover:not(.active) {
+  background: #f9fafb;
+}
+
+.kwt-mode-btn.active {
+  background: #fef2f2;
+  color: #E51636;
+  border-color: #fecaca;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.kwt-mode-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ========== KPI cards ========== */
+.kwt-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.kwt-kpi {
+  background: #ffffff;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.kwt-kpi-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.kwt-kpi-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.kwt-kpi-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.kwt-kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.kwt-kpi-value-sm {
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kwt-kpi-sub {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 4px 0 0 0;
+}
+
+/* ========== Quick action row (Items / Prices) ========== */
+.kwt-quick-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.kwt-quick-btn {
+  flex: 1;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.kwt-quick-btn:hover {
+  background: #f9fafb;
+}
+
+.kwt-quick-btn:active {
+  transform: scale(0.95);
+}
+
+/* Bulk entry red button */
+.kwt-bulk-btn {
+  width: 100%;
+  padding: 12px 16px;
+  background: #E51636;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.kwt-bulk-btn:hover {
+  background: #C41230;
+}
+
+.kwt-bulk-btn:active {
+  transform: scale(0.98);
+}
+
+/* ========== Menu items card ========== */
+.kwt-items-card,
+.kwt-reason-card,
+.kwt-entries-card,
+.kwt-custom-card {
+  background: #ffffff;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Meal period pill row (gray 100 bg) */
+.kwt-meal-pills {
+  display: flex;
+  gap: 0;
+  padding: 4px;
+  margin-bottom: 16px;
+  background: #f3f4f6;
+  border-radius: 12px;
+}
+
+.kwt-meal-pill {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.kwt-meal-pill.active {
+  background: #E51636;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.kwt-meal-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+@media (max-width: 639px) {
+  .kwt-meal-label {
+    display: none;
+  }
+  .kwt-meal-pill {
+    gap: 0;
+  }
+}
+
+/* Item grid */
+.kwt-items-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .kwt-items-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.kwt-item-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: #f9fafb;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.kwt-item-tile:hover {
+  background: #f3f4f6;
+}
+
+.kwt-item-tile:active {
+  transform: scale(0.95);
+}
+
+.kwt-item-emoji {
+  font-size: 20px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.kwt-item-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #111827;
+  text-align: center;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.kwt-item-price {
+  font-size: 12px;
+  font-weight: 500;
+  color: #E51636;
+  margin-top: 2px;
+}
+
+/* ========== Section label ========== */
+.kwt-section-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 12px 0;
+}
+
+.kwt-section-label-inline {
+  margin: 0;
+}
+
+/* ========== Waste Reason tiles ========== */
+.kwt-reasons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.kwt-reason {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  background: #f9fafb;
+  border: 2px solid transparent;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.kwt-reason:hover:not(.active) {
+  background: #f3f4f6;
+}
+
+.kwt-reason:active {
+  transform: scale(0.95);
+}
+
+.kwt-reason.active {
+  background: #fef2f2;
+  color: #E51636;
+  border-color: #fecaca;
+}
+
+.kwt-reason-emoji {
+  font-size: 16px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.kwt-reason-label {
+  line-height: 1.2;
+}
+
+/* ========== Today's Entries ========== */
+.kwt-entries-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.kwt-entries-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kwt-date-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.kwt-date-chip:hover {
+  background: #f3f4f6;
+}
+
+.kwt-date-chip-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.kwt-notes-btn {
+  border: none;
+  background: transparent;
+  color: #E51636;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.kwt-notes-btn:hover {
+  text-decoration: underline;
+}
+
+.kwt-entries-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.kwt-entries-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.kwt-entries-list::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 6px;
+}
+
+.kwt-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 12px;
+}
+
+.kwt-entry-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.kwt-entry-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kwt-entry-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.kwt-entry-qty {
+  font-size: 12px;
+  font-weight: 500;
+  color: #E51636;
+}
+
+.kwt-entry-price {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.kwt-entry-time {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.kwt-entry-delete {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.kwt-entry-delete:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.kwt-entry-delete-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* ========== Custom Entry ========== */
+.kwt-custom-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kwt-custom-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.kwt-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #111827;
+  font-size: 14px;
+  font-family: inherit;
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.kwt-input::placeholder {
+  color: #9ca3af;
+}
+
+.kwt-input:focus {
+  border-color: #E51636;
+  box-shadow: 0 0 0 3px rgba(229, 22, 54, 0.15);
+}
+
+.kwt-add-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: #E51636;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.kwt-add-btn:hover:not(:disabled) {
+  background: #C41230;
+}
+
+.kwt-add-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.kwt-add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -1,0 +1,293 @@
+/* Weekly Digest - LD Growth Match */
+
+.weekly-digest-page {
+  min-height: 100vh;
+  background: #f9fafb;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding-top: 0;
+}
+
+/* ========== Header ========== */
+.digest-header {
+  position: sticky;
+  top: 80px;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(229, 231, 235, 0.6);
+}
+
+.digest-header-inner {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.digest-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.digest-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.digest-back-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.digest-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ========== Main Content ========== */
+.digest-main {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+/* Day Selector */
+.day-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.day-button {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #6b7280;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.day-button:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.day-button.active {
+  background: #E51636;
+  color: #ffffff;
+  border-color: #E51636;
+}
+
+/* Date Display */
+.digest-date {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+/* Summary Grid */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.summary-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Sections */
+.digest-section {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 16px 0;
+}
+
+/* Highlights Grid */
+.highlights-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.highlight-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.highlight-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.highlight-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.highlight-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Tasks Card */
+.tasks-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.tasks-progress {
+  margin-bottom: 16px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #E51636 0%, #C41230 100%);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.pending-tasks {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
+.pending-title {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pending-item {
+  font-size: 13px;
+  color: #374151;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+/* Staffing Grid */
+.staffing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.staffing-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.staffing-number {
+  font-size: 28px;
+  font-weight: 700;
+  color: #E51636;
+  margin-bottom: 8px;
+}
+
+.staffing-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .highlights-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .staffing-grid {
+    grid-template-columns: 1fr;
+  }
+}

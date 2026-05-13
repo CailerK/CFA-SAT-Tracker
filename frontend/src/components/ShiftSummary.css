@@ -1,0 +1,701 @@
+/* Shift Summary - LD Growth Match
+   Uses .sst-page/.sst-container/.sst-banner*/.sst-tabs* imported from SetupSheetTemplates.css */
+
+/* ========== History callout ========== */
+.ssum-history-card {
+  background: linear-gradient(to right, #fef2f2, #ffffff);
+  border: 1px solid #fee2e2;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .ssum-history-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.ssum-history-text {
+  flex: 1;
+}
+
+.ssum-history-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ssum-history-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  background: #E51636;
+  color: #ffffff;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ssum-history-subtitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.ssum-history-description {
+  font-size: 14px;
+  color: #4b5563;
+  margin: 0;
+}
+
+.ssum-history-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-height: 44px;
+  padding: 0 16px;
+  background: #E51636;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease;
+  align-self: stretch;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .ssum-history-btn {
+    align-self: flex-start;
+  }
+}
+
+.ssum-history-btn:hover {
+  background: #C91432;
+}
+
+.ssum-history-btn:active {
+  transform: scale(0.98);
+}
+
+/* ========== 2-col grid ========== */
+.ssum-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 1280px) {
+  .ssum-grid {
+    grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+  }
+}
+
+/* ========== Generic Card ========== */
+.ssum-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.ssum-card-head {
+  padding: 24px 24px 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ssum-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.ssum-card-title-icon {
+  width: 20px;
+  height: 20px;
+  color: #E51636;
+  flex-shrink: 0;
+}
+
+.ssum-card-desc {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.ssum-card-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ========== Form fields ========== */
+.ssum-row-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .ssum-row-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ssum-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ssum-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  line-height: 1;
+}
+
+.ssum-input {
+  width: 100%;
+  height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.ssum-input::placeholder {
+  color: #9ca3af;
+}
+
+.ssum-input:focus {
+  border-color: #E51636;
+  box-shadow: 0 0 0 3px rgba(229, 22, 54, 0.15);
+}
+
+.ssum-select-wrap {
+  position: relative;
+}
+
+.ssum-select {
+  width: 100%;
+  height: 44px;
+  padding: 8px 36px 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.ssum-select:focus {
+  border-color: #E51636;
+  box-shadow: 0 0 0 3px rgba(229, 22, 54, 0.15);
+}
+
+.ssum-select-chevron {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #6b7280;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.ssum-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+  line-height: 1.5;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.ssum-textarea::placeholder {
+  color: #9ca3af;
+}
+
+.ssum-textarea:hover {
+  border-color: #C91432;
+}
+
+.ssum-textarea:focus {
+  border-color: #e5e7eb;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.5);
+}
+
+/* ========== Rate the shift ========== */
+.ssum-rate-box {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.ssum-stars {
+  display: flex;
+  gap: 4px;
+}
+
+.ssum-star-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ssum-star-icon {
+  width: 24px;
+  height: 24px;
+  transition: fill 0.15s ease, color 0.15s ease;
+}
+
+.ssum-rate-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+/* ========== Chips ========== */
+.ssum-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ssum-chip {
+  padding: 8px 12px;
+  border-radius: 9999px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.ssum-chip-good:hover {
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.ssum-chip-good.active {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #047857;
+}
+
+.ssum-chip-warn:hover {
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+.ssum-chip-warn.active {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #b45309;
+}
+
+/* ========== Follow-up toggle ========== */
+.ssum-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.ssum-toggle-title {
+  font-weight: 500;
+  color: #111827;
+  margin: 0 0 2px 0;
+}
+
+.ssum-toggle-desc {
+  font-size: 14px;
+  color: #4b5563;
+  margin: 0;
+}
+
+.ssum-switch {
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: #e5e7eb;
+  border-radius: 9999px;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.ssum-switch.checked {
+  background: #dc2626;
+}
+
+.ssum-switch-thumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 9999px;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.ssum-switch.checked .ssum-switch-thumb {
+  transform: translateX(16px);
+}
+
+/* ========== Actions ========== */
+.ssum-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+@media (min-width: 640px) {
+  .ssum-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+
+.ssum-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.ssum-btn-secondary {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+}
+
+.ssum-btn-secondary:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.ssum-btn-primary {
+  border: none;
+  background: #E51636;
+  color: #ffffff;
+}
+
+.ssum-btn-primary:hover {
+  background: #C91432;
+}
+
+.ssum-btn:active {
+  transform: scale(0.98);
+}
+
+/* ========== Right side (preview + why) ========== */
+.ssum-side {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Mobile preview toggle */
+.ssum-preview-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+@media (min-width: 1280px) {
+  .ssum-preview-toggle {
+    display: none;
+  }
+}
+
+.ssum-preview-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.ssum-preview-toggle-icon {
+  width: 16px;
+  height: 16px;
+  color: #E51636;
+}
+
+.ssum-preview-toggle-chev {
+  width: 16px;
+  height: 16px;
+  color: #9ca3af;
+  transition: transform 0.2s ease;
+}
+
+.ssum-preview-toggle-chev.open {
+  transform: rotate(180deg);
+}
+
+.ssum-side-card {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .ssum-side-card {
+    display: block;
+  }
+}
+
+.ssum-side-card.mobile-open {
+  display: block;
+}
+
+.ssum-why-card {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .ssum-why-card {
+    display: block;
+  }
+}
+
+/* Preview content */
+.ssum-preview-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ssum-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  background: #f3f4f6;
+  color: #111827;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ssum-preview-box {
+  padding: 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ssum-preview-k {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.ssum-preview-v {
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.ssum-preview-v-medium {
+  font-weight: 500;
+  color: #111827;
+  margin: 0;
+}
+
+.ssum-preview-text {
+  font-size: 14px;
+  color: #374151;
+  margin: 4px 0 0 0;
+  white-space: pre-wrap;
+}
+
+.ssum-preview-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ssum-preview-h {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  margin: 0;
+}
+
+.ssum-preview-tags {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ssum-preview-muted {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.ssum-preview-2col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .ssum-preview-2col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ssum-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.ssum-tag-good {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.ssum-tag-warn {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+/* Why this workflow helps */
+.ssum-why-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.ssum-why-body {
+  gap: 16px;
+}
+
+.ssum-why-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.ssum-why-icon {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.ssum-why-icon-green { color: #059669; }
+.ssum-why-icon-blue { color: #2563eb; }
+.ssum-why-icon-amber { color: #d97706; }
+.ssum-why-icon-red { color: #dc2626; }
+
+.ssum-why-h {
+  font-weight: 500;
+  color: #111827;
+  margin: 0 0 2px 0;
+}
+
+.ssum-why-p {
+  font-size: 14px;
+  color: #4b5563;
+  margin: 0;
+  line-height: 1.5;
+}

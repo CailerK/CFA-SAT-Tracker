@@ -1,0 +1,446 @@
+/* Team Surveys - LD Growth Match */
+
+.tsy-page {
+  min-height: 100vh;
+  background: #ffffff;
+  padding: 16px;
+}
+
+@media (min-width: 768px) {
+  .tsy-page { padding: 24px; }
+}
+
+.tsy-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .tsy-container { gap: 24px; }
+}
+
+/* ========== Custom red banner ========== */
+.tsy-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, #E51636 0%, #D01530 100%);
+  color: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+@media (min-width: 768px) {
+  .tsy-banner {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px;
+  }
+}
+
+.tsy-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tsy-banner-icon-tile {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+}
+
+.tsy-banner-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.tsy-banner-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+@media (min-width: 768px) {
+  .tsy-banner-title { font-size: 24px; }
+}
+
+.tsy-banner-sub {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 2px 0 0 0;
+}
+
+@media (min-width: 768px) {
+  .tsy-banner-sub { font-size: 16px; }
+}
+
+.tsy-banner-right {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .tsy-banner-right { width: auto; }
+}
+
+.tsy-back-home-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #ffffff;
+  color: #E51636;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  min-height: 44px;
+}
+
+@media (min-width: 768px) {
+  .tsy-back-home-btn { width: auto; }
+}
+
+.tsy-back-home-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.tsy-back-home-btn:active {
+  transform: scale(0.98);
+}
+
+/* ========== View row (top-level) ========== */
+.tsy-view-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tsy-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.tsy-view-btn.primary {
+  background: #E51636;
+  color: #ffffff;
+  border: 1px solid #E51636;
+}
+
+.tsy-view-btn.primary:hover {
+  background: rgba(229, 22, 54, 0.9);
+}
+
+.tsy-view-btn.outline {
+  background: #ffffff;
+  color: #E51636;
+  border: 1px solid rgba(229, 22, 54, 0.2);
+}
+
+.tsy-view-btn.outline:hover {
+  background: rgba(229, 22, 54, 0.05);
+}
+
+.tsy-view-btn:active {
+  transform: scale(0.98);
+}
+
+.tsy-btn-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ========== Main card ========== */
+.tsy-main-card {
+  background: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 768px) {
+  .tsy-main-card { padding: 24px; }
+}
+
+.tsy-main-head {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .tsy-main-head {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.tsy-main-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+@media (min-width: 768px) {
+  .tsy-main-title { font-size: 24px; }
+}
+
+.tsy-main-title-icon {
+  width: 24px;
+  height: 24px;
+  color: #E51636;
+}
+
+.tsy-main-sub {
+  font-size: 14px;
+  color: #4b5563;
+  margin: 4px 0 0 0;
+}
+
+.tsy-main-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ========== KPI cards ========== */
+.tsy-kpis {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .tsy-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 1280px) {
+  .tsy-kpis { grid-template-columns: repeat(4, 1fr); }
+}
+
+.tsy-kpi {
+  background: #ffffff;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .tsy-kpi { padding: 20px; }
+}
+
+.tsy-kpi.tsy-kpi-red { border-color: #fee2e2; }
+.tsy-kpi.tsy-kpi-blue { border-color: #dbeafe; }
+.tsy-kpi.tsy-kpi-green { border-color: #dcfce7; }
+.tsy-kpi.tsy-kpi-purple { border-color: #f3e8ff; }
+
+.tsy-kpi-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
+  margin: 0;
+}
+
+.tsy-kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 8px 0 0 0;
+  line-height: 1;
+}
+
+.tsy-kpi-sub {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 4px 0 0 0;
+}
+
+.tsy-kpi-icon-tile {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  padding: 8px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tsy-kpi-icon-tile.tsy-kpi-icon-red { background: #fef2f2; color: #E51636; }
+.tsy-kpi-icon-tile.tsy-kpi-icon-blue { background: #eff6ff; color: #2563eb; }
+.tsy-kpi-icon-tile.tsy-kpi-icon-green { background: #f0fdf4; color: #16a34a; }
+.tsy-kpi-icon-tile.tsy-kpi-icon-purple { background: #faf5ff; color: #9333ea; }
+
+.tsy-kpi-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* ========== Survey management inner card ========== */
+.tsy-manage-card {
+  background: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.tsy-manage-head {
+  padding: 24px;
+  background: rgba(249, 250, 251, 0.8);
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .tsy-manage-head {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.tsy-manage-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.tsy-manage-sub {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 2px 0 0 0;
+}
+
+.tsy-manage-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tsy-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.tsy-chip.primary {
+  background: #E51636;
+  color: #ffffff;
+  border: 1px solid #E51636;
+}
+
+.tsy-chip.primary:hover { background: rgba(229, 22, 54, 0.9); }
+
+.tsy-chip.outline {
+  background: #ffffff;
+  color: #E51636;
+  border: 1px solid rgba(229, 22, 54, 0.2);
+}
+
+.tsy-chip.outline:hover { background: rgba(229, 22, 54, 0.05); }
+
+.tsy-chip:active { transform: scale(0.98); }
+
+.tsy-manage-body {
+  padding: 16px;
+}
+
+@media (min-width: 768px) {
+  .tsy-manage-body { padding: 24px; }
+}
+
+/* ========== Empty state ========== */
+.tsy-empty {
+  padding: 40px 16px;
+  text-align: center;
+  border: 1px dashed #e5e7eb;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.tsy-empty-icon {
+  width: 40px;
+  height: 40px;
+  color: #9ca3af;
+}
+
+.tsy-empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.tsy-empty-text {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}

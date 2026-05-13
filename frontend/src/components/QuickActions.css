@@ -1,0 +1,202 @@
+/* Quick Actions - LD Growth match */
+
+.quick-actions {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(243, 244, 246, 0.5);
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.quick-actions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 24px 12px 24px;
+  border-bottom: 1px solid rgba(249, 250, 251, 0.8);
+}
+
+.quick-actions-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #27251F;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+/* Uses .customize-button from Dashboard.css */
+
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 16px;
+  background: rgba(249, 250, 251, 0.3);
+}
+
+@media (min-width: 640px) {
+  .quick-actions-grid {
+    gap: 16px;
+    padding: 20px;
+  }
+}
+
+@media (min-width: 768px) {
+  .quick-actions-grid {
+    padding: 24px;
+  }
+}
+
+.quick-action-item {
+  background: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  font-family: inherit;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.quick-action-item:hover {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+  border-color: #e5e7eb;
+}
+
+.action-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.quick-action-item:hover .action-icon {
+  transform: scale(1.1);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* Colored icon backgrounds */
+.action-icon.blue {
+  background: #dbeafe;
+  color: #2563eb;
+}
+.action-icon.purple {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+.action-icon.green {
+  background: #dcfce7;
+  color: #16a34a;
+}
+.action-icon.cyan {
+  background: #cffafe;
+  color: #0891b2;
+}
+.action-icon.sky {
+  background: #e0f2fe;
+  color: #0284c7;
+}
+.action-icon.yellow {
+  background: #fef9c3;
+  color: #ca8a04;
+}
+.action-icon.orange {
+  background: #ffedd5;
+  color: #ea580c;
+}
+.action-icon.amber {
+  background: #fef3c7;
+  color: #d97706;
+}
+.action-icon.red {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.action-icon.indigo {
+  background: #e0e7ff;
+  color: #4f46e5;
+}
+.action-icon.violet {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+.action-icon.fuchsia {
+  background: #fae8ff;
+  color: #c026d3;
+}
+.action-icon.pink {
+  background: #fce7f3;
+  color: #db2777;
+}
+.action-icon.rose {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+.action-icon.teal {
+  background: #ccfbf1;
+  color: #0d9488;
+}
+.action-icon.emerald {
+  background: #d1fae5;
+  color: #059669;
+}
+.action-icon.lime {
+  background: #ecfccb;
+  color: #65a30d;
+}
+.action-icon.gray {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.action-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.action-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #27251F;
+  margin: 0;
+  line-height: 1.2;
+  transition: color 0.2s ease;
+}
+
+.quick-action-item:hover .action-title {
+  color: #E51636;
+}
+
+.action-subtitle {
+  font-size: 11px;
+  color: rgba(39, 37, 31, 0.6);
+  margin: 0;
+  line-height: 1.3;
+}
+
+@media (min-width: 640px) {
+  .action-title {
+    font-size: 14px;
+  }
+  .action-subtitle {
+    font-size: 12px;
+  }
+}
