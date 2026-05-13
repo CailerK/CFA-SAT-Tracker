@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './Settings.css';
+import settingsService from '../services/settings';
 
 const TABS = [
   { id: 'general',      label: 'General',       icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
@@ -17,55 +18,207 @@ const Toggle = ({ checked, onChange }) => (
   </label>
 );
 
+// Map between the backend's snake_case feature keys and the frontend's camelCase.
+// Backend stores e.g. {foh_tasks, team_chat, guest_recovery, safe_counting}.
+const BACKEND_FEATURE_KEYS = {
+  fohTasks: 'foh_tasks',
+  kitchen: 'kitchen',
+  setups: 'setups',
+  documentation: 'documentation',
+  evaluations: 'evaluations',
+  leadership: 'leadership',
+  rewards: 'rewards',
+  safeCounting: 'safe_counting',
+  calendar: 'calendar',
+  teamChat: 'team_chat',
+  guestRecovery: 'guest_recovery',
+  vendors: 'vendors',
+};
+
+const featuresFromBackend = (apiFeatures = {}) =>
+  Object.fromEntries(
+    Object.entries(BACKEND_FEATURE_KEYS).map(([fe, be]) => [
+      fe,
+      Boolean(apiFeatures[be]),
+    ])
+  );
+
+const featuresToBackend = (uiFeatures = {}) =>
+  Object.fromEntries(
+    Object.entries(BACKEND_FEATURE_KEYS).map(([fe, be]) => [
+      be,
+      Boolean(uiFeatures[fe]),
+    ])
+  );
+
 const Settings = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState('general');
+  const [isLoading, setIsLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState(null); // 'saving' | 'saved' | 'error' | null
 
-  // General
+  // General — language is per-user preference; timezone is per-store.
   const [language, setLanguage]     = useState('english');
   const [timezone, setTimezone]     = useState('America/Chicago');
 
   // Store Info
-  const [storeName, setStoreName]   = useState('CFA I-410 & Rigsby');
-  const [storeNum, setStoreNum]     = useState('00727');
-  const [storeAddr, setStoreAddr]   = useState('4531 Rigsby Ave, San Antonio, TX 78222');
-  const [storePhone, setStorePhone] = useState('(210) 648-8780');
-  const [storeEmail, setStoreEmail] = useState('cfa00727@cfamail.com');
-  const [vision, setVision]         = useState('To be the most caring company in the world.');
-  const [mission, setMission]       = useState('To glorify God by being a faithful steward of all that is entrusted to us.');
+  const [storeName, setStoreName]   = useState('');
+  const [storeNum, setStoreNum]     = useState('');
+  const [storeAddr, setStoreAddr]   = useState('');
+  const [storePhone, setStorePhone] = useState('');
+  const [storeEmail, setStoreEmail] = useState('');
+  const [vision, setVision]         = useState('');
+  const [mission, setMission]       = useState('');
 
-  // Features
+  // Features (store settings)
   const [features, setFeatures] = useState({
-    fohTasks:       true,
-    kitchen:        true,
-    setups:         true,
-    documentation:  true,
-    evaluations:    true,
-    leadership:     true,
-    rewards:        false,
-    safeCounting:   false,
-    calendar:       true,
-    teamChat:       true,
-    guestRecovery:  true,
-    vendors:        true,
+    fohTasks: true, kitchen: true, setups: true, documentation: true,
+    evaluations: true, leadership: true, rewards: false, safeCounting: false,
+    calendar: true, teamChat: true, guestRecovery: true, vendors: true,
   });
 
-  // User Access
+  // User Access (store settings)
   const [setupViewLeadersOnly, setSetupViewLeadersOnly] = useState(false);
-  const [requireLeaderReview,  setRequireLeaderReview]  = useState(true);
+  const [requireLeaderReview,  setRequireLeaderReview]  = useState(false);
   const [requireDirectorAppr,  setRequireDirectorAppr]  = useState(false);
   const [deptRestriction,      setDeptRestriction]       = useState(false);
   const [teamMemberCompletion, setTeamMemberCompletion] = useState(true);
 
-  // Notifications
+  // Notifications (per-user preferences)
   const [notifEval,     setNotifEval]     = useState(true);
   const [notifTask,     setNotifTask]     = useState(true);
   const [notifChat,     setNotifChat]     = useState(true);
   const [notifComplaint,setNotifComplaint]= useState(true);
   const [emailDigest,   setEmailDigest]   = useState(false);
 
-  // Appearance
+  // Appearance (per-user preferences)
   const [darkMode,     setDarkMode]     = useState(false);
   const [compactMode,  setCompactMode]  = useState(false);
+
+  // ---------- Load from backend on mount ----------
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [store, storeSettings, prefs] = await Promise.all([
+          settingsService.getStore(),
+          settingsService.getStoreSettings(),
+          settingsService.getPreferences(),
+        ]);
+        if (cancelled) return;
+        // Store info
+        setStoreName(store.name || '');
+        setStoreNum(store.store_number || '');
+        setStoreAddr(store.address || '');
+        setStorePhone(store.phone || '');
+        setStoreEmail(store.email || '');
+        setVision(store.vision || '');
+        setMission(store.mission || '');
+        setTimezone(store.timezone_name || 'America/Chicago');
+        // Feature flags + access toggles
+        setFeatures(featuresFromBackend(storeSettings.features));
+        const access = storeSettings.access || {};
+        setSetupViewLeadersOnly(Boolean(access.setup_view_leaders_only));
+        setRequireLeaderReview(Boolean(access.require_leader_review));
+        setRequireDirectorAppr(Boolean(access.require_director_approval));
+        setDeptRestriction(Boolean(access.department_restriction));
+        setTeamMemberCompletion(Boolean(access.team_member_completion));
+        // User preferences
+        setLanguage(prefs.language || 'english');
+        setDarkMode(Boolean(prefs.dark_mode));
+        setCompactMode(Boolean(prefs.compact_mode));
+        const notif = prefs.notifications || {};
+        setNotifEval(Boolean(notif.eval_due));
+        setNotifTask(Boolean(notif.task_reminder));
+        setNotifChat(Boolean(notif.chat));
+        setNotifComplaint(Boolean(notif.complaint));
+        setEmailDigest(Boolean(notif.email_digest));
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ---------- Save helpers ----------
+  const withSaveStatus = useCallback(async (fn) => {
+    setSaveStatus('saving');
+    try {
+      await fn();
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(null), 1500);
+    } catch (err) {
+      console.error('Settings save failed:', err);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(null), 2500);
+    }
+  }, []);
+
+  const saveGeneral = () => withSaveStatus(async () => {
+    await Promise.all([
+      settingsService.updatePreferences({ language }),
+      settingsService.updateStore({ timezone_name: timezone }),
+    ]);
+  });
+
+  const saveStore = () => withSaveStatus(() =>
+    settingsService.updateStore({
+      name: storeName, address: storeAddr, phone: storePhone,
+      email: storeEmail, vision, mission,
+    })
+  );
+
+  const saveFeatures = () => withSaveStatus(() =>
+    settingsService.updateStoreSettings({ features: featuresToBackend(features) })
+  );
+
+  const saveAccess = () => withSaveStatus(() =>
+    settingsService.updateStoreSettings({
+      access: {
+        setup_view_leaders_only: setupViewLeadersOnly,
+        require_leader_review: requireLeaderReview,
+        require_director_approval: requireDirectorAppr,
+        department_restriction: deptRestriction,
+        team_member_completion: teamMemberCompletion,
+      },
+    })
+  );
+
+  const saveNotifications = () => withSaveStatus(() =>
+    settingsService.updatePreferences({
+      notifications: {
+        eval_due: notifEval, task_reminder: notifTask, chat: notifChat,
+        complaint: notifComplaint, email_digest: emailDigest,
+      },
+    })
+  );
+
+  const saveAppearance = () => withSaveStatus(() =>
+    settingsService.updatePreferences({
+      dark_mode: darkMode, compact_mode: compactMode,
+    })
+  );
+
+  // Single dispatch from each panel's Save Changes button.
+  const saveCurrentTab = () => {
+    switch (activeTab) {
+      case 'general':       return saveGeneral();
+      case 'store':         return saveStore();
+      case 'features':      return saveFeatures();
+      case 'access':        return saveAccess();
+      case 'notifications': return saveNotifications();
+      case 'appearance':    return saveAppearance();
+      default: return null;
+    }
+  };
+
+  const saveButtonLabel = () => {
+    if (saveStatus === 'saving') return 'Saving…';
+    if (saveStatus === 'saved')  return 'Saved ✓';
+    if (saveStatus === 'error')  return 'Try again';
+    return 'Save Changes';
+  };
 
   const featureLabels = {
     fohTasks:      'FOH Tasks',
@@ -103,7 +256,9 @@ const Settings = ({ onBack }) => {
       <header className="stg-header">
         <div className="stg-header-inner">
           <h1 className="stg-title">Settings</h1>
-          <p className="stg-subtitle">Manage your store settings and preferences</p>
+          <p className="stg-subtitle">
+            {isLoading ? 'Loading your settings…' : 'Manage your store settings and preferences'}
+          </p>
         </div>
       </header>
 
@@ -161,7 +316,13 @@ const Settings = ({ onBack }) => {
 
               <div className="stg-footer">
                 <button className="stg-btn-secondary">Reset to Default</button>
-                <button className="stg-btn-primary">Save Changes</button>
+                <button
+                  className="stg-btn-primary"
+                  onClick={saveCurrentTab}
+                  disabled={saveStatus === 'saving' || isLoading}
+                >
+                  {saveButtonLabel()}
+                </button>
               </div>
             </div>
           )}
@@ -211,7 +372,13 @@ const Settings = ({ onBack }) => {
 
               <div className="stg-footer">
                 <button className="stg-btn-secondary">Reset to Default</button>
-                <button className="stg-btn-primary">Save Changes</button>
+                <button
+                  className="stg-btn-primary"
+                  onClick={saveCurrentTab}
+                  disabled={saveStatus === 'saving' || isLoading}
+                >
+                  {saveButtonLabel()}
+                </button>
               </div>
             </div>
           )}
@@ -240,7 +407,13 @@ const Settings = ({ onBack }) => {
               </div>
 
               <div className="stg-footer">
-                <button className="stg-btn-primary">Save Changes</button>
+                <button
+                  className="stg-btn-primary"
+                  onClick={saveCurrentTab}
+                  disabled={saveStatus === 'saving' || isLoading}
+                >
+                  {saveButtonLabel()}
+                </button>
               </div>
             </div>
           )}
@@ -301,7 +474,13 @@ const Settings = ({ onBack }) => {
               </div>
 
               <div className="stg-footer">
-                <button className="stg-btn-primary">Save Changes</button>
+                <button
+                  className="stg-btn-primary"
+                  onClick={saveCurrentTab}
+                  disabled={saveStatus === 'saving' || isLoading}
+                >
+                  {saveButtonLabel()}
+                </button>
               </div>
             </div>
           )}
@@ -344,7 +523,13 @@ const Settings = ({ onBack }) => {
               </div>
 
               <div className="stg-footer">
-                <button className="stg-btn-primary">Save Changes</button>
+                <button
+                  className="stg-btn-primary"
+                  onClick={saveCurrentTab}
+                  disabled={saveStatus === 'saving' || isLoading}
+                >
+                  {saveButtonLabel()}
+                </button>
               </div>
             </div>
           )}
@@ -390,7 +575,13 @@ const Settings = ({ onBack }) => {
               </div>
 
               <div className="stg-footer">
-                <button className="stg-btn-primary">Save Changes</button>
+                <button
+                  className="stg-btn-primary"
+                  onClick={saveCurrentTab}
+                  disabled={saveStatus === 'saving' || isLoading}
+                >
+                  {saveButtonLabel()}
+                </button>
               </div>
             </div>
           )}

@@ -2,6 +2,100 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
+
+# =============================================================================
+# Foundation: Store + StoreSettings
+# =============================================================================
+# Every operational record (task, sheet, vendor, chat message) belongs to one
+# Store. Users belong to a Store. ViewSets filter by request.user.store so a
+# user from store A can never see store B's data.
+
+class Store(models.Model):
+    """A single physical location (e.g., 'CFA I-410 & Rigsby #00727')."""
+    name = models.CharField(max_length=200)
+    store_number = models.CharField(max_length=10, unique=True)
+    address = models.CharField(max_length=300, blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    email = models.EmailField(blank=True)
+    vision = models.TextField(blank=True)
+    mission = models.TextField(blank=True)
+    timezone_name = models.CharField(
+        max_length=64,
+        default="America/Chicago",
+        help_text="IANA timezone identifier; used to render local dates.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} #{self.store_number}"
+
+
+def _default_feature_flags():
+    """Default feature toggles for a brand-new store."""
+    return {
+        "foh_tasks": True,
+        "kitchen": True,
+        "setups": True,
+        "documentation": True,
+        "evaluations": True,
+        "leadership": True,
+        "rewards": True,
+        "safe_counting": True,
+        "calendar": True,
+        "team_chat": True,
+        "guest_recovery": True,
+        "vendors": True,
+    }
+
+
+def _default_access_toggles():
+    return {
+        "setup_view_leaders_only": False,
+        "require_leader_review": False,
+        "require_director_approval": False,
+        "department_restriction": False,
+        "team_member_completion": True,
+    }
+
+
+def _default_cleaning_settings():
+    return {
+        "enable_daily_tasks": True,
+        "team_member_completion": True,
+    }
+
+
+class StoreSettings(models.Model):
+    """Per-store toggles and configuration. 1:1 with Store."""
+    store = models.OneToOneField(
+        Store, on_delete=models.CASCADE, related_name="settings"
+    )
+    features = models.JSONField(default=_default_feature_flags)
+    access = models.JSONField(default=_default_access_toggles)
+    cleaning_settings = models.JSONField(default=_default_cleaning_settings)
+    foh_require_initials = models.BooleanField(
+        default=False,
+        help_text="If true, FOH task completions require initials.",
+    )
+    waste_goal_daily = models.DecimalField(
+        max_digits=10, decimal_places=2, default=100,
+    )
+    waste_goal_weekly = models.DecimalField(
+        max_digits=10, decimal_places=2, default=600,
+    )
+    waste_goal_monthly = models.DecimalField(
+        max_digits=10, decimal_places=2, default=2500,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Settings for {self.store.name}"
+
+
+# =============================================================================
+# Users
+# =============================================================================
 # User System - Based on captured LD Growth data
 class User(AbstractUser):
     """Custom user model matching LD Growth structure"""
@@ -9,22 +103,98 @@ class User(AbstractUser):
     last_name = models.CharField(max_length=150)
     email = models.EmailField(unique=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
-    company_id = models.CharField(max_length=10, default='00727')  # LD Growth #00727
+    # company_id is the legacy store identifier; we keep it for back-compat
+    # but new code should read user.store.store_number instead.
+    company_id = models.CharField(max_length=10, default='00727')
+    # Phase 0: nullable so existing rows don't break; the data migration
+    # backfills it, and new users get assigned a Store on creation.
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="users",
+    )
+    phone = models.CharField(max_length=30, blank=True)
     role = models.CharField(max_length=50, default='team_member')
     is_demo_user = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
 
+    @property
+    def initials(self):
+        """Two-character initials used in avatars across the UI."""
+        f = (self.first_name or "").strip()
+        l = (self.last_name or "").strip()
+        if f and l:
+            return (f[0] + l[0]).upper()
+        if f:
+            return f[:2].upper()
+        return (self.email or "?")[:2].upper()
+
+    @property
+    def is_manager_or_above(self):
+        """Used by IsManagerOrAbove permission class."""
+        return (
+            self.is_superuser
+            or self.role in {"manager", "shift_lead", "shift_leader",
+                             "director", "admin"}
+        )
+
+
 class UserProfile(models.Model):
-    """Extended user profile data"""
+    """Extended user profile data — kept for back-compat. New code should
+    write to UserPreferences below instead of dashboard_customization."""
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     bio = models.TextField(blank=True)
     preferences = models.JSONField(default=dict)
     notification_settings = models.JSONField(default=dict)
     dashboard_customization = models.JSONField(default=dict)
+
+
+def _default_notification_prefs():
+    return {
+        "eval_due": True,
+        "task_reminder": True,
+        "chat": True,
+        "complaint": True,
+        "email_digest": False,
+    }
+
+
+def _default_quick_action_ids():
+    # Mirrors DEFAULT_ACTION_IDS in frontend/src/components/QuickActions.js
+    return [
+        "my-evaluations", "my-profile", "goals", "playbooks",
+        "cfadollars", "safe-counting", "team-chat", "settings",
+    ]
+
+
+def _default_insight_ids():
+    # Mirrors the four cards shown on the Dashboard's first render.
+    return [
+        "foh-tasks", "kitchen-checklist", "equipment-issues", "documentation",
+    ]
+
+
+class UserPreferences(models.Model):
+    """Per-user UI preferences. 1:1 with User. Created on demand."""
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="preferences"
+    )
+    language = models.CharField(max_length=10, default="english")
+    theme_color = models.CharField(max_length=7, default="#E51636")
+    dark_mode = models.BooleanField(default=False)
+    compact_mode = models.BooleanField(default=False)
+    notifications = models.JSONField(default=_default_notification_prefs)
+    quick_action_ids = models.JSONField(default=_default_quick_action_ids)
+    insight_ids = models.JSONField(default=_default_insight_ids)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Preferences for {self.user.email}"
 
 # Team System - Restaurant/Hospitality Structure
 class Department(models.Model):

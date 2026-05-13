@@ -22,17 +22,56 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
     import django
     django.setup()
 
-from api.models import User  # noqa: E402
+from api.models import (  # noqa: E402
+    Store,
+    StoreSettings,
+    User,
+    UserPreferences,
+)
+
+
+DEFAULT_STORE_NUMBER = os.environ.get("DEFAULT_STORE_NUMBER", "02203")
+DEFAULT_STORE_NAME = os.environ.get(
+    "DEFAULT_STORE_NAME", "CFA I-410 & Rigsby"
+)
+
+
+def upsert_default_store():
+    """Create the seed Store + StoreSettings if they don't already exist."""
+    store, created = Store.objects.get_or_create(
+        store_number=DEFAULT_STORE_NUMBER,
+        defaults={
+            "name": DEFAULT_STORE_NAME,
+            "timezone_name": "America/Chicago",
+            "address": "2203 SE Loop 410, San Antonio, TX",
+        },
+    )
+    StoreSettings.objects.get_or_create(store=store)
+    if created:
+        print(f"  + Created Store {store}")
+    else:
+        print(f"  - Store {store} already exists, skipping.")
+    return store
 
 
 def upsert_user(*, email, username, password, first_name, last_name, role,
-                company_id="02203", is_demo_user=False, is_superuser=False,
-                is_staff=False):
-    """Create the user if missing; otherwise leave them alone (don't clobber
-    passwords or roles someone may have changed in admin)."""
+                store=None, company_id="02203", is_demo_user=False,
+                is_superuser=False, is_staff=False):
+    """Create the user if missing; otherwise just make sure they're linked
+    to the default store + have a preferences row. We never clobber existing
+    passwords or roles."""
     existing = User.objects.filter(email=email).first()
     if existing:
-        print(f"  - {email} already exists, skipping.")
+        # Make sure existing users get backfilled to the new store FK if
+        # they were created before Phase 0.
+        changed = False
+        if store and existing.store_id is None:
+            existing.store = store
+            changed = True
+        if changed:
+            existing.save(update_fields=["store"])
+        UserPreferences.objects.get_or_create(user=existing)
+        print(f"  - {email} already exists, ensured store link + prefs.")
         return existing
     user = User.objects.create_user(
         username=username,
@@ -43,6 +82,7 @@ def upsert_user(*, email, username, password, first_name, last_name, role,
         role=role,
         company_id=company_id,
         is_demo_user=is_demo_user,
+        store=store,
     )
     if is_superuser:
         user.is_superuser = True
@@ -51,6 +91,7 @@ def upsert_user(*, email, username, password, first_name, last_name, role,
     elif is_staff:
         user.is_staff = True
         user.save()
+    UserPreferences.objects.get_or_create(user=user)
     print(f"  + Created {email} ({first_name} {last_name}, role={role}, "
           f"superuser={is_superuser})")
     return user
@@ -58,6 +99,10 @@ def upsert_user(*, email, username, password, first_name, last_name, role,
 
 def main():
     print("Initializing users on Railway database...")
+
+    # ----- 0. Default Store + Settings -----
+    print("Default store:")
+    store = upsert_default_store()
 
     # ----- 1. Superuser from environment -----
     admin_email = os.environ.get("DJANGO_SUPERUSER_EMAIL")
@@ -75,6 +120,7 @@ def main():
             first_name=admin_first,
             last_name=admin_last,
             role="admin",
+            store=store,
             is_superuser=True,
             is_staff=True,
         )
@@ -113,7 +159,7 @@ def main():
         },
     ]
     for u in demo_users:
-        upsert_user(**u, company_id="02203")
+        upsert_user(**u, store=store, company_id=DEFAULT_STORE_NUMBER)
 
     print("User initialization complete.")
 

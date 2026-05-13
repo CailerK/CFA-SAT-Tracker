@@ -13,6 +13,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .models import User
+from .serializers import UserMeSerializer
 import json
 
 @api_view(['GET'])
@@ -63,14 +64,7 @@ def login_view(request):
             login(request, user)
             return Response({
                 'message': 'Login successful',
-                'user': {
-                    'id': user.id,
-                    'email': user.email,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name,
-                    'role': user.role,
-                    'company_id': user.company_id
-                }
+                'user': UserMeSerializer(user).data,
             }, status=status.HTTP_200_OK)
         else:
             return Response({
@@ -98,18 +92,15 @@ def logout_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def current_user(request):
-    """Get current authenticated user info"""
-    user = request.user
-    return Response({
-        'user': {
-            'id': user.id,
-            'email': user.email,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'role': user.role,
-            'company_id': user.company_id
-        }
-    }, status=status.HTTP_200_OK)
+    """Get current authenticated user info, including their assigned Store.
+
+    Returns the richer UserMeSerializer payload so the frontend has the
+    store + settings on a single round-trip after login.
+    """
+    return Response(
+        {"user": UserMeSerializer(request.user).data},
+        status=status.HTTP_200_OK,
+    )
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
