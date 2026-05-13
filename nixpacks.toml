@@ -11,12 +11,14 @@ nixPkgs = ["python311", "nodejs_20", "gcc"]
 cmds = [
   "python -m venv /opt/venv",
   ". /opt/venv/bin/activate && pip install --upgrade pip && pip install -r backend/requirements.txt",
-  "cd frontend && npm ci"
+  "cd frontend && npm install --legacy-peer-deps --no-audit --no-fund"
 ]
 
 [phases.build]
 cmds = [
-  "cd frontend && npm run build",
+  # CI=false: CRA treats warnings as errors when CI=true (Railway default).
+  # Most React projects have lint warnings; we don't want those to fail the build.
+  "cd frontend && CI=false npm run build",
   ". /opt/venv/bin/activate && cd backend && python manage.py collectstatic --noinput"
 ]
 
