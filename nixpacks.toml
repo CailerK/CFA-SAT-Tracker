@@ -23,4 +23,7 @@ cmds = [
 ]
 
 [start]
-cmd = ". /opt/venv/bin/activate && cd backend && python manage.py migrate --noinput && gunicorn myproject.wsgi:application --bind 0.0.0.0:$PORT --log-file -"
+# On every deploy: run migrations, then idempotently create the admin +
+# demo users (uses DJANGO_SUPERUSER_* env vars), then start gunicorn.
+# The user init script is safe to re-run — it skips users that already exist.
+cmd = ". /opt/venv/bin/activate && cd backend && python manage.py migrate --noinput && python init_railway_users.py && gunicorn myproject.wsgi:application --bind 0.0.0.0:$PORT --log-file -"
