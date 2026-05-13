@@ -10,3 +10,6 @@ whitenoise==6.6.0
 # Postgres (Railway managed DB)
 psycopg2-binary==2.9.9
 dj-database-url==2.1.0
+
+# Image handling (Django ImageField uses this for User.avatar)
+Pillow==10.2.0
