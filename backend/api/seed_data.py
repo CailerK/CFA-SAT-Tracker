@@ -9,6 +9,7 @@ text within a shift). Safe to re-run on every deploy.
 from datetime import date, timedelta
 
 from .models import (
+    CleaningTask,
     FOHTaskTemplate,
     SetupSheet,
     SetupSheetTemplate,
@@ -192,6 +193,53 @@ def seed_sample_saved_setup(store):
     print("    Sample saved setup: created (4-19-25).")
 
 
+# ---------------------------------------------------------------------------
+# Cleaning Tasks — sample tasks across scopes + frequencies
+# ---------------------------------------------------------------------------
+
+CLEANING_TASKS = [
+    # FOH — Daily
+    {"scope": "foh", "frequency": "daily", "name": "Wipe down high chairs"},
+    {"scope": "foh", "frequency": "daily", "name": "Sweep dining room floor"},
+    {"scope": "foh", "frequency": "daily", "name": "Restock napkin holders"},
+    {"scope": "foh", "frequency": "daily", "name": "Clean front door glass"},
+    # FOH — Weekly
+    {"scope": "foh", "frequency": "weekly", "name": "Detail-clean drink station"},
+    {"scope": "foh", "frequency": "weekly", "name": "Deep clean restroom floors"},
+    # FOH — Monthly
+    {"scope": "foh", "frequency": "monthly", "name": "Wipe down AC vents in lobby"},
+    {"scope": "foh", "frequency": "monthly", "name": "Polish countertops"},
+    # FOH — Quarterly
+    {"scope": "foh", "frequency": "quarterly", "name": "Steam clean carpets"},
+    # Kitchen — Daily
+    {"scope": "kitchen", "frequency": "daily", "name": "Wipe down prep tables"},
+    {"scope": "kitchen", "frequency": "daily", "name": "Sweep & mop kitchen floor"},
+    {"scope": "kitchen", "frequency": "daily", "name": "Empty trash & change liners"},
+    # Kitchen — Weekly
+    {"scope": "kitchen", "frequency": "weekly", "name": "Clean walk-in cooler shelves"},
+    {"scope": "kitchen", "frequency": "weekly", "name": "Boil-out fryers"},
+    # Kitchen — Monthly
+    {"scope": "kitchen", "frequency": "monthly", "name": "Descale dish machine"},
+    {"scope": "kitchen", "frequency": "monthly", "name": "Clean hood filters"},
+]
+
+
+def seed_cleaning_tasks(store):
+    created = 0
+    by_scope_freq = {}
+    for t in CLEANING_TASKS:
+        key = (t["scope"], t["frequency"])
+        by_scope_freq[key] = by_scope_freq.get(key, 0) + 1
+        order = by_scope_freq[key] - 1
+        _, was_created = CleaningTask.objects.get_or_create(
+            store=store, scope=t["scope"], name=t["name"], frequency=t["frequency"],
+            defaults={"order": order},
+        )
+        if was_created:
+            created += 1
+    print(f"    Cleaning tasks: +{created} created.")
+
+
 def seed_all_for_store(store):
     """Run every per-store seeder. Idempotent."""
     print(f"  Seeding data for {store}…")
@@ -199,3 +247,4 @@ def seed_all_for_store(store):
     seed_shift_tags(store)
     seed_setup_templates(store)
     seed_sample_saved_setup(store)
+    seed_cleaning_tasks(store)

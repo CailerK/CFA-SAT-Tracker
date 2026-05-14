@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './SetupSheetTemplates.css'; // banner
 import './KitchenDashboard.css';     // kitchen nav
 import './KitchenCleaning.css';
+import cleaningService from '../services/cleaning';
 
 // ===== Icons =====
 const IconLayoutDashboard = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>);
@@ -29,11 +30,48 @@ const FREQUENCIES = [
 
 const KitchenCleaning = ({ onNavigate, user }) => {
   const [activeFrequency, setActiveFrequency] = useState('daily');
+  const [tasksByFreq, setTasksByFreq] = useState({ daily: [], weekly: [], monthly: [] });
+  const [isLoading, setIsLoading] = useState(true);
 
-  // DEMO DATA: task list is empty (matches LD Growth empty state). See FAKE_DATA.md.
-  const tasks = [];
-  const doneToday = 0;
-  const totalToday = 0;
+  const refresh = useCallback(async () => {
+    try {
+      const grouped = await cleaningService.listGroupedByFrequency({ scope: 'kitchen' });
+      setTasksByFreq({
+        daily: grouped.daily || [],
+        weekly: grouped.weekly || [],
+        monthly: grouped.monthly || [],
+      });
+    } catch (err) {
+      console.error('Failed to load kitchen cleaning:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const tasks = tasksByFreq[activeFrequency] || [];
+  const doneToday = tasks.filter(t => t.today_completion).length;
+  const totalToday = tasks.length;
+
+  const toggleTask = async (taskId, currentlyCompleted) => {
+    // Optimistic
+    setTasksByFreq(prev => ({
+      ...prev,
+      [activeFrequency]: prev[activeFrequency].map(t =>
+        t.id === taskId
+          ? { ...t, today_completion: currentlyCompleted ? null : { id: 'optimistic' } }
+          : t
+      ),
+    }));
+    try {
+      if (currentlyCompleted) await cleaningService.uncomplete(taskId);
+      else await cleaningService.complete(taskId);
+    } catch (err) {
+      console.error('Kitchen cleaning toggle failed:', err);
+      refresh();
+    }
+  };
 
   const tabs = [
     { id: 'home', label: 'Home', Icon: IconLayoutDashboard },
@@ -145,16 +183,53 @@ const KitchenCleaning = ({ onNavigate, user }) => {
 
         {/* Task list / empty */}
         <div className="kcl-list">
-          {tasks.length === 0 ? (
+          {isLoading ? (
+            <div className="kcl-empty">
+              <p className="kcl-empty-sub">Loading…</p>
+            </div>
+          ) : tasks.length === 0 ? (
             <div className="kcl-empty">
               <div className="kcl-empty-emoji">🧹</div>
               <p className="kcl-empty-title">No tasks</p>
               <p className="kcl-empty-sub">Add a task to get started</p>
             </div>
           ) : (
-            tasks.map((t) => (
-              <div key={t.id} className="kcl-task">{t.name}</div>
-            ))
+            tasks.map((t) => {
+              const completed = Boolean(t.today_completion);
+              return (
+                <div
+                  key={t.id}
+                  className={`kcl-task ${completed ? 'completed' : ''}`}
+                  onClick={() => toggleTask(t.id, completed)}
+                  style={{
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 14px',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 20, height: 20, borderRadius: 4,
+                      border: '2px solid #d1d5db',
+                      background: completed ? '#16a34a' : '#fff',
+                      borderColor: completed ? '#16a34a' : '#d1d5db',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: 14,
+                    }}
+                  >
+                    {completed && '✓'}
+                  </span>
+                  <span style={{ textDecoration: completed ? 'line-through' : 'none', color: completed ? '#6b7280' : '#111827' }}>
+                    {t.name}
+                  </span>
+                </div>
+              );
+            })
           )}
         </div>
       </div>

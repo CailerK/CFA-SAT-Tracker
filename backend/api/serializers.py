@@ -8,6 +8,8 @@ to camelCase at the App.js boundary (see frontend/src/App.js).
 from rest_framework import serializers
 
 from .models import (
+    CleaningCompletion,
+    CleaningTask,
     FOHTaskCompletion,
     FOHTaskTemplate,
     SetupSheet,
@@ -332,3 +334,51 @@ class SetupSheetSerializer(serializers.ModelSerializer):
             f"{obj.week_start.strftime('%b %-d, %Y')} – "
             f"{obj.week_end.strftime('%b %-d, %Y')}"
         )
+
+
+# ============================================================================
+# Phase 3: Cleaning & Maintenance
+# ============================================================================
+
+class CleaningCompletionSerializer(serializers.ModelSerializer):
+    completed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CleaningCompletion
+        fields = [
+            "id", "date", "completed_at",
+            "completed_by", "completed_by_name", "notes",
+        ]
+        read_only_fields = ["id", "completed_at", "completed_by_name"]
+
+    def get_completed_by_name(self, obj):
+        u = obj.completed_by
+        if not u:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+
+class CleaningTaskSerializer(serializers.ModelSerializer):
+    """Cleaning task with today's completion attached (mirrors FOH pattern)."""
+    today_completion = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CleaningTask
+        fields = [
+            "id", "scope", "name", "frequency",
+            "days", "supplies", "links", "estimated_minutes", "order",
+            "today_completion", "archived_at",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = [
+            "id", "today_completion", "archived_at", "created_at", "updated_at",
+        ]
+
+    def get_today_completion(self, obj):
+        prefetched = getattr(obj, "today_completion_list", None)
+        if prefetched is not None:
+            comp = prefetched[0] if prefetched else None
+        else:
+            from django.utils import timezone
+            comp = obj.completions.filter(date=timezone.localdate()).first()
+        return CleaningCompletionSerializer(comp).data if comp else None

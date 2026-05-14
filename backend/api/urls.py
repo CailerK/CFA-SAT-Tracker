@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from . import views, views_stores
+from .views_cleaning import CleaningTaskViewSet
 from .views_foh import FOHTaskTemplateViewSet
 from .views_setup_sheets import SetupSheetTemplateViewSet, SetupSheetViewSet
 from .views_shift_summary import ShiftSummaryViewSet, ShiftTagViewSet
@@ -10,6 +11,7 @@ from .views_shift_summary import ShiftSummaryViewSet, ShiftTagViewSet
 # DRF router gives us list / detail / retrieve / @action routes for free.
 router = DefaultRouter()
 router.register(r"foh/tasks", FOHTaskTemplateViewSet, basename="foh-task")
+router.register(r"cleaning/tasks", CleaningTaskViewSet, basename="cleaning-task")
 router.register(
     r"shift-summaries/tags", ShiftTagViewSet, basename="shift-tag"
 )

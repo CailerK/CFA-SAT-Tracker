@@ -1,40 +1,130 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './CleaningMaintenance.css';
+import cleaningService from '../services/cleaning';
+
+const SCOPE = 'foh';
+
+// Normalize a backend task to the row shape this UI was built around.
+const normalizeRow = (raw) => {
+  const comp = raw.today_completion;
+  let timeStr = null;
+  if (comp && comp.completed_at) {
+    try {
+      timeStr = new Date(comp.completed_at).toLocaleTimeString('en-US', {
+        hour: 'numeric', minute: '2-digit',
+      });
+    } catch { timeStr = null; }
+  }
+  return {
+    id: raw.id,
+    text: raw.name,
+    completed: Boolean(comp),
+    completedBy: comp?.completed_by_name || null,
+    completedAt: timeStr,
+  };
+};
 
 const CleaningMaintenance = ({ onBack }) => {
   const [activeFrequency, setActiveFrequency] = useState('daily');
+  const [tasks, setTasks] = useState({ daily: [], weekly: [], monthly: [], quarterly: [] });
+  const [counts, setCounts] = useState({
+    daily: { done: 0, total: 0 },
+    weekly: { done: 0, total: 0 },
+    monthly: { done: 0, total: 0 },
+    quarterly: { done: 0, total: 0 },
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const refresh = useCallback(async () => {
+    try {
+      const [grouped, c] = await Promise.all([
+        cleaningService.listGroupedByFrequency({ scope: SCOPE }),
+        cleaningService.getCounts({ scope: SCOPE }),
+      ]);
+      setTasks({
+        daily: (grouped.daily || []).map(normalizeRow),
+        weekly: (grouped.weekly || []).map(normalizeRow),
+        monthly: (grouped.monthly || []).map(normalizeRow),
+        quarterly: (grouped.quarterly || []).map(normalizeRow),
+      });
+      setCounts({
+        daily: c.daily || { done: 0, total: 0 },
+        weekly: c.weekly || { done: 0, total: 0 },
+        monthly: c.monthly || { done: 0, total: 0 },
+        quarterly: c.quarterly || { done: 0, total: 0 },
+      });
+      setErrorMsg('');
+    } catch (err) {
+      console.error('Failed to load cleaning tasks:', err);
+      setErrorMsg(err.message || 'Could not load tasks.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
 
   const frequencies = [
-    { id: 'daily', label: 'Daily', count: 12, total: 15 },
-    { id: 'weekly', label: 'Weekly', count: 8, total: 10 },
-    { id: 'monthly', label: 'Monthly', count: 3, total: 5 },
-    { id: 'quarterly', label: 'Quarterly', count: 1, total: 2 }
+    { id: 'daily', label: 'Daily', count: counts.daily.done, total: counts.daily.total },
+    { id: 'weekly', label: 'Weekly', count: counts.weekly.done, total: counts.weekly.total },
+    { id: 'monthly', label: 'Monthly', count: counts.monthly.done, total: counts.monthly.total },
+    { id: 'quarterly', label: 'Quarterly', count: counts.quarterly.done, total: counts.quarterly.total },
   ];
 
-  const tasks = {
-    daily: [
-      { id: 1, text: 'Clean dining room tables', completed: true, completedBy: 'Maria', completedAt: '2:30 PM' },
-      { id: 2, text: 'Sweep and mop floors', completed: true, completedBy: 'John', completedAt: '2:45 PM' },
-      { id: 3, text: 'Clean restrooms', completed: false, completedBy: null, completedAt: null },
-      { id: 4, text: 'Wipe down counters', completed: true, completedBy: 'Sarah', completedAt: '3:00 PM' },
-      { id: 5, text: 'Empty trash bins', completed: false, completedBy: null, completedAt: null }
-    ],
-    weekly: [
-      { id: 6, text: 'Deep clean kitchen', completed: true, completedBy: 'Team', completedAt: 'Mon 10:00 AM' },
-      { id: 7, text: 'Clean windows', completed: false, completedBy: null, completedAt: null },
-      { id: 8, text: 'Sanitize equipment', completed: true, completedBy: 'Chef', completedAt: 'Tue 9:00 AM' }
-    ],
-    monthly: [
-      { id: 9, text: 'Deep clean coolers', completed: false, completedBy: null, completedAt: null },
-      { id: 10, text: 'Inspect HVAC filters', completed: true, completedBy: 'Maintenance', completedAt: 'May 1' }
-    ],
-    quarterly: [
-      { id: 11, text: 'Professional carpet cleaning', completed: false, completedBy: null, completedAt: null }
-    ]
+  const currentTasks = tasks[activeFrequency] || [];
+  const currentFreq = frequencies.find(f => f.id === activeFrequency) || { count: 0, total: 0 };
+
+  // Optimistic toggle.
+  const toggleTask = async (taskId) => {
+    const list = tasks[activeFrequency];
+    const target = list.find(t => t.id === taskId);
+    if (!target) return;
+    const willBeCompleted = !target.completed;
+    setTasks(prev => ({
+      ...prev,
+      [activeFrequency]: prev[activeFrequency].map(t =>
+        t.id === taskId
+          ? { ...t, completed: willBeCompleted,
+              completedBy: willBeCompleted ? 'You' : null,
+              completedAt: willBeCompleted ? 'just now' : null }
+          : t
+      ),
+    }));
+    setCounts(prev => ({
+      ...prev,
+      [activeFrequency]: {
+        ...prev[activeFrequency],
+        done: prev[activeFrequency].done + (willBeCompleted ? 1 : -1),
+      },
+    }));
+    try {
+      if (willBeCompleted) await cleaningService.complete(taskId);
+      else await cleaningService.uncomplete(taskId);
+    } catch (err) {
+      console.error('Cleaning toggle failed:', err);
+      setErrorMsg('Could not save — refreshing.');
+      refresh();
+    }
   };
 
-  const currentTasks = tasks[activeFrequency] || [];
-  const currentFreq = frequencies.find(f => f.id === activeFrequency);
+  const deleteTask = async (taskId) => {
+    const prevList = tasks[activeFrequency];
+    setTasks(prev => ({
+      ...prev,
+      [activeFrequency]: prev[activeFrequency].filter(t => t.id !== taskId),
+    }));
+    try {
+      await cleaningService.remove(taskId);
+      // Refresh counts since totals changed.
+      const c = await cleaningService.getCounts({ scope: SCOPE });
+      setCounts({ daily: c.daily, weekly: c.weekly, monthly: c.monthly, quarterly: c.quarterly });
+    } catch (err) {
+      console.error('Cleaning delete failed:', err);
+      setErrorMsg('Could not delete — manager role required.');
+      setTasks(prev => ({ ...prev, [activeFrequency]: prevList }));
+    }
+  };
 
   return (
     <div className="cleaning-page">
@@ -95,9 +185,18 @@ const CleaningMaintenance = ({ onBack }) => {
 
         {/* Tasks List */}
         <div className="tasks-list">
+          {isLoading && <div style={{ padding: 24, color: '#6b7280' }}>Loading tasks…</div>}
+          {!isLoading && errorMsg && <div style={{ padding: 12, color: '#dc2626', fontSize: 14 }}>{errorMsg}</div>}
+          {!isLoading && currentTasks.length === 0 && (
+            <div style={{ padding: 24, color: '#6b7280' }}>No {activeFrequency} cleaning tasks yet.</div>
+          )}
           {currentTasks.map(task => (
             <div key={task.id} className={`task-item ${task.completed ? 'completed' : ''}`}>
-              <button className="task-checkbox">
+              <button
+                className="task-checkbox"
+                onClick={() => toggleTask(task.id)}
+                aria-label={task.completed ? 'Uncomplete' : 'Complete'}
+              >
                 {task.completed && (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                     <polyline points="20 6 9 17 4 12"/>
@@ -109,11 +208,15 @@ const CleaningMaintenance = ({ onBack }) => {
                 {task.completed && task.completedBy && (
                   <div className="task-meta">
                     <span className="meta-user">{task.completedBy}</span>
-                    <span className="meta-time">{task.completedAt}</span>
+                    {task.completedAt && <span className="meta-time">{task.completedAt}</span>}
                   </div>
                 )}
               </div>
-              <button className="task-delete" aria-label="Delete task">
+              <button
+                className="task-delete"
+                aria-label="Delete task"
+                onClick={() => deleteTask(task.id)}
+              >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M3 6h18"/>
                   <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
@@ -128,7 +231,10 @@ const CleaningMaintenance = ({ onBack }) => {
         <div className="tasks-footer">
           <span className="footer-text">{currentFreq.count} of {currentFreq.total} completed</span>
           <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${(currentFreq.count / currentFreq.total) * 100}%` }}/>
+            <div
+              className="progress-fill"
+              style={{ width: `${currentFreq.total ? (currentFreq.count / currentFreq.total) * 100 : 0}%` }}
+            />
           </div>
         </div>
       </main>

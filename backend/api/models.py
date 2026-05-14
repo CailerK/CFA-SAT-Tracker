@@ -694,3 +694,82 @@ class ShiftSummary(models.Model):
 
     def __str__(self):
         return f"{self.shift_type} on {self.shift_date} by {self.shift_lead_id}"
+
+
+# =============================================================================
+# Phase 3: Cleaning & Maintenance
+# =============================================================================
+# One model covers FOH cleaning, kitchen cleaning, and maintenance tasks —
+# disambiguated by `scope`. Completion is the same per-day pattern as FOH:
+# the template lives forever (until archived), and each day gets its own
+# CleaningCompletion row.
+
+class CleaningTask(models.Model):
+    SCOPE_CHOICES = [
+        ('foh', 'Front of House'),
+        ('kitchen', 'Kitchen'),
+    ]
+    FREQUENCY_CHOICES = [
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly'),
+        ('quarterly', 'Quarterly'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='cleaning_tasks'
+    )
+    scope = models.CharField(max_length=20, choices=SCOPE_CHOICES, default='foh')
+    name = models.CharField(max_length=200)
+    frequency = models.CharField(
+        max_length=20, choices=FREQUENCY_CHOICES, default='daily'
+    )
+    # For weekly frequency: list of weekday slugs ['mon','tue',...].
+    days = models.JSONField(default=list, blank=True)
+    supplies = models.JSONField(
+        default=list, blank=True,
+        help_text="List of supply names, e.g. ['Sanitizer', 'Microfiber'].",
+    )
+    links = models.JSONField(
+        default=list, blank=True,
+        help_text="List of {label, url} objects.",
+    )
+    estimated_minutes = models.PositiveIntegerField(null=True, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['scope', 'frequency', 'order', 'id']
+        indexes = [
+            models.Index(fields=['store', 'scope', 'frequency']),
+        ]
+
+    def __str__(self):
+        return f"[{self.scope}/{self.frequency}] {self.name}"
+
+
+class CleaningCompletion(models.Model):
+    task = models.ForeignKey(
+        CleaningTask, on_delete=models.CASCADE, related_name='completions'
+    )
+    date = models.DateField()
+    completed_at = models.DateTimeField(auto_now_add=True)
+    completed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='cleaning_completions',
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['task', 'date'],
+                name='unique_cleaning_completion_per_day',
+            ),
+        ]
+        indexes = [models.Index(fields=['date'])]
+
+    def __str__(self):
+        return f"{self.task} on {self.date}"
