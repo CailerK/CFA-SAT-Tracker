@@ -246,7 +246,45 @@ These rules apply everywhere — flag any place they're violated.
 ---
 
 ## Phase 6 — Team (Members, Documentation, Training, Quick Links)
-_(To be added.)_
+
+### `/users` (Team Members)
+
+- [ ] On load, the roster shows your superuser/admin + 3 demo users (`demouser@gmail.com`, `admin@gmail.com`, `store@cfasattracker.com`) + 10 sample team members seeded from LD Growth roster (Greg Argyrou, Adaya Garcia, Addisyn Thomas, etc.).
+- [ ] Pill counts at top (Active / Inactive / Managers) reflect real counts from `/api/team/stats/`.
+- [ ] Search box → filters server-side. Try searching "Garcia" → both Garcias appear.
+- [ ] Switch tab Active ↔ Inactive → list updates.
+- [ ] **Admin badge** appears on Greg Argyrou (seeded as `is_admin=True`).
+- [ ] Department pills under each name reflect their seeded departments (FOH, Kitchen, Drive Thru, etc.).
+
+#### As `demouser@gmail.com`:
+- [ ] Can view the roster.
+- [ ] 3-dot action menu / Add member is gated (manager-only).
+
+### `/documentation` (Team Documentation)
+
+- [ ] Empty initially: KPI cards all show 0, employee list is empty.
+- [ ] **Test the create flow** via Django admin: log into `/admin/`, find a user, add an EmployeeRecord with kind=warning, refresh `/documentation` — the user card should now appear, KPI counts update, risk badge shows.
+- [ ] Add 3 warnings → user's risk_level should compute to `mid` then `high`.
+- [ ] Filter pills (All / Disciplinary / PIP / Admin) re-fetch + filter.
+- [ ] Search box → filters.
+
+### `/training/progress` (Team Training)
+
+- [ ] KPI strip shows real counts: Active Trainees, Completion Rate, New Hires (last 30 days), Active Plans (4 seeded plans).
+- [ ] Departments donut shows progress per department (likely 0% for all initially — needs trainee assignments to populate).
+- [ ] Trainee list is empty initially. Create a TraineeAssignment via Django admin: user=demouser, plan="Foundations FOH" → comes back here, demouser shows up with In Progress status and 0% progress.
+- [ ] Switch Active/Completed pill → re-fetches.
+
+### `/quick-links` (Team Quick Links)
+
+- [ ] 4 seeded links appear: HotSchedules, Pathway, Beam, CFA Connect.
+- [ ] Each card has a colored border matching its category (Daily Tools=red, Reference=blue, External=green).
+- [ ] Clicking a link opens it in a new tab.
+- [ ] "Add Quick Link" and "Manage Categories" buttons aren't wired yet — known limitation, will be in a polish phase.
+
+#### As `demouser@gmail.com`:
+- [ ] Can see + click all quick links.
+- [ ] Cannot edit categories or add new links (gated when those buttons get wired).
 
 ---
 

@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import teamService from '../services/team';
 import './SetupSheetTemplates.css'; // shared red hero banner
 import './TeamDocumentation.css';
 
@@ -76,21 +77,38 @@ const FILTERS = [
 const TeamDocumentation = ({ onNavigate, user }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [employees, setEmployees] = useState([]);
+  const [stats, setStats] = useState({ total: 0, disciplinary: 0, admin: 0, employeesWithDocs: 0 });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return EMPLOYEES.filter((e) => {
-      if (activeFilter === 'disciplinary' && e.counts.disc === 0) return false;
-      if (activeFilter === 'pip' && e.counts.pip === 0) return false;
-      if (activeFilter === 'admin' && e.counts.admin === 0) return false;
-      if (!q) return true;
-      return (
-        e.name.toLowerCase().includes(q) ||
-        e.latest.title.toLowerCase().includes(q) ||
-        e.latest.text.toLowerCase().includes(q)
-      );
-    });
-  }, [searchQuery, activeFilter]);
+  const refresh = useCallback(async () => {
+    try {
+      const [rows, s] = await Promise.all([
+        teamService.docEmployees({ filter: activeFilter, q: searchQuery.trim() || undefined }),
+        teamService.docStats(),
+      ]);
+      const rawRows = Array.isArray(rows) ? rows : (rows.results || []);
+      // Backend returns risk_level (snake_case); UI expects riskLevel.
+      setEmployees(rawRows.map((r) => ({ ...r, riskLevel: r.risk_level || 'standard' })));
+      setStats({
+        total: s.total || 0,
+        disciplinary: s.disciplinary || 0,
+        admin: s.admin || 0,
+        employeesWithDocs: s.employees_with_docs || 0,
+      });
+    } catch (err) {
+      console.error('Failed to load team documentation:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeFilter, searchQuery]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  // The backend already filters; this is a no-op pass-through.
+  const filtered = employees;
+  // Provide an alias so the existing STATS references below still work.
+  const STATS = stats;
 
   return (
     <div className="sst-page">

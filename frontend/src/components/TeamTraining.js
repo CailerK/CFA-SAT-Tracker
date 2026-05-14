@@ -1,4 +1,18 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import teamService from '../services/team';
+
+// Normalize a backend TraineeAssignment to the trainee row shape the UI uses.
+const normalizeTrainee = (raw) => ({
+  id: raw.id,
+  name: raw.user_name,
+  initials: raw.user_initials || '??',
+  role: 'Team Member',
+  dept: raw.department_name || '—',
+  plan: raw.plan_name,
+  progress: raw.progress_percent || 0,
+  status: raw.status === 'in_progress' ? 'In Progress'
+    : raw.status === 'completed' ? 'Completed' : 'Paused',
+});
 import './TeamTraining.css';
 
 /* ----- Inline Lucide icons (stroke = currentColor) ----- */
@@ -68,22 +82,48 @@ const PAGE_SIZE = 10;
 
 const TeamTraining = ({ user, onBack }) => {
   const [activeTab, setActiveTab] = useState('progress');
-  const [deptView, setDeptView] = useState('department'); // 'department' | 'recent'
-  const [statusTab, setStatusTab] = useState('active');    // 'active' | 'completed'
+  const [deptView, setDeptView] = useState('department');
+  const [statusTab, setStatusTab] = useState('active');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [trainees, setTrainees] = useState([]);
+  const [kpis, setKpis] = useState({
+    active_trainees: 0, completion_rate: 0, new_hires: 0, active_plans: 0,
+  });
+  const [departments, setDepartments] = useState([]);
+  const [totalTrainees, setTotalTrainees] = useState(0);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return TRAINEES;
-    return TRAINEES.filter((t) =>
-      [t.name, t.role, t.dept, t.plan].some((f) => f.toLowerCase().includes(q))
-    );
-  }, [query]);
+  const refresh = useCallback(async () => {
+    try {
+      const apiStatus = statusTab === 'active' ? 'in_progress'
+        : statusTab === 'completed' ? 'completed' : undefined;
+      const [list, statsData, byDept] = await Promise.all([
+        teamService.listTrainees({ status: apiStatus, q: query.trim() || undefined }),
+        teamService.trainingStats(),
+        teamService.progressByDepartment(),
+      ]);
+      const rows = list.results || list || [];
+      setTrainees(rows.map(normalizeTrainee));
+      setTotalTrainees(list.count || rows.length);
+      setKpis(statsData);
+      const palette = ['rgb(229, 22, 54)', 'rgb(0, 79, 113)', 'rgb(217, 119, 6)', 'rgb(5, 150, 105)', 'rgb(124, 58, 237)'];
+      setDepartments(
+        (byDept || []).map((d, i) => ({ ...d, color: palette[i % palette.length] }))
+      );
+    } catch (err) {
+      console.error('Failed to load team training:', err);
+    }
+  }, [statusTab, query]);
 
-  const totalPages = Math.max(1, Math.ceil(TOTAL_TRAINEES / PAGE_SIZE));
-  const pageStart = (page - 1) * PAGE_SIZE + 1;
-  const pageEnd = Math.min(page * PAGE_SIZE, TOTAL_TRAINEES);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  // The backend already filters; expose the local list under the original name.
+  const filtered = trainees;
+
+  const PAGE_SIZE_LOCAL = 10;
+  const totalPages = Math.max(1, Math.ceil(totalTrainees / PAGE_SIZE_LOCAL));
+  const pageStart = totalTrainees ? (page - 1) * PAGE_SIZE_LOCAL + 1 : 0;
+  const pageEnd = Math.min(page * PAGE_SIZE_LOCAL, totalTrainees);
 
   const displayName = user?.firstName || user?.name || 'Demo User';
 
@@ -132,7 +172,7 @@ const TeamTraining = ({ user, onBack }) => {
         <div className="tt-kpi">
           <div className="tt-kpi-info">
             <p className="tt-kpi-label">Active Trainees</p>
-            <p className="tt-kpi-value">25</p>
+            <p className="tt-kpi-value">{kpis.active_trainees}</p>
             <p className="tt-kpi-sub">Currently in training</p>
           </div>
           <div className="tt-kpi-icon"><IconUsers size={22} /></div>
@@ -141,7 +181,7 @@ const TeamTraining = ({ user, onBack }) => {
         <div className="tt-kpi tt-kpi--featured">
           <div className="tt-kpi-info">
             <p className="tt-kpi-label">Completion Rate</p>
-            <p className="tt-kpi-value">75%</p>
+            <p className="tt-kpi-value">{kpis.completion_rate}%</p>
             <p className="tt-kpi-sub">Average progress</p>
           </div>
           <div className="tt-kpi-icon tt-kpi-icon--white"><IconTrendUp size={22} /></div>
@@ -150,7 +190,7 @@ const TeamTraining = ({ user, onBack }) => {
         <div className="tt-kpi">
           <div className="tt-kpi-info">
             <p className="tt-kpi-label">New Hires</p>
-            <p className="tt-kpi-value">25</p>
+            <p className="tt-kpi-value">{kpis.new_hires}</p>
             <p className="tt-kpi-sub">Need training plans</p>
           </div>
           <div className="tt-kpi-icon"><IconSearchPlus size={22} /></div>
@@ -163,7 +203,7 @@ const TeamTraining = ({ user, onBack }) => {
         <div className="tt-kpi">
           <div className="tt-kpi-info">
             <p className="tt-kpi-label">Active Plans</p>
-            <p className="tt-kpi-value">60</p>
+            <p className="tt-kpi-value">{kpis.active_plans}</p>
             <p className="tt-kpi-sub">Plans in use</p>
           </div>
           <div className="tt-kpi-icon"><IconClipboardList size={22} /></div>
@@ -192,7 +232,7 @@ const TeamTraining = ({ user, onBack }) => {
         <div className="tt-card-body">
           {deptView === 'department' ? (
             <div className="tt-dept-list">
-              {DEPARTMENTS.map((d) => (
+              {(departments.length ? departments : []).map((d) => (
                 <div key={d.name} className="tt-dept-row">
                   <div className="tt-dept-head">
                     <span className="tt-dept-name">{d.name}</span>

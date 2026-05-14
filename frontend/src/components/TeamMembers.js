@@ -1,4 +1,28 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import teamService from '../services/team';
+
+// Map a backend role slug → the display string the UI was built for.
+const formatRole = (slug) => {
+  if (!slug) return 'Team Member';
+  return slug
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+// Normalize backend user → existing UI shape ({id, name, initials, email,
+// isAdmin, isActive, role, depts, shift, manager}).
+const normalizeMember = (raw) => ({
+  id: raw.id,
+  name: raw.name,
+  initials: raw.initials || '??',
+  email: raw.email || '',
+  isAdmin: Boolean(raw.is_admin),
+  isActive: Boolean(raw.is_active),
+  role: formatRole(raw.role),
+  depts: (raw.departments || []).map((d) => d.name),
+  shift: raw.shift_preference ? raw.shift_preference[0].toUpperCase() + raw.shift_preference.slice(1) : 'Flex',
+  manager: raw.manager_name || null,
+});
 import './TeamMembers.css';
 
 // ===== Icons =====
@@ -11,22 +35,6 @@ const IconMoreHorizontal = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewB
 const IconMoreVertical = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>);
 
 // ===== DEMO DATA (see FAKE_DATA.md) =====
-const STATS = { active: 183, inactive: 71, managers: 53 };
-
-// First 10 active team members copied from LD Growth `/users`.
-const TEAM_MEMBERS = [
-  { id: 1,  name: 'Greg Argyrou',         initials: 'GA', email: 'greg.argyrou@cfafranchisee.com',   isAdmin: true,  isActive: true, role: 'Director',    depts: ['Front Counter', 'Kitchen', 'Drive Thru'], shift: 'Day',   manager: null                   },
-  { id: 2,  name: 'Adaya Garcia',         initials: 'AG', email: 'adayagarcia400@gmail.com',          isAdmin: false, isActive: true, role: 'Team Member', depts: ['Front Counter'],                         shift: 'Day',   manager: 'Savannah Holloway'    },
-  { id: 3,  name: 'Addisyn Thomas',       initials: 'AT', email: 'addisyn10608@icloud.com',           isAdmin: false, isActive: true, role: 'Team Member', depts: ['Front Counter'],                         shift: 'Night', manager: 'Savannah Holloway'    },
-  { id: 4,  name: 'Aleia Anderson',       initials: 'AA', email: 'aleiaanderson2007@gmail.com',       isAdmin: false, isActive: true, role: 'Team Member', depts: ['Kitchen'],                               shift: 'Night', manager: 'Phillip Williams'     },
-  { id: 5,  name: 'Alisha Champet',       initials: 'AC', email: 'champetalisha@gmail.com',           isAdmin: false, isActive: true, role: 'Team Member', depts: ['Front Counter'],                         shift: 'Night', manager: 'Kaylee Baker Williams'},
-  { id: 6,  name: 'Aliyah Henry',         initials: 'AH', email: 'hiringcfactr@gmail.com',            isAdmin: true,  isActive: true, role: 'Director',    depts: ['Front Counter', 'Training'],             shift: 'Day',   manager: null                   },
-  { id: 7,  name: 'Allison Burlison',     initials: 'AB', email: 'allyburli0328@gmail.com',           isAdmin: false, isActive: true, role: 'Team Member', depts: ['Front Counter'],                         shift: 'Night', manager: 'Kaylee Baker Williams'},
-  { id: 8,  name: 'Allison Villalobos',   initials: 'AV', email: 'allisonvillalobos02@icloud.com',    isAdmin: false, isActive: true, role: 'Team Member', depts: ['Front Counter'],                         shift: 'Night', manager: 'Savannah Holloway'    },
-  { id: 9,  name: 'Ana Aguilar Rios',     initials: 'AA', email: 'aguilarriosana@outlook.com',        isAdmin: false, isActive: true, role: 'Team Member', depts: ['Kitchen'],                               shift: 'Night', manager: 'Phillip Williams'     },
-  { id: 10, name: 'Ana Carranza',         initials: 'AC', email: 'otonielcarranza1957@gmail.com',     isAdmin: false, isActive: true, role: 'Team Member', depts: ['Kitchen'],                               shift: 'Day',   manager: 'Laura Garcia'         },
-];
-
 const ITEMS_PER_PAGE = 10;
 
 const TeamMembers = ({ onBack, onNavigate }) => {
@@ -34,24 +42,34 @@ const TeamMembers = ({ onBack, onNavigate }) => {
   const [managersOpen, setManagersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [STATS, setSTATS] = useState({ active: 0, inactive: 0, managers: 0 });
+  const [members, setMembers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load roster + stats on mount and whenever tab/search changes.
+  const refresh = useCallback(async () => {
+    try {
+      const [list, stats] = await Promise.all([
+        teamService.listMembers({ status: activeTab, q: searchQuery.trim() || undefined }),
+        teamService.getStats(),
+      ]);
+      const rows = list.results || list || [];
+      setMembers(rows.map(normalizeMember));
+      setSTATS(stats);
+    } catch (err) {
+      console.error('Failed to load team members:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeTab, searchQuery]);
+
+  useEffect(() => { refresh(); }, [refresh]);
 
   const totalCount = activeTab === 'active' ? STATS.active : STATS.inactive;
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
 
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return TEAM_MEMBERS.filter((m) => {
-      if (activeTab === 'active' && !m.isActive) return false;
-      if (activeTab === 'inactive' && m.isActive) return false;
-      if (!q) return true;
-      return (
-        m.name.toLowerCase().includes(q) ||
-        m.email.toLowerCase().includes(q) ||
-        m.role.toLowerCase().includes(q) ||
-        m.depts.some((d) => d.toLowerCase().includes(q))
-      );
-    });
-  }, [searchQuery, activeTab]);
+  // Server-side filtering already applies; this is just a guard for the local list.
+  const filtered = members;
 
   // Simple page-number strip: 1 ... totalPages with current + neighbors
   const pageNumbers = useMemo(() => {

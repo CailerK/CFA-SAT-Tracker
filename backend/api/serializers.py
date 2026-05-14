@@ -10,6 +10,8 @@ from rest_framework import serializers
 from .models import (
     CleaningCompletion,
     CleaningTask,
+    Department,
+    EmployeeRecord,
     Equipment,
     EquipmentCategory,
     FOHTaskCompletion,
@@ -22,6 +24,8 @@ from .models import (
     MaintenanceSchedule,
     MealPeriod,
     MenuItem,
+    QuickLink,
+    QuickLinkCategory,
     SetupSheet,
     SetupSheetShare,
     SetupSheetTemplate,
@@ -32,6 +36,9 @@ from .models import (
     TemperatureReading,
     TemperatureTarget,
     TimeBlock,
+    TraineeAssignment,
+    TrainingActivity,
+    TrainingPlan,
     User,
     UserPreferences,
     WasteEntry,
@@ -681,3 +688,175 @@ class TemperatureReadingSerializer(serializers.ModelSerializer):
     def get_recorded_by_name(self, obj):
         u = obj.recorded_by
         return (f"{u.first_name} {u.last_name}".strip() or u.email) if u else None
+
+
+# ============================================================================
+# Phase 6: Team Members (User roster view)
+# ============================================================================
+
+class DepartmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Department
+        fields = ["id", "name", "display_name", "description", "icon"]
+        read_only_fields = ["id"]
+
+
+class TeamMemberSerializer(serializers.ModelSerializer):
+    """The Team Members page consumes a list of users with extra fields."""
+    name = serializers.SerializerMethodField()
+    initials = serializers.CharField(read_only=True)
+    manager_name = serializers.SerializerMethodField()
+    departments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id", "name", "initials", "email", "phone",
+            "role", "shift_preference",
+            "is_admin", "is_active", "is_demo_user",
+            "manager", "manager_name",
+            "departments",
+            "avatar",
+        ]
+        read_only_fields = ["id", "name", "initials", "manager_name", "departments"]
+
+    def get_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip() or obj.email
+
+    def get_manager_name(self, obj):
+        m = obj.manager
+        if not m:
+            return None
+        return f"{m.first_name} {m.last_name}".strip() or m.email
+
+    def get_departments(self, obj):
+        return [
+            {"id": d.id, "name": d.display_name or d.name, "slug": d.name}
+            for d in obj.departments.all()
+        ]
+
+
+# ============================================================================
+# Phase 6: Employee Documentation
+# ============================================================================
+
+class EmployeeRecordSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    recorded_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmployeeRecord
+        fields = [
+            "id", "user", "user_name",
+            "recorded_by", "recorded_by_name",
+            "kind", "title", "body", "status",
+            "recorded_at", "resolved_at",
+        ]
+        read_only_fields = ["id", "user_name", "recorded_by", "recorded_by_name",
+                            "recorded_at"]
+
+    def _name(self, u):
+        if not u:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+    def get_user_name(self, obj):
+        return self._name(obj.user)
+
+    def get_recorded_by_name(self, obj):
+        return self._name(obj.recorded_by)
+
+
+# ============================================================================
+# Phase 6: Training
+# ============================================================================
+
+class TrainingPlanSerializer(serializers.ModelSerializer):
+    department_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TrainingPlan
+        fields = [
+            "id", "name", "description",
+            "department", "department_name",
+            "total_steps", "archived_at",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "department_name", "archived_at",
+                            "created_at", "updated_at"]
+
+    def get_department_name(self, obj):
+        return obj.department.display_name if obj.department else None
+
+
+class TraineeAssignmentSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    user_initials = serializers.CharField(source="user.initials", read_only=True)
+    plan_name = serializers.CharField(source="plan.name", read_only=True)
+    progress_percent = serializers.IntegerField(read_only=True)
+    department_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TraineeAssignment
+        fields = [
+            "id",
+            "user", "user_name", "user_initials",
+            "plan", "plan_name",
+            "assigned_by", "status",
+            "completed_steps", "progress_percent",
+            "department_name",
+            "assigned_at", "completed_at",
+        ]
+        read_only_fields = ["id", "user_name", "user_initials",
+                            "plan_name", "progress_percent", "department_name",
+                            "assigned_at"]
+
+    def get_user_name(self, obj):
+        u = obj.user
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+    def get_department_name(self, obj):
+        # Prefer the plan's department; otherwise the user's first department.
+        if obj.plan and obj.plan.department:
+            return obj.plan.department.display_name
+        d = obj.user.departments.first()
+        return d.display_name if d else None
+
+
+class TrainingActivitySerializer(serializers.ModelSerializer):
+    recorded_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TrainingActivity
+        fields = ["id", "assignment", "kind", "notes",
+                  "recorded_by", "recorded_by_name", "recorded_at"]
+        read_only_fields = ["id", "recorded_by", "recorded_by_name", "recorded_at"]
+
+    def get_recorded_by_name(self, obj):
+        u = obj.recorded_by
+        return (f"{u.first_name} {u.last_name}".strip() or u.email) if u else None
+
+
+# ============================================================================
+# Phase 6: Quick Links
+# ============================================================================
+
+class QuickLinkCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuickLinkCategory
+        fields = ["id", "name", "color", "order", "archived_at",
+                  "created_at", "updated_at"]
+        read_only_fields = ["id", "archived_at", "created_at", "updated_at"]
+
+
+class QuickLinkSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    category_color = serializers.CharField(source="category.color", read_only=True)
+
+    class Meta:
+        model = QuickLink
+        fields = ["id", "label", "url", "icon", "order",
+                  "category", "category_name", "category_color",
+                  "archived_at", "created_at", "updated_at"]
+        read_only_fields = ["id", "category_name", "category_color",
+                            "archived_at", "created_at", "updated_at"]

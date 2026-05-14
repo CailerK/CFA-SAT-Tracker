@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import teamService from '../services/team';
 import './TeamQuickLinks.css';
 
 /* ----- Inline Lucide icons ----- */
@@ -44,8 +45,21 @@ const formatToday = () => {
 };
 
 const TeamQuickLinks = ({ user }) => {
-  // Empty list for now — matches LD Growth empty state
-  const [links] = useState([]);
+  const [links, setLinks] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await teamService.listQuickLinks();
+        const rows = res.results || res || [];
+        if (!cancelled) setLinks(rows);
+      } catch (err) {
+        console.error('Failed to load quick links:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const displayName = user?.firstName || user?.name || 'Demo User';
 
@@ -103,6 +117,40 @@ const TeamQuickLinks = ({ user }) => {
               <span>Add Your First Link</span>
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Populated list view */}
+      {links.length > 0 && (
+        <div className="tql-list" style={{ padding: '16px 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+          {links.map((l) => (
+            <a
+              key={l.id}
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '14px 16px',
+                border: `2px solid ${l.category_color || '#e5e7eb'}`,
+                borderRadius: 12,
+                background: '#fff',
+                textDecoration: 'none',
+                color: '#111827',
+                fontWeight: 500,
+              }}
+            >
+              <span style={{ fontSize: 22 }}>{l.icon || '🔗'}</span>
+              <div style={{ flex: 1 }}>
+                <div>{l.label}</div>
+                {l.category_name && (
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>{l.category_name}</div>
+                )}
+              </div>
+            </a>
+          ))}
         </div>
       )}
     </div>

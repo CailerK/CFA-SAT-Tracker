@@ -116,6 +116,23 @@ class User(AbstractUser):
     )
     phone = models.CharField(max_length=30, blank=True)
     role = models.CharField(max_length=50, default='team_member')
+    # Phase 6: roster fields surfaced on the Team Members page.
+    manager = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="direct_reports",
+    )
+    shift_preference = models.CharField(
+        max_length=10,
+        choices=[("day", "Day"), ("night", "Night"), ("flex", "Flex")],
+        default="flex",
+        blank=True,
+    )
+    is_admin = models.BooleanField(
+        default=False,
+        help_text="Shows the Admin badge on the roster. Separate from is_superuser.",
+    )
     is_demo_user = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -206,12 +223,24 @@ class Department(models.Model):
         ('facilities', 'Facilities'),
         ('catering', 'Catering'),
     ]
-    
-    name = models.CharField(max_length=50, choices=DEPARTMENT_CHOICES)
+
+    # Phase 6: scope departments per-store. Nullable for back-compat.
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, null=True, blank=True,
+        related_name="departments",
+    )
+    name = models.CharField(max_length=50)
     display_name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-    icon = models.CharField(max_length=50)  # Emoji or icon class
+    icon = models.CharField(max_length=50, blank=True)  # Emoji or icon class
+    members = models.ManyToManyField(
+        User, blank=True, related_name="departments",
+        help_text="Users assigned to this department.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.display_name or self.name
 
 class Team(models.Model):
     """Team/Restaurant location"""
@@ -1195,3 +1224,178 @@ class TemperatureReading(models.Model):
         except (TypeError, ValueError):
             pass
         super().save(*args, **kwargs)
+
+
+# =============================================================================
+# Phase 6: Team Documentation
+# =============================================================================
+
+class EmployeeRecord(models.Model):
+    """A documentation record on an employee — discipline / PIP / admin notes."""
+    KIND_CHOICES = [
+        ('admin', 'Admin Note'),
+        ('warning', 'Warning'),
+        ('pip', 'PIP'),
+        ('recognition', 'Recognition'),
+    ]
+    STATUS_CHOICES = [
+        ('documented', 'Documented'),
+        ('pending', 'Pending'),
+        ('resolved', 'Resolved'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='employee_records'
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='records'
+    )
+    recorded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='records_created',
+    )
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    title = models.CharField(max_length=200)
+    body = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='documented'
+    )
+    recorded_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-recorded_at', '-id']
+        indexes = [
+            models.Index(fields=['store', 'user']),
+            models.Index(fields=['store', 'kind']),
+        ]
+
+
+# =============================================================================
+# Phase 6: Training
+# =============================================================================
+
+class TrainingPlan(models.Model):
+    """A reusable training program (e.g., 'Foundations FOH')."""
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='training_plans'
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    department = models.ForeignKey(
+        Department, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='training_plans',
+    )
+    total_steps = models.PositiveIntegerField(default=10)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class TraineeAssignment(models.Model):
+    """A user actively going through a training plan."""
+    STATUS_CHOICES = [
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('paused', 'Paused'),
+    ]
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='training_assignments'
+    )
+    plan = models.ForeignKey(
+        TrainingPlan, on_delete=models.CASCADE, related_name='trainees'
+    )
+    assigned_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='trainees_assigned',
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='in_progress'
+    )
+    completed_steps = models.PositiveIntegerField(default=0)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-assigned_at', '-id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'plan'],
+                name='unique_trainee_per_plan',
+            ),
+        ]
+
+    @property
+    def progress_percent(self):
+        if not self.plan_id or not self.plan.total_steps:
+            return 0
+        return min(100, round((self.completed_steps / self.plan.total_steps) * 100))
+
+
+class TrainingActivity(models.Model):
+    """Event log entries per assignment (training milestone, note, etc.)."""
+    assignment = models.ForeignKey(
+        TraineeAssignment, on_delete=models.CASCADE, related_name='activities'
+    )
+    kind = models.CharField(max_length=30, default='note')
+    notes = models.TextField(blank=True)
+    recorded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='training_activities_logged',
+    )
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-recorded_at', '-id']
+
+
+# =============================================================================
+# Phase 6: Quick Links
+# =============================================================================
+
+class QuickLinkCategory(models.Model):
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='quick_link_categories'
+    )
+    name = models.CharField(max_length=80)
+    color = models.CharField(max_length=7, default='#E51636')
+    order = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.name
+
+
+class QuickLink(models.Model):
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='quick_links'
+    )
+    category = models.ForeignKey(
+        QuickLinkCategory, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='links',
+    )
+    label = models.CharField(max_length=100)
+    url = models.URLField()
+    icon = models.CharField(max_length=30, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.label

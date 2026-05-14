@@ -26,6 +26,20 @@ from .views_kitchen import (
 )
 from .views_setup_sheets import SetupSheetTemplateViewSet, SetupSheetViewSet
 from .views_shift_summary import ShiftSummaryViewSet, ShiftTagViewSet
+from .views_team import (
+    EmployeeRecordViewSet,
+    QuickLinkCategoryViewSet,
+    QuickLinkViewSet,
+    TeamMemberViewSet,
+    TraineeAssignmentViewSet,
+    TrainingPlanViewSet,
+    documentation_employees,
+    documentation_stats,
+    employee_records,
+    team_stats,
+    training_progress_by_department,
+    training_stats,
+)
 
 
 # DRF router gives us list / detail / retrieve / @action routes for free.
@@ -63,6 +77,21 @@ router.register(
 router.register(
     r"kitchen/food-safety/temperature-readings",
     TemperatureReadingViewSet, basename="temp-reading",
+)
+# Phase 6: Team domain
+router.register(r"team/members", TeamMemberViewSet, basename="team-member")
+router.register(
+    r"team/documentation/records",
+    EmployeeRecordViewSet, basename="employee-record",
+)
+router.register(
+    r"team/quick-links/categories",
+    QuickLinkCategoryViewSet, basename="quick-link-category",
+)
+router.register(r"team/quick-links", QuickLinkViewSet, basename="quick-link")
+router.register(r"training/plans", TrainingPlanViewSet, basename="training-plan")
+router.register(
+    r"training/trainees", TraineeAssignmentViewSet, basename="trainee",
 )
 router.register(
     r"shift-summaries/tags", ShiftTagViewSet, basename="shift-tag"
@@ -112,6 +141,28 @@ urlpatterns = [
         "kitchen/equipment/schedules/<int:pk>/complete/",
         MaintenanceScheduleViewSet.as_view({"post": "complete"}),
         name="schedule_complete",
+    ),
+
+    # Phase 6: Team stats + per-employee documentation
+    path("team/stats/", team_stats, name="team_stats"),
+    path(
+        "team/documentation/stats/",
+        documentation_stats, name="documentation_stats",
+    ),
+    path(
+        "team/documentation/employees/",
+        documentation_employees, name="documentation_employees",
+    ),
+    path(
+        "team/documentation/employees/<int:user_id>/records/",
+        employee_records, name="employee_records",
+    ),
+    # Phase 6: Training rollups
+    path("training/stats/", training_stats, name="training_stats"),
+    path(
+        "training/progress-by-department/",
+        training_progress_by_department,
+        name="training_progress_by_department",
     ),
 
     # Phase 4: Kitchen dashboard + waste KPIs/trend/top-items/goals (function views)

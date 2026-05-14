@@ -10,6 +10,7 @@ from datetime import date, timedelta
 
 from .models import (
     CleaningTask,
+    Department,
     Equipment,
     EquipmentCategory,
     FOHTaskTemplate,
@@ -18,10 +19,14 @@ from .models import (
     MaintenanceSchedule,
     MealPeriod,
     MenuItem,
+    QuickLink,
+    QuickLinkCategory,
     SetupSheet,
     SetupSheetTemplate,
     ShiftTag,
     TemperatureTarget,
+    TrainingPlan,
+    User,
     WasteReason,
 )
 
@@ -584,6 +589,151 @@ def seed_temperature_targets(store):
     print(f"    Temperature targets: +{created} created.")
 
 
+# ---------------------------------------------------------------------------
+# Phase 6: Departments + sample team members + training plans + quick links
+# ---------------------------------------------------------------------------
+
+DEPARTMENTS = [
+    {"name": "foh", "display_name": "Front of House", "icon": "🛎️"},
+    {"name": "kitchen", "display_name": "Kitchen", "icon": "🔥"},
+    {"name": "drive_thru", "display_name": "Drive Thru", "icon": "🚗"},
+    {"name": "management", "display_name": "Management", "icon": "📋"},
+    {"name": "training", "display_name": "Training", "icon": "🎓"},
+]
+
+
+def seed_departments(store):
+    created = 0
+    for d in DEPARTMENTS:
+        _, was_created = Department.objects.get_or_create(
+            store=store, name=d["name"],
+            defaults={
+                "display_name": d["display_name"],
+                "icon": d["icon"],
+            },
+        )
+        if was_created:
+            created += 1
+    print(f"    Departments: +{created} created.")
+
+
+# Mirrors the names from the LD Growth /users page (FAKE_DATA.md). These are
+# created as **inactive demo users without passwords** — they show up on the
+# roster but can't log in. Admins can activate or replace them later.
+SAMPLE_TEAM_MEMBERS = [
+    {"first": "Greg", "last": "Argyrou", "role": "manager", "is_admin": True, "depts": ["management"]},
+    {"first": "Adaya", "last": "Garcia", "role": "team_member", "depts": ["foh"]},
+    {"first": "Addisyn", "last": "Thomas", "role": "shift_leader", "depts": ["foh", "drive_thru"]},
+    {"first": "Aleia", "last": "Anderson", "role": "team_member", "depts": ["foh"]},
+    {"first": "Alisha", "last": "Champet", "role": "team_member", "depts": ["kitchen"]},
+    {"first": "Aliyah", "last": "Henry", "role": "team_member", "depts": ["drive_thru"]},
+    {"first": "Allison", "last": "Burlison", "role": "team_member", "depts": ["foh"]},
+    {"first": "Allison", "last": "Villalobos", "role": "team_member", "depts": ["kitchen"]},
+    {"first": "Ana", "last": "Aguilar Rios", "role": "team_member", "depts": ["foh"]},
+    {"first": "Ana", "last": "Carranza", "role": "team_member", "depts": ["drive_thru"]},
+]
+
+
+def seed_sample_team_members(store):
+    """Create read-only roster fillers. They can't log in (no password set)."""
+    created = 0
+    depts_by_slug = {d.name: d for d in Department.objects.filter(store=store)}
+    for m in SAMPLE_TEAM_MEMBERS:
+        email = (
+            f"{m['first'].lower()}.{m['last'].lower().replace(' ', '')}"
+            f"@demo.cfasattracker.com"
+        )
+        if User.objects.filter(email=email).exists():
+            continue
+        u = User.objects.create(
+            username=f"{m['first'].lower()}.{m['last'].lower().replace(' ', '')}"[:30],
+            email=email,
+            first_name=m["first"],
+            last_name=m["last"],
+            role=m["role"],
+            store=store,
+            is_admin=m.get("is_admin", False),
+            is_active=True,
+            is_demo_user=True,
+            company_id=store.store_number,
+        )
+        u.set_unusable_password()
+        u.save()
+        # Attach departments.
+        for slug in m.get("depts", []):
+            d = depts_by_slug.get(slug)
+            if d:
+                u.departments.add(d)
+        created += 1
+    print(f"    Sample team members: +{created} created.")
+
+
+TRAINING_PLANS = [
+    {"name": "Foundations FOH", "department": "foh", "total_steps": 10},
+    {"name": "Foundations Kitchen", "department": "kitchen", "total_steps": 12},
+    {"name": "Drive Thru Excellence", "department": "drive_thru", "total_steps": 8},
+    {"name": "Leadership 101", "department": "management", "total_steps": 15},
+]
+
+
+def seed_training_plans(store):
+    created = 0
+    depts_by_slug = {d.name: d for d in Department.objects.filter(store=store)}
+    for p in TRAINING_PLANS:
+        dept = depts_by_slug.get(p["department"])
+        _, was_created = TrainingPlan.objects.get_or_create(
+            store=store, name=p["name"],
+            defaults={
+                "total_steps": p["total_steps"],
+                "department": dept,
+            },
+        )
+        if was_created:
+            created += 1
+    print(f"    Training plans: +{created} created.")
+
+
+QUICK_LINK_CATEGORIES = [
+    {"name": "Daily Tools", "color": "#E51636", "order": 0},
+    {"name": "Reference", "color": "#3b82f6", "order": 1},
+    {"name": "External", "color": "#10b981", "order": 2},
+]
+
+QUICK_LINKS = [
+    {"label": "HotSchedules", "url": "https://app.hotschedules.com/", "category": "Daily Tools", "icon": "📅"},
+    {"label": "Pathway", "url": "https://www.chick-fil-a.com/pathway", "category": "Reference", "icon": "📚"},
+    {"label": "Beam", "url": "https://beam.chick-fil-a.com/", "category": "Reference", "icon": "💡"},
+    {"label": "CFA Connect", "url": "https://connect.chick-fil-a.com/", "category": "External", "icon": "🔗"},
+]
+
+
+def seed_quick_links(store):
+    cat_created = 0
+    cat_by_name = {}
+    for c in QUICK_LINK_CATEGORIES:
+        obj, was_created = QuickLinkCategory.objects.get_or_create(
+            store=store, name=c["name"],
+            defaults={"color": c["color"], "order": c["order"]},
+        )
+        cat_by_name[c["name"]] = obj
+        if was_created:
+            cat_created += 1
+    link_created = 0
+    for order, link in enumerate(QUICK_LINKS):
+        _, was_created = QuickLink.objects.get_or_create(
+            store=store, label=link["label"],
+            defaults={
+                "url": link["url"],
+                "icon": link["icon"],
+                "order": order,
+                "category": cat_by_name.get(link["category"]),
+            },
+        )
+        if was_created:
+            link_created += 1
+    print(f"    Quick links: +{cat_created} categories, +{link_created} links.")
+
+
 def seed_all_for_store(store):
     """Run every per-store seeder. Idempotent."""
     print(f"  Seeding data for {store}…")
@@ -602,3 +752,8 @@ def seed_all_for_store(store):
     seed_equipment(store)
     seed_food_safety_tasks(store)
     seed_temperature_targets(store)
+    # Phase 6
+    seed_departments(store)
+    seed_sample_team_members(store)
+    seed_training_plans(store)
+    seed_quick_links(store)
