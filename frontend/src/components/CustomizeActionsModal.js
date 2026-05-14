@@ -241,42 +241,44 @@ const CustomizeActionsModal = ({ isOpen, onClose, onSave, currentActions }) => {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         
-        <p className="modal-description">
-          Select up to 12 actions to display on your dashboard. Uncheck all to use the default set.
-        </p>
+        <div className="modal-body">
+          <p className="modal-description">
+            Select up to 12 actions to display on your dashboard. Uncheck all to use the default set.
+          </p>
 
-        <div className="selection-info">
-          <span className="selection-count">
-            Selected: <span className="count-highlight">{selectedActions.length}</span> / 12
-          </span>
-          <button className="reset-button" onClick={handleReset}>
-            🔄 Reset to Default
-          </button>
-        </div>
-
-        <div className="actions-grid">
-          {availableActions.map((action) => (
-            <button
-              key={action.id}
-              onClick={() => handleActionToggle(action.id)}
-              className={`action-option ${selectedActions.includes(action.id) ? 'selected' : ''} ${
-                !selectedActions.includes(action.id) && selectedActions.length >= 12 ? 'disabled' : ''
-              }`}
-              disabled={!selectedActions.includes(action.id) && selectedActions.length >= 12}
-            >
-              <div className={`action-icon ${action.iconColor}`}>
-                {action.icon}
-              </div>
-              <div className="action-info">
-                <h3 className="action-title">{action.title}</h3>
-                <p className="action-subtitle">{action.subtitle}</p>
-                <span className="action-category">{action.category}</span>
-              </div>
-              {selectedActions.includes(action.id) && (
-                <div className="selected-indicator">✓</div>
-              )}
+          <div className="selection-info">
+            <span className="selection-count">
+              Selected: <span className="count-highlight">{selectedActions.length}</span> / 12
+            </span>
+            <button className="reset-button" onClick={handleReset}>
+              🔄 Reset to Default
             </button>
-          ))}
+          </div>
+
+          <div className="actions-grid">
+            {availableActions.map((action) => (
+              <button
+                key={action.id}
+                onClick={() => handleActionToggle(action.id)}
+                className={`action-option ${selectedActions.includes(action.id) ? 'selected' : ''} ${
+                  !selectedActions.includes(action.id) && selectedActions.length >= 12 ? 'disabled' : ''
+                }`}
+                disabled={!selectedActions.includes(action.id) && selectedActions.length >= 12}
+              >
+                <div className={`action-icon ${action.iconColor}`}>
+                  {action.icon}
+                </div>
+                <div className="action-info">
+                  <h3 className="action-title">{action.title}</h3>
+                  <p className="action-subtitle">{action.subtitle}</p>
+                  <span className="action-category">{action.category}</span>
+                </div>
+                {selectedActions.includes(action.id) && (
+                  <div className="selected-indicator">✓</div>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="modal-actions">

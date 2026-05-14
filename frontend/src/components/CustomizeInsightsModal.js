@@ -205,42 +205,44 @@ const CustomizeInsightsModal = ({ isOpen, onClose, onSave, currentInsights }) =>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         
-        <p className="modal-description">
-          Select up to 4 stat cards to display on your dashboard. Uncheck all to use role-based defaults.
-        </p>
+        <div className="modal-body">
+          <p className="modal-description">
+            Select up to 4 stat cards to display on your dashboard. Uncheck all to use role-based defaults.
+          </p>
 
-        <div className="selection-info">
-          <span className="selection-count">
-            Selected: <span className="count-highlight">{selectedCards.length}</span> / 4
-          </span>
-          <button className="reset-button" onClick={handleReset}>
-            🔄 Reset to Default
-          </button>
-        </div>
-
-        <div className="cards-grid">
-          {availableCards.map((card) => (
-            <button
-              key={card.id}
-              onClick={() => handleCardToggle(card.id)}
-              className={`card-option ${selectedCards.includes(card.id) ? 'selected' : ''} ${
-                !selectedCards.includes(card.id) && selectedCards.length >= 4 ? 'disabled' : ''
-              }`}
-              disabled={!selectedCards.includes(card.id) && selectedCards.length >= 4}
-            >
-              <div className={`card-icon ${card.iconColor}`}>
-                {card.icon}
-              </div>
-              <div className="card-info">
-                <h3 className="card-title">{card.title}</h3>
-                <p className="card-subtitle">{card.subtitle}</p>
-                <span className="card-category">{card.category}</span>
-              </div>
-              {selectedCards.includes(card.id) && (
-                <div className="selected-indicator">✓</div>
-              )}
+          <div className="selection-info">
+            <span className="selection-count">
+              Selected: <span className="count-highlight">{selectedCards.length}</span> / 4
+            </span>
+            <button className="reset-button" onClick={handleReset}>
+              🔄 Reset to Default
             </button>
-          ))}
+          </div>
+
+          <div className="cards-grid">
+            {availableCards.map((card) => (
+              <button
+                key={card.id}
+                onClick={() => handleCardToggle(card.id)}
+                className={`card-option ${selectedCards.includes(card.id) ? 'selected' : ''} ${
+                  !selectedCards.includes(card.id) && selectedCards.length >= 4 ? 'disabled' : ''
+                }`}
+                disabled={!selectedCards.includes(card.id) && selectedCards.length >= 4}
+              >
+                <div className={`card-icon ${card.iconColor}`}>
+                  {card.icon}
+                </div>
+                <div className="card-info">
+                  <h3 className="card-title">{card.title}</h3>
+                  <p className="card-subtitle">{card.subtitle}</p>
+                  <span className="card-category">{card.category}</span>
+                </div>
+                {selectedCards.includes(card.id) && (
+                  <div className="selected-indicator">✓</div>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="modal-actions">
