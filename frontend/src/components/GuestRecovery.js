@@ -1,5 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './GuestRecovery.css';
+import guestRecoveryService from '../services/guestRecovery';
+
+// Backend status slugs → UI labels.
+const STATUS_FROM_API = {
+  open: 'Open',
+  in_progress: 'In Progress',
+  resolved: 'Resolved',
+};
+const STATUS_TO_API = {
+  Open: 'open', 'In Progress': 'in_progress', Resolved: 'resolved',
+};
+
+// Backend category slugs → UI labels (UI matches LD Growth strings).
+const CATEGORY_FROM_API = {
+  order_error: 'Order Error',
+  service: 'Service Issue',
+  food_quality: 'Food Quality',
+  wait_time: 'Wait Time',
+  cleanliness: 'Cleanliness',
+  staff_behavior: 'Staff Behavior',
+  app_rewards: 'App/Rewards',
+  other: 'Other',
+};
+const CATEGORY_TO_API = Object.fromEntries(
+  Object.entries(CATEGORY_FROM_API).map(([k, v]) => [v, k])
+);
+
+// Normalize a backend GuestComplaint → the row shape the UI uses.
+const normalizeComplaint = (raw) => {
+  let date = '';
+  let time = '';
+  if (raw.occurred_at) {
+    try {
+      const d = new Date(raw.occurred_at);
+      date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    } catch {}
+  }
+  return {
+    id: raw.id,
+    name: raw.guest_name || '',
+    phone: raw.guest_phone || '',
+    date, time,
+    category: CATEGORY_FROM_API[raw.category] || raw.category || 'Other',
+    description: raw.description || '',
+    status: STATUS_FROM_API[raw.status] || 'Open',
+    resolution: raw.resolution || '',
+    assignedTo: raw.assigned_to_name || null,
+  };
+};
 
 const CATEGORIES = ['Order Error', 'Service Issue', 'Food Quality', 'Wait Time', 'Cleanliness', 'Staff Behavior', 'App/Rewards', 'Other'];
 const STATUSES = ['All', 'Open', 'In Progress', 'Resolved'];
@@ -24,18 +74,50 @@ const GuestRecovery = ({ onBack }) => {
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [form, setForm] = useState({ name: '', phone: '', category: '', description: '', assignedTo: '' });
+  const [complaints, setComplaints] = useState([]);
 
-  const filtered = SAMPLE_COMPLAINTS.filter(c => {
-    const matchesStatus = activeStatus === 'All' || c.status === activeStatus;
-    const matchesSearch = !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.description.toLowerCase().includes(searchQuery.toLowerCase()) || c.category.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
+  const refresh = useCallback(async () => {
+    try {
+      const res = await guestRecoveryService.list({
+        status: activeStatus !== 'All' ? STATUS_TO_API[activeStatus] : undefined,
+        q: searchQuery.trim() || undefined,
+      });
+      const rows = res.results || res || [];
+      setComplaints(rows.map(normalizeComplaint));
+    } catch (err) {
+      console.error('Failed to load guest complaints:', err);
+    }
+  }, [activeStatus, searchQuery]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  // Backend already filters; pass-through.
+  const filtered = complaints;
 
   const counts = {
-    All: SAMPLE_COMPLAINTS.length,
-    Open: SAMPLE_COMPLAINTS.filter(c => c.status === 'Open').length,
-    'In Progress': SAMPLE_COMPLAINTS.filter(c => c.status === 'In Progress').length,
-    Resolved: SAMPLE_COMPLAINTS.filter(c => c.status === 'Resolved').length,
+    All: complaints.length,
+    Open: complaints.filter(c => c.status === 'Open').length,
+    'In Progress': complaints.filter(c => c.status === 'In Progress').length,
+    Resolved: complaints.filter(c => c.status === 'Resolved').length,
+  };
+
+  // Hook up the Log Complaint modal submit.
+  const handleSubmitLog = async () => {
+    if (!form.name.trim() || !form.description.trim()) return;
+    try {
+      await guestRecoveryService.create({
+        guest_name: form.name.trim(),
+        guest_phone: form.phone.trim(),
+        category: CATEGORY_TO_API[form.category] || 'other',
+        description: form.description.trim(),
+        occurred_at: new Date().toISOString(),
+      });
+      setForm({ name: '', phone: '', category: '', description: '', assignedTo: '' });
+      setShowLogModal(false);
+      refresh();
+    } catch (err) {
+      console.error('Create complaint failed:', err);
+    }
   };
 
   return (

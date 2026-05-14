@@ -1,4 +1,23 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import leadershipService from '../services/leadership';
+
+// Normalize a backend Evaluation360 to the row shape this UI uses.
+const normalizeEval = (raw) => ({
+  id: raw.id,
+  name: raw.evaluatee_name || 'Unknown',
+  role: raw.evaluatee_role || '',
+  template: raw.template_name || '',
+  status: raw.status === 'in_progress' ? 'in-progress' : raw.status,
+  statusLabel: raw.status === 'in_progress' ? 'In Progress'
+    : raw.status === 'completed' ? 'Completed' : raw.status,
+  dueDate: raw.due_date
+    ? new Date(raw.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '',
+  progress: raw.progress_percent || 0,
+  completed: raw.completed_evaluators || 0,
+  total: raw.total_evaluators || 0,
+  overdue: Boolean(raw.is_overdue),
+});
 import './Leadership360Evaluations.css';
 
 /* ----- Inline Lucide icons ----- */
@@ -69,17 +88,37 @@ const Leadership360Evaluations = ({ user }) => {
   const [activeTab, setActiveTab] = useState('evaluations');
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
+  const [evaluations, setEvaluations] = useState([]);
+  const [stats, setStats] = useState({ total: 0, in_progress: 0, completed: 0, reviewed: 0 });
 
   const displayName = user?.firstName || user?.name || 'Demo User';
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return EVALUATIONS.filter((e) => {
-      if (filter !== 'all' && e.status !== filter) return false;
-      if (!q) return true;
-      return [e.name, e.template, e.role].some((f) => f.toLowerCase().includes(q));
-    });
+  const refresh = useCallback(async () => {
+    try {
+      const [list, statsData] = await Promise.all([
+        leadershipService.listEvaluations({ status: filter, q: query.trim() || undefined }),
+        leadershipService.getEvaluationStats(),
+      ]);
+      const rows = list.results || list || [];
+      setEvaluations(rows.map(normalizeEval));
+      setStats(statsData);
+    } catch (err) {
+      console.error('Failed to load 360 evaluations:', err);
+    }
   }, [filter, query]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  // Backend already filters; UI no-op pass-through.
+  const filtered = evaluations;
+
+  // Override the hardcoded STATS const using live data.
+  const liveStats = useMemo(() => ([
+    { key: 'total',      label: 'Total Reviews', value: stats.total || 0,       tone: 'slate',   Icon: IconClipboardList },
+    { key: 'in-progress',label: 'In Progress',   value: stats.in_progress || 0, tone: 'blue',    Icon: IconClock },
+    { key: 'completed',  label: 'Completed',     value: stats.completed || 0,   tone: 'emerald', Icon: IconCheckCircle },
+    { key: 'reviewed',   label: 'Reviewed',      value: stats.reviewed || 0,    tone: 'purple',  Icon: IconEye },
+  ]), [stats]);
 
   return (
     <div className="l360-page">
@@ -128,7 +167,7 @@ const Leadership360Evaluations = ({ user }) => {
         <>
           {/* KPIs */}
           <section className="l360-kpis">
-            {STATS.map((s) => {
+            {liveStats.map((s) => {
               const t = TONE[s.tone];
               return (
                 <div key={s.key} className="l360-kpi">

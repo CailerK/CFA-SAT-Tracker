@@ -1,43 +1,83 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './TeamChat.css';
+import chatService from '../services/chat';
 
-const TeamChat = ({ onBack }) => {
-  const [selectedChat, setSelectedChat] = useState('general');
+const formatTime = (iso) => {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  } catch { return ''; }
+};
+
+const TeamChat = ({ onBack, user }) => {
+  const [chats, setChats] = useState([]);
+  const [selectedChat, setSelectedChat] = useState(null);
   const [messageText, setMessageText] = useState('');
+  const [messages, setMessages] = useState([]);
 
-  const chats = [
-    { id: 'general', name: 'General', unread: 0, lastMessage: 'Great work today!', lastTime: '2:30 PM' },
-    { id: 'operations', name: 'Operations', unread: 2, lastMessage: 'Shift schedule updated', lastTime: '1:15 PM' },
-    { id: 'kitchen', name: 'Kitchen', unread: 0, lastMessage: 'New menu items ready', lastTime: '12:45 PM' },
-    { id: 'foh', name: 'FOH Team', unread: 1, lastMessage: 'Table 5 ready for seating', lastTime: '11:30 AM' }
-  ];
+  // Load channels on mount.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await chatService.listChannels();
+        const rows = res.results || res || [];
+        if (cancelled) return;
+        const mapped = rows.map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          name: c.name || (c.slug ? c.slug[0].toUpperCase() + c.slug.slice(1) : 'Channel'),
+          unread: c.unread_count || 0,
+          lastMessage: c.last_message_preview || '',
+          lastTime: formatTime(c.last_message_at),
+        }));
+        setChats(mapped);
+        if (mapped.length && !selectedChat) setSelectedChat(mapped[0].id);
+      } catch (err) {
+        console.error('Failed to load chat channels:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const messages = {
-    general: [
-      { id: 1, user: 'Sarah Johnson', avatar: 'SJ', message: 'Good morning team! Ready for today?', time: '9:00 AM', isOwn: false },
-      { id: 2, user: 'You', avatar: 'YO', message: 'Morning! All set here.', time: '9:05 AM', isOwn: true },
-      { id: 3, user: 'John Smith', avatar: 'JS', message: 'Let\'s have a great shift today', time: '9:10 AM', isOwn: false },
-      { id: 4, user: 'Maria Garcia', avatar: 'MG', message: 'Great work today!', time: '2:30 PM', isOwn: false }
-    ],
-    operations: [
-      { id: 5, user: 'Manager', avatar: 'M', message: 'Shift schedule updated for next week', time: '1:15 PM', isOwn: false },
-      { id: 6, user: 'You', avatar: 'YO', message: 'Thanks for the update', time: '1:20 PM', isOwn: true }
-    ],
-    kitchen: [
-      { id: 7, user: 'Chef', avatar: 'C', message: 'New menu items ready for service', time: '12:45 PM', isOwn: false }
-    ],
-    foh: [
-      { id: 8, user: 'Host', avatar: 'H', message: 'Table 5 ready for seating', time: '11:30 AM', isOwn: false },
-      { id: 9, user: 'You', avatar: 'YO', message: 'Got it, sending server now', time: '11:32 AM', isOwn: true }
-    ]
-  };
+  // Poll messages for the selected channel every 5s while open.
+  const loadMessages = useCallback(async () => {
+    if (!selectedChat) return;
+    try {
+      const res = await chatService.listMessages(selectedChat);
+      const rows = res.results || res || [];
+      setMessages(rows.map((m) => ({
+        id: m.id,
+        user: m.author_name || 'Anonymous',
+        avatar: m.author_initials || '??',
+        message: m.body || '',
+        time: formatTime(m.created_at),
+        isOwn: user && m.author === user.id,
+      })));
+    } catch (err) {
+      console.error('Failed to load chat messages:', err);
+    }
+  }, [selectedChat, user]);
+
+  useEffect(() => {
+    loadMessages();
+    const t = setInterval(loadMessages, 5000);
+    return () => clearInterval(t);
+  }, [loadMessages]);
 
   const currentChat = chats.find(c => c.id === selectedChat);
-  const currentMessages = messages[selectedChat] || [];
+  const currentMessages = messages;
 
-  const handleSendMessage = () => {
-    if (messageText.trim()) {
-      setMessageText('');
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !selectedChat) return;
+    const body = messageText.trim();
+    setMessageText('');
+    try {
+      await chatService.sendMessage({ channel: selectedChat, body });
+      loadMessages();
+    } catch (err) {
+      console.error('Send message failed:', err);
+      setMessageText(body); // restore on failure
     }
   };
 

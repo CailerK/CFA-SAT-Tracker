@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import leadershipService from '../services/leadership';
 import './TeamDevelopment.css';
 
 /* ----- Inline Lucide icons ----- */
@@ -40,10 +41,32 @@ const formatToday = () =>
 const TeamDevelopment = ({ user }) => {
   const [active, setActive] = useState('all');
   const [query, setQuery] = useState('');
-  const [scope, setScope] = useState('my-team'); // 'my-team' | 'all'
+  const [scope, setScope] = useState('my-team');
+  const [members, setMembers] = useState([]);
 
-  // Hardcoded empty list — wire to API later
-  const members = useMemo(() => [], []);
+  const refresh = useCallback(async () => {
+    try {
+      const res = await leadershipService.listProgress({
+        scope,
+        position: active !== 'all' ? active : undefined,
+      });
+      const rows = res.results || res || [];
+      // Each row has { user_name, user_initials, track_name, status, current_step, completed_steps }
+      setMembers(rows.map((r) => ({
+        id: r.id,
+        name: r.user_name || 'Unknown',
+        initials: r.user_initials || '??',
+        position: r.track_slug || 'team-member',
+        status: r.status,
+        currentStep: r.current_step || 0,
+        completedSteps: r.completed_steps || 0,
+      })));
+    } catch (err) {
+      console.error('Failed to load team development:', err);
+    }
+  }, [scope, active]);
+
+  useEffect(() => { refresh(); }, [refresh]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return members.filter((m) => {

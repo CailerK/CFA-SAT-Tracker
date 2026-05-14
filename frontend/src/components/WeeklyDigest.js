@@ -1,71 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './WeeklyDigest.css';
+import weeklyDigestService from '../services/weeklyDigest';
+
+// Empty skeleton used while the digest loads / no data yet.
+const EMPTY_DAY = {
+  date: '',
+  summary: { totalSales: '$0.00', transactions: 0, avgTicket: '$0.00', peakHour: '—' },
+  highlights: [
+    { label: 'Busiest Hour', value: '—', icon: '📊' },
+    { label: 'Top Item', value: '—', icon: '🍗' },
+    { label: 'Staff Performance', value: '—', icon: '⭐' },
+    { label: 'Customer Satisfaction', value: '—', icon: '😊' },
+  ],
+  tasks: { completed: 0, total: 0, pending: [] },
+  staffing: { scheduled: 0, present: 0, absent: 0 },
+};
 
 const WeeklyDigest = ({ onBack }) => {
   const [selectedDay, setSelectedDay] = useState('Monday');
+  const [digestData, setDigestData] = useState({});
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-  const digestData = {
-    Monday: {
-      date: 'May 13, 2024',
-      summary: {
-        totalSales: '$4,250.00',
-        transactions: 142,
-        avgTicket: '$29.93',
-        peakHour: '12:00 PM - 1:00 PM'
-      },
-      highlights: [
-        { label: 'Busiest Hour', value: '12:00 PM - 1:00 PM', icon: '📊' },
-        { label: 'Top Item', value: 'Chicken Sandwich', icon: '🍗' },
-        { label: 'Staff Performance', value: '94% Efficiency', icon: '⭐' },
-        { label: 'Customer Satisfaction', value: '4.8/5.0', icon: '😊' }
-      ],
-      tasks: {
-        completed: 16,
-        total: 18,
-        pending: [
-          'Stock Ice cream supplies',
-          'Clean shake machine'
-        ]
-      },
-      staffing: {
-        scheduled: 8,
-        present: 8,
-        absent: 0
+  // Load the current week's digest. Backend returns per-day records keyed by weekday name.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await weeklyDigestService.get();
+        if (cancelled) return;
+        // Expected shape: { week_start, days: {Monday: {...}, ...} }
+        if (res && res.days && typeof res.days === 'object') {
+          // Normalize each day's keys snake_case → camelCase for the summary block.
+          const out = {};
+          for (const [d, body] of Object.entries(res.days)) {
+            out[d] = {
+              date: body.date || '',
+              summary: {
+                totalSales: body.summary?.total_sales || '$0.00',
+                transactions: body.summary?.transactions || 0,
+                avgTicket: body.summary?.avg_ticket || '$0.00',
+                peakHour: body.summary?.peak_hour || '—',
+              },
+              highlights: body.highlights || EMPTY_DAY.highlights,
+              tasks: body.tasks || EMPTY_DAY.tasks,
+              staffing: body.staffing || EMPTY_DAY.staffing,
+            };
+          }
+          setDigestData(out);
+        }
+      } catch (err) {
+        console.error('Failed to load weekly digest:', err);
       }
-    },
-    Tuesday: {
-      date: 'May 14, 2024',
-      summary: {
-        totalSales: '$3,890.00',
-        transactions: 128,
-        avgTicket: '$30.39',
-        peakHour: '1:00 PM - 2:00 PM'
-      },
-      highlights: [
-        { label: 'Busiest Hour', value: '1:00 PM - 2:00 PM', icon: '📊' },
-        { label: 'Top Item', value: 'Burger Combo', icon: '🍔' },
-        { label: 'Staff Performance', value: '91% Efficiency', icon: '⭐' },
-        { label: 'Customer Satisfaction', value: '4.7/5.0', icon: '😊' }
-      ],
-      tasks: {
-        completed: 15,
-        total: 18,
-        pending: [
-          'Restock napkins',
-          'Clean coolers'
-        ]
-      },
-      staffing: {
-        scheduled: 7,
-        present: 7,
-        absent: 0
-      }
-    }
-  };
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-  const currentData = digestData[selectedDay] || digestData.Monday;
+  const currentData = digestData[selectedDay] || EMPTY_DAY;
 
   return (
     <div className="weekly-digest-page">

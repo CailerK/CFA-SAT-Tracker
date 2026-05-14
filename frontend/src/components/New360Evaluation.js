@@ -1,13 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import leadershipService from '../services/leadership';
 import './New360Evaluation.css';
 
-const New360Evaluation = ({ onBack }) => {
+const New360Evaluation = ({ onBack, onNavigate }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedLeader, setSelectedLeader] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [startDate, setStartDate] = useState('April 20th, 2026');
   const [dueDate, setDueDate] = useState('April 27th, 2026');
   const [evaluators, setEvaluators] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [saveStatus, setSaveStatus] = useState(null);
+
+  // Load real templates from the backend on mount. Falls back to the
+  // hardcoded list (defined below) if the API returns empty.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await leadershipService.listTemplates();
+        const rows = res.results || res || [];
+        if (!cancelled && rows.length) {
+          setTemplates(rows.map((t) => ({
+            id: t.id,
+            name: t.name,
+            description: t.description || 'Leadership 360 evaluation template',
+            sections: t.sections_count || 6,
+          })));
+        }
+      } catch (err) {
+        console.error('Failed to load 360 templates:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!selectedLeader || !selectedTemplate || evaluators.length < 2) return;
+    setSaveStatus('saving');
+    try {
+      await leadershipService.createEvaluation({
+        evaluatee: selectedLeader,
+        template: selectedTemplate,
+        due_date: dueDate,
+        evaluators: evaluators.map((e) => ({ user_id: e.userId || null, type: e.type.toLowerCase().replace(' ', '_') })),
+      });
+      setSaveStatus('saved');
+      setTimeout(() => onNavigate && onNavigate('leadership-360'), 800);
+    } catch (err) {
+      console.error('Create evaluation failed:', err);
+      setSaveStatus('error');
+    }
+  };
 
   const steps = [
     { id: 1, label: 'Leader', icon: '👤' },
@@ -16,12 +60,7 @@ const New360Evaluation = ({ onBack }) => {
     { id: 4, label: 'Evaluators', icon: '👥' }
   ];
 
-  const templates = [
-    { id: 'directors', name: 'Leadership 360 - Directors', description: 'Comprehensive 360-degree feedback template for leadership evaluation', sections: 6 },
-    { id: 'emerging', name: 'Leadership 360 - Emerging Leaders', description: 'Comprehensive 360-degree feedback template for leadership evaluation', sections: 6 },
-    { id: 'managers', name: 'Leadership 360 - Managers', description: 'Comprehensive 360-degree feedback template for leadership evaluation', sections: 6 },
-    { id: 'general', name: 'Leadership 360 Evaluation', description: 'Comprehensive 360-degree feedback template for leadership evaluation', sections: 6 }
-  ];
+  // `templates` now comes from useState (loaded from backend, see useEffect above).
 
   const handleNext = () => {
     if (currentStep < 4) setCurrentStep(currentStep + 1);

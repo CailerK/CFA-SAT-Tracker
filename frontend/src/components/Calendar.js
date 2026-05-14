@@ -1,25 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Calendar.css';
+import calendarService from '../services/calendar';
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-const EVENTS = {
-  '2024-05-13': [
-    { id: 1, title: 'Shift Planning', color: '#ef4444' },
-    { id: 2, title: 'Menu Review', color: '#a855f7' },
-  ],
-  '2024-05-18': [{ id: 3, title: 'Inventory Check', color: '#f97316' }],
-  '2024-05-25': [{ id: 4, title: 'Team Celebration', color: '#ec4899' }],
-  '2024-05-5':  [{ id: 5, title: 'Team Meeting',    color: '#3b82f6' }],
-  '2024-05-8':  [{ id: 6, title: 'Staff Training',  color: '#10b981' }],
+// Color palette per category — matches the legend strip in the existing UI.
+const CATEGORY_COLOR = {
+  weekly_task: '#3b82f6',
+  out_of_school: '#10b981',
+  store_event: '#ef4444',
+  local_event: '#f97316',
+  announcement: '#a855f7',
+  deadline: '#ec4899',
+  other: '#6b7280',
 };
 
 const pad = (n) => String(n).padStart(2, '0');
 
 const Calendar = ({ onBack }) => {
-  const [viewDate, setViewDate] = useState(new Date(2024, 4, 1)); // May 2024
+  const [viewDate, setViewDate] = useState(new Date());
   const [viewMode, setViewMode] = useState('month');
+  const [EVENTS, setEVENTS] = useState({});
+
+  // Load events for the current month whenever the view date changes.
+  useEffect(() => {
+    let cancelled = false;
+    const monthStr = `${viewDate.getFullYear()}-${pad(viewDate.getMonth() + 1)}`;
+    (async () => {
+      try {
+        const res = await calendarService.list({ month: monthStr });
+        const rows = res.results || res || [];
+        // Bucket events into a map keyed by 'YYYY-M-D' (matches original shape).
+        const bucket = {};
+        for (const e of rows) {
+          if (!e.starts_at) continue;
+          const d = new Date(e.starts_at);
+          const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+          (bucket[key] ||= []).push({
+            id: e.id,
+            title: e.title,
+            color: CATEGORY_COLOR[e.category] || '#6b7280',
+          });
+        }
+        if (!cancelled) setEVENTS(bucket);
+      } catch (err) {
+        console.error('Failed to load calendar:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [viewDate]);
 
   const today = new Date();
   const isToday = (d) =>

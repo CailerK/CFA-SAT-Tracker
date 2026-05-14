@@ -1,5 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './Vendors.css';
+import vendorsService from '../services/vendors';
+
+// Backend category slug ↔ UI label.
+const CATEGORY_FROM_API = {
+  food_beverage: 'Food & Beverage',
+  supplies: 'Supplies',
+  equipment: 'Equipment',
+  cleaning: 'Cleaning',
+  uniforms: 'Uniforms',
+  marketing: 'Marketing',
+  other: 'Other',
+};
+const CATEGORY_TO_API = Object.fromEntries(
+  Object.entries(CATEGORY_FROM_API).map(([k, v]) => [v, k])
+);
+
+const normalizeVendor = (raw) => ({
+  id: raw.id,
+  name: raw.name,
+  category: CATEGORY_FROM_API[raw.category] || 'Other',
+  contact: raw.contact_name || '',
+  phone: raw.phone || '',
+  email: raw.email || '',
+  website: raw.website || '',
+  accountNumber: raw.account_number || '',
+  notes: raw.notes || '',
+  tags: raw.tags || [],
+});
 
 const CATEGORIES = ['All', 'Food & Beverage', 'Supplies', 'Equipment', 'Cleaning', 'Uniforms', 'Marketing', 'Other'];
 
@@ -60,19 +88,51 @@ const Vendors = ({ onBack }) => {
   const [showAddModal, setShowAddModal]     = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [form, setForm]                     = useState(initForm);
+  const [vendors, setVendors] = useState([]);
 
-  const filtered = SAMPLE_VENDORS.filter(v => {
-    const matchesCat    = activeCategory === 'All' || v.category === activeCategory;
-    const matchesSearch = !searchQuery ||
-      v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.contact.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.category.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCat && matchesSearch;
-  });
+  const refresh = useCallback(async () => {
+    try {
+      const res = await vendorsService.list({
+        category: activeCategory !== 'All' ? CATEGORY_TO_API[activeCategory] : undefined,
+        q: searchQuery.trim() || undefined,
+      });
+      const rows = res.results || res || [];
+      setVendors(rows.map(normalizeVendor));
+    } catch (err) {
+      console.error('Failed to load vendors:', err);
+    }
+  }, [activeCategory, searchQuery]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  // Backend already filters.
+  const filtered = vendors;
 
   const countFor = (cat) => cat === 'All'
-    ? SAMPLE_VENDORS.length
-    : SAMPLE_VENDORS.filter(v => v.category === cat).length;
+    ? vendors.length
+    : vendors.filter(v => v.category === cat).length;
+
+  const handleSubmitVendor = async () => {
+    if (!form.name.trim() || !form.category) return;
+    try {
+      await vendorsService.create({
+        name: form.name.trim(),
+        category: CATEGORY_TO_API[form.category] || 'other',
+        contact_name: form.contact || '',
+        phone: form.phone || '',
+        email: form.email || '',
+        website: form.website || '',
+        account_number: form.accountNumber || '',
+        notes: form.notes || '',
+        tags: [],
+      });
+      setForm(initForm);
+      setShowAddModal(false);
+      refresh();
+    } catch (err) {
+      console.error('Create vendor failed:', err);
+    }
+  };
 
   const avatar = (name) => name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 

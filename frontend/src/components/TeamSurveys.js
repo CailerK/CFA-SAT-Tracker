@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import surveysService from '../services/surveys';
 import './TeamSurveys.css';
 
 // ===== Icons =====
@@ -12,10 +13,7 @@ const IconBarChart = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 
 const IconPlus = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M5 12h14"/><path d="M12 5v14"/></svg>);
 const IconSettings = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>);
 
-// ===== DEMO DATA (see FAKE_DATA.md) =====
 const STORE_NUMBER = '00727';
-const STATS = { visible: 0, active: 0, responses: 0, avgRate: 0 };
-const TOTAL_SURVEYS = 0;
 
 const FILTERS = [
   { id: 'all',      label: 'All' },
@@ -26,8 +24,40 @@ const FILTERS = [
 ];
 
 const TeamSurveys = ({ onNavigate }) => {
-  const [activeView, setActiveView] = useState('all-surveys'); // all-surveys | dashboard
+  const [activeView, setActiveView] = useState('all-surveys');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [STATS, setSTATS] = useState({ visible: 0, active: 0, responses: 0, avgRate: 0 });
+  const [surveys, setSurveys] = useState([]);
+  const [TOTAL_SURVEYS, setTOTAL_SURVEYS] = useState(0);
+
+  const refresh = useCallback(async () => {
+    try {
+      const apiStatus = activeFilter === 'active' ? 'active'
+        : activeFilter === 'closed' ? 'closed'
+        : activeFilter === 'drafts' ? 'draft'
+        : activeFilter === 'archived' ? 'archived'
+        : undefined;
+      const [list, statsData] = await Promise.all([
+        surveysService.list({ status: apiStatus }),
+        surveysService.stats().catch(() => null),
+      ]);
+      const rows = list.results || list || [];
+      setSurveys(rows);
+      setTOTAL_SURVEYS(list.count || rows.length);
+      if (statsData) {
+        setSTATS({
+          visible: statsData.visible || rows.length,
+          active: statsData.active || rows.filter(r => r.status === 'active').length,
+          responses: statsData.responses || 0,
+          avgRate: statsData.avg_rate || 0,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load surveys:', err);
+    }
+  }, [activeFilter]);
+
+  useEffect(() => { refresh(); }, [refresh]);
 
   const handleBackHome = () => onNavigate && onNavigate('dashboard');
 

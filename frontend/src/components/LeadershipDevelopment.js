@@ -1,7 +1,80 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import './LeadershipDevelopment.css';
+import leadershipService from '../services/leadership';
 
 const LeadershipDevelopment = ({ user, onNavigate }) => {
+  // Track which area_keys the current user has selected (persisted on backend).
+  const [selectedAreaIds, setSelectedAreaIds] = useState(new Set());
+  // Map area_key → backend record id so we can DELETE on toggle off.
+  const [areaRecordIds, setAreaRecordIds] = useState({});
+  const [notes, setNotes] = useState([]);
+  const [noteText, setNoteText] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [areaRes, noteRes] = await Promise.all([
+          leadershipService.listAreas(),
+          leadershipService.listNotes(),
+        ]);
+        if (cancelled) return;
+        const areaRows = areaRes.results || areaRes || [];
+        setSelectedAreaIds(new Set(areaRows.map((a) => a.area_key)));
+        const map = {};
+        for (const a of areaRows) map[a.area_key] = a.id;
+        setAreaRecordIds(map);
+        setNotes(noteRes.results || noteRes || []);
+      } catch (err) {
+        console.error('Failed to load leadership areas:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const toggleArea = async (areaKey) => {
+    const isSelected = selectedAreaIds.has(areaKey);
+    // Optimistic update.
+    setSelectedAreaIds((prev) => {
+      const next = new Set(prev);
+      if (isSelected) next.delete(areaKey);
+      else next.add(areaKey);
+      return next;
+    });
+    try {
+      if (isSelected) {
+        const id = areaRecordIds[areaKey];
+        if (id) await leadershipService.deleteArea(id);
+        setAreaRecordIds((m) => { const c = { ...m }; delete c[areaKey]; return c; });
+      } else {
+        const created = await leadershipService.createArea({ area_key: areaKey });
+        if (created?.id) {
+          setAreaRecordIds((m) => ({ ...m, [areaKey]: created.id }));
+        }
+      }
+    } catch (err) {
+      console.error('Toggle area failed:', err);
+      // Roll back.
+      setSelectedAreaIds((prev) => {
+        const next = new Set(prev);
+        if (isSelected) next.add(areaKey);
+        else next.delete(areaKey);
+        return next;
+      });
+    }
+  };
+
+  const saveNote = async () => {
+    if (!noteText.trim()) return;
+    try {
+      const created = await leadershipService.createNote({ text: noteText.trim() });
+      setNotes((n) => [created, ...n]);
+      setNoteText('');
+    } catch (err) {
+      console.error('Save note failed:', err);
+    }
+  };
+
   const areas = [
     { id: 'kitchen', name: 'Kitchen', icon: '🍳' },
     { id: 'drive-thru', name: 'Drive Thru', icon: '🚗' },
@@ -38,12 +111,21 @@ const LeadershipDevelopment = ({ user, onNavigate }) => {
         <h2>Add an Area</h2>
         <p>What part of the business do you own?</p>
         <div className="areas-grid">
-          {areas.map(area => (
-            <button key={area.id} className="area-card">
-              <span className="area-icon">{area.icon}</span>
-              <span className="area-name">{area.name}</span>
-            </button>
-          ))}
+          {areas.map(area => {
+            const isSelected = selectedAreaIds.has(area.id);
+            return (
+              <button
+                key={area.id}
+                className={`area-card ${isSelected ? 'selected' : ''}`}
+                onClick={() => toggleArea(area.id)}
+                style={isSelected ? { borderColor: '#E51636', background: '#fff5f6' } : {}}
+              >
+                <span className="area-icon">{area.icon}</span>
+                <span className="area-name">{area.name}</span>
+                {isSelected && <span style={{ color: '#E51636', marginLeft: 6 }}>✓</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
 
