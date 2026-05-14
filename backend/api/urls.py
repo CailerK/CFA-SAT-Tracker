@@ -40,6 +40,12 @@ from .views_phase8 import (
     SurveyViewSet,
     VendorViewSet,
 )
+from .views_phase9 import (
+    NotificationViewSet,
+    dashboard_insights_catalog,
+    dashboard_insights_values,
+    weekly_digest,
+)
 from .views_setup_sheets import SetupSheetTemplateViewSet, SetupSheetViewSet
 from .views_shift_summary import ShiftSummaryViewSet, ShiftTagViewSet
 from .views_team import (
@@ -187,6 +193,12 @@ router.register(
     SurveyViewSet,
     basename="survey",
 )
+# Phase 9: Notifications
+router.register(
+    r"notifications",
+    NotificationViewSet,
+    basename="notification",
+)
 
 
 urlpatterns = [
@@ -251,6 +263,11 @@ urlpatterns = [
     path("kitchen/waste/top-items/", waste_top_items, name="waste_top_items"),
     path("kitchen/waste/goals/", waste_goals, name="waste_goals"),
 
-    # Router-managed (Phase 1-4 viewsets)
+    # Phase 9: Dashboard insights + weekly digest
+    path("dashboard/insights/catalog/", dashboard_insights_catalog, name="dashboard_insights_catalog"),
+    path("dashboard/insights/values/", dashboard_insights_values, name="dashboard_insights_values"),
+    path("weekly-digest/", weekly_digest, name="weekly_digest"),
+
+    # Router-managed (Phase 1-8 viewsets)
     path("", include(router.urls)),
 ]

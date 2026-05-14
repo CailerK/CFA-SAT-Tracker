@@ -506,7 +506,86 @@ These rules apply everywhere — flag any place they're violated.
 ---
 
 ## Phase 9 — Polish (Notifications, Dashboard insights, Weekly Digest)
-_(To be added.)_
+
+### Notifications
+
+#### As any user:
+- [ ] Bell icon in header shows unread count badge.
+- [ ] Click bell icon → opens notifications dropdown/panel.
+- [ ] Notifications list shows title, message, timestamp, read/unread status.
+- [ ] Click notification → marks as read and navigates to action_url (if present).
+- [ ] "Mark all as read" button marks all notifications as read.
+- [ ] Unread count updates in real-time after marking as read.
+
+#### API Endpoints:
+- [ ] `GET /api/notifications/` returns user's notifications (newest first).
+- [ ] `POST /api/notifications/:id/mark-read/` marks single notification as read.
+- [ ] `POST /api/notifications/mark-all-read/` marks all as read, returns count.
+- [ ] `GET /api/notifications/unread-count/` returns unread count for badge.
+- [ ] Users can only see their own notifications (scoped by user).
+
+### Dashboard Insights
+
+#### As any user:
+- [ ] Dashboard shows customizable insight cards.
+- [ ] Click "Customize Dashboard" → opens modal with insight catalog.
+- [ ] Insight catalog shows 6 available insights:
+  - Tasks Completed Today (operations)
+  - Waste Today (kitchen)
+  - Shifts Logged (operations)
+  - Team Size (team)
+  - Open Complaints (guest_recovery)
+  - Upcoming Events (calendar)
+- [ ] Can select/deselect insights to show on dashboard.
+- [ ] Selected insights persist in UserPreferences.
+- [ ] Insight cards show real-time values from backend.
+- [ ] Values update when page refreshes.
+
+#### API Endpoints:
+- [ ] `GET /api/dashboard/insights/catalog/` returns full catalog of 6 insights.
+- [ ] `GET /api/dashboard/insights/values/?ids=tasks_completed_today,waste_today` returns actual values for requested IDs.
+- [ ] Values include: value (number), label (formatted string), trend (optional).
+- [ ] `PATCH /api/users/me/preferences/` persists insight_ids selection.
+
+### Weekly Digest
+
+#### As any user:
+- [ ] Weekly digest page shows aggregated stats for current week.
+- [ ] Can select different weeks via date picker.
+- [ ] Stats shown:
+  - Shifts logged
+  - FOH tasks completed
+  - Cleaning tasks completed
+  - Kitchen tasks completed
+  - Waste total ($)
+  - Waste entries count
+  - Complaints received
+  - Complaints resolved
+  - Training completed
+- [ ] Week starts on Monday, ends on Sunday.
+- [ ] Stats are accurate for the selected week.
+
+#### API Endpoints:
+- [ ] `GET /api/weekly-digest/` returns current week's digest.
+- [ ] `GET /api/weekly-digest/?week=2026-05-12` returns specific week's digest.
+- [ ] Week parameter is start of week (Monday).
+- [ ] Returns aggregated counts and totals from all operational data.
+
+### UserPreferences Persistence
+
+#### As any user:
+- [ ] Dashboard customization (insight_ids) persists across sessions.
+- [ ] Quick actions customization (quick_action_ids) persists across sessions.
+- [ ] `GET /api/users/me/preferences/` returns current preferences including insight_ids and quick_action_ids.
+- [ ] `PATCH /api/users/me/preferences/` updates preferences.
+- [ ] Preferences are user-specific (not shared across users).
+
+### Integration Testing:
+- [ ] Create a notification → appears in list with unread badge.
+- [ ] Mark notification as read → badge count decreases.
+- [ ] Select insights on dashboard → preferences saved, insights load on next visit.
+- [ ] View weekly digest for past week → shows historical data accurately.
+- [ ] All Phase 9 endpoints respect authentication (require login).
 
 ---
 

@@ -34,6 +34,7 @@ from .models import (
     MaintenanceSchedule,
     MealPeriod,
     MenuItem,
+    Notification,
     PositionTrack,
     QuickLink,
     QuickLinkCategory,
@@ -1128,3 +1129,15 @@ class SurveySerializer(serializers.ModelSerializer):
 
     def get_response_count(self, obj):
         return obj.responses.count()
+
+
+# ============================================================================
+# Phase 9: Notifications
+# ============================================================================
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ["id", "user", "notification_type", "title", "message",
+                  "is_read", "action_url", "created_at"]
+        read_only_fields = ["id", "user", "created_at"]
