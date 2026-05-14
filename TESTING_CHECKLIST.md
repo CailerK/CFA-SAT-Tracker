@@ -384,7 +384,124 @@ These rules apply everywhere — flag any place they're violated.
 ---
 
 ## Phase 8 — Calendar, Guest Recovery, Vendors, Team Chat, Surveys
-_(To be added.)_
+
+### `/calendar` (Calendar Events)
+
+#### As manager:
+- [ ] Page loads with calendar view showing events.
+- [ ] Can create new events with title, category, start/end times, all-day toggle, notes.
+- [ ] Categories: Weekly Task, Out of School, Store Event, Local Event, Announcement, Deadline, Other.
+- [ ] Events display on calendar with color coding by category.
+- [ ] Can edit and delete events.
+- [ ] "Upcoming Events" section shows next 30 days.
+
+#### As team member:
+- [ ] Can view all calendar events.
+- [ ] Cannot create, edit, or delete events (manager-only).
+
+### `/guest-recovery` (Guest Complaints)
+
+#### As manager:
+- [ ] Page loads with complaints list showing guest name, category, status, occurred date.
+- [ ] Can create new complaint with guest info, category, description, occurred time.
+- [ ] Categories: Order Error, Service, Food Quality, Wait Time, Cleanliness, Staff Behavior, App/Rewards, Other.
+- [ ] Can assign complaints to team members.
+- [ ] Can mark complaints as resolved with resolution notes.
+- [ ] Stats card shows: Total, Open, In Progress, Resolved counts.
+- [ ] Filter by status (open/in_progress/resolved).
+
+#### As team member:
+- [ ] Can view all complaints.
+- [ ] Can see complaints assigned to them.
+- [ ] Cannot create or assign complaints (manager-only).
+
+### `/vendors` (Vendor Directory)
+
+#### As manager:
+- [ ] Page loads with vendor list showing name, category, contact info.
+- [ ] Can create new vendor with all fields (name, category, contact, phone, email, website, account #, notes, tags).
+- [ ] Categories: Food & Beverage, Supplies, Equipment, Cleaning, Uniforms, Marketing, Other.
+- [ ] Tags are editable (e.g., "Primary", "Weekly Delivery", "Auto-Ship").
+- [ ] Can edit and archive vendors.
+- [ ] Search/filter by category or tags.
+
+#### As team member:
+- [ ] Can view vendor directory.
+- [ ] Cannot create, edit, or archive vendors (manager-only).
+
+### `/team-chat` (Team Chat)
+
+#### As any user:
+- [ ] Page loads with 4 default channels: #general, #operations, #kitchen, #foh.
+- [ ] Can select a channel and see message history (last 100 messages).
+- [ ] Can post messages to channels they're a member of.
+- [ ] Messages show author name, initials, timestamp.
+- [ ] Real-time updates via polling (no WebSockets yet).
+- [ ] Unread count badge on channels with new messages.
+
+#### As manager:
+- [ ] Can create new chat channels.
+- [ ] Can set channel as default.
+- [ ] Can manage channel memberships.
+
+### `/surveys` (Team Surveys)
+
+#### As manager:
+- [ ] Page loads with surveys list showing title, status, response count.
+- [ ] Can create new survey with title, open/close dates, anonymous toggle.
+- [ ] Can add questions with types: Text, Rating, Multiple Choice, Yes/No.
+- [ ] Can set questions as required.
+- [ ] Can activate/close/archive surveys.
+- [ ] Can view survey results (aggregated responses).
+- [ ] Results respect anonymity setting (no user names if anonymous).
+
+#### As team member:
+- [ ] Can see active surveys only.
+- [ ] Can submit responses to active surveys.
+- [ ] Anonymous surveys don't capture user identity.
+- [ ] Cannot view survey results (manager-only).
+- [ ] Cannot create or edit surveys (manager-only).
+
+### API Endpoints (Backend Testing)
+
+#### Calendar:
+- [ ] `GET /api/calendar/` returns all events for store.
+- [ ] `POST /api/calendar/` creates new event (manager-only).
+- [ ] `GET /api/calendar/upcoming/` returns events in next 30 days.
+- [ ] `PATCH /api/calendar/:id/` updates event.
+- [ ] `DELETE /api/calendar/:id/` deletes event.
+
+#### Guest Recovery:
+- [ ] `GET /api/guest-complaints/` returns all complaints.
+- [ ] `POST /api/guest-complaints/` creates complaint (manager-only).
+- [ ] `POST /api/guest-complaints/:id/assign/` assigns to user.
+- [ ] `POST /api/guest-complaints/:id/resolve/` marks as resolved.
+- [ ] `GET /api/guest-complaints/stats/` returns status counts.
+
+#### Vendors:
+- [ ] `GET /api/vendors/` returns all vendors.
+- [ ] `POST /api/vendors/` creates vendor (manager-only).
+- [ ] `PATCH /api/vendors/:id/` updates vendor.
+- [ ] Tags field accepts JSON array of strings.
+
+#### Team Chat:
+- [ ] `GET /api/chat/channels/` returns 4 default channels.
+- [ ] `GET /api/chat/messages/` returns messages for user's channels.
+- [ ] `GET /api/chat/messages/channel/:id/` returns last 100 messages for channel.
+- [ ] `POST /api/chat/messages/` creates message (auto-sets author).
+
+#### Surveys:
+- [ ] `GET /api/surveys/` returns active surveys (or all if manager).
+- [ ] `POST /api/surveys/` creates survey (manager-only).
+- [ ] `POST /api/surveys/:id/respond/` submits response with answers.
+- [ ] `GET /api/surveys/:id/results/` returns results (manager-only).
+- [ ] Anonymous surveys have null user on responses.
+
+### Permissions Testing:
+- [ ] Team members can view all Phase 8 data but cannot create/edit (except chat messages and survey responses).
+- [ ] Managers can create/edit calendar events, complaints, vendors, channels, and surveys.
+- [ ] Survey results are manager-only.
+- [ ] Chat messages are scoped to channels user is a member of.
 
 ---
 

@@ -8,6 +8,10 @@ to camelCase at the App.js boundary (see frontend/src/App.js).
 from rest_framework import serializers
 
 from .models import (
+    CalendarEvent,
+    ChatChannel,
+    ChatMembership,
+    ChatMessage,
     CleaningCompletion,
     CleaningTask,
     Department,
@@ -21,6 +25,7 @@ from .models import (
     FOHTaskTemplate,
     FoodSafetyCompletion,
     FoodSafetyTask,
+    GuestComplaint,
     KitchenChecklistCompletion,
     KitchenChecklistTask,
     LeadershipArea,
@@ -39,6 +44,10 @@ from .models import (
     ShiftTag,
     Store,
     StoreSettings,
+    Survey,
+    SurveyAnswer,
+    SurveyQuestion,
+    SurveyResponse,
     TemperatureReading,
     TemperatureTarget,
     TimeBlock,
@@ -48,6 +57,7 @@ from .models import (
     TrainingPlan,
     User,
     UserPreferences,
+    Vendor,
     WasteEntry,
     WasteReason,
 )
@@ -952,3 +962,169 @@ class LeadershipNoteSerializer(serializers.ModelSerializer):
         model = LeadershipNote
         fields = ["id", "user", "text", "created_at"]
         read_only_fields = ["id", "created_at"]
+
+
+# ============================================================================
+# Phase 8: Calendar
+# ============================================================================
+
+class CalendarEventSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CalendarEvent
+        fields = ["id", "title", "category", "starts_at", "ends_at", "all_day",
+                  "notes", "created_by", "created_by_name", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_by", "created_by_name", "created_at", "updated_at"]
+
+    def get_created_by_name(self, obj):
+        u = obj.created_by
+        return (f"{u.first_name} {u.last_name}".strip() or u.email) if u else None
+
+
+# ============================================================================
+# Phase 8: Guest Recovery
+# ============================================================================
+
+class GuestComplaintSerializer(serializers.ModelSerializer):
+    assigned_to_name = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GuestComplaint
+        fields = ["id", "guest_name", "guest_phone", "category", "description",
+                  "status", "resolution", "assigned_to", "assigned_to_name",
+                  "occurred_at", "resolved_at", "created_by", "created_by_name",
+                  "created_at", "updated_at"]
+        read_only_fields = ["id", "assigned_to_name", "created_by_name",
+                            "created_at", "updated_at"]
+
+    def get_assigned_to_name(self, obj):
+        u = obj.assigned_to
+        return (f"{u.first_name} {u.last_name}".strip() or u.email) if u else None
+
+    def get_created_by_name(self, obj):
+        u = obj.created_by
+        return (f"{u.first_name} {u.last_name}".strip() or u.email) if u else None
+
+
+# ============================================================================
+# Phase 8: Vendors
+# ============================================================================
+
+class VendorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Vendor
+        fields = ["id", "name", "category", "contact_name", "phone", "email",
+                  "website", "account_number", "notes", "tags",
+                  "archived_at", "created_at", "updated_at"]
+        read_only_fields = ["id", "archived_at", "created_at", "updated_at"]
+
+
+# ============================================================================
+# Phase 8: Team Chat
+# ============================================================================
+
+class ChatChannelSerializer(serializers.ModelSerializer):
+    unread_count = serializers.SerializerMethodField()
+    member_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatChannel
+        fields = ["id", "name", "slug", "is_default", "unread_count", "member_count",
+                  "created_at"]
+        read_only_fields = ["id", "unread_count", "member_count", "created_at"]
+
+    def get_unread_count(self, obj):
+        # Placeholder: would calculate unread messages for current user
+        return 0
+
+    def get_member_count(self, obj):
+        return obj.memberships.count()
+
+
+class ChatMembershipSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatMembership
+        fields = ["id", "channel", "user", "user_name", "joined_at", "last_read_at"]
+        read_only_fields = ["id", "user_name", "joined_at"]
+
+    def get_user_name(self, obj):
+        u = obj.user
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+
+class ChatMessageSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+    author_initials = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatMessage
+        fields = ["id", "channel", "author", "author_name", "author_initials",
+                  "body", "created_at", "edited_at"]
+        read_only_fields = ["id", "author", "author_name", "author_initials",
+                            "created_at"]
+
+    def get_author_name(self, obj):
+        u = obj.author
+        return (f"{u.first_name} {u.last_name}".strip() or u.email) if u else "Unknown"
+
+    def get_author_initials(self, obj):
+        return obj.author.initials if obj.author else "?"
+
+
+# ============================================================================
+# Phase 8: Surveys
+# ============================================================================
+
+class SurveyQuestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SurveyQuestion
+        fields = ["id", "survey", "text", "kind", "options", "order", "required"]
+        read_only_fields = ["id"]
+
+
+class SurveyAnswerSerializer(serializers.ModelSerializer):
+    question_text = serializers.CharField(source="question.text", read_only=True)
+
+    class Meta:
+        model = SurveyAnswer
+        fields = ["id", "response", "question", "question_text", "value"]
+        read_only_fields = ["id", "question_text"]
+
+
+class SurveyResponseSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    answers = SurveyAnswerSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SurveyResponse
+        fields = ["id", "survey", "user", "user_name", "answers", "submitted_at"]
+        read_only_fields = ["id", "user_name", "submitted_at"]
+
+    def get_user_name(self, obj):
+        u = obj.user
+        return (f"{u.first_name} {u.last_name}".strip() or u.email) if u else "Anonymous"
+
+
+class SurveySerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+    questions = SurveyQuestionSerializer(many=True, read_only=True)
+    response_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Survey
+        fields = ["id", "title", "status", "opens_at", "closes_at", "is_anonymous",
+                  "created_by", "created_by_name", "questions", "response_count",
+                  "created_at", "updated_at"]
+        read_only_fields = ["id", "created_by", "created_by_name", "questions",
+                            "response_count", "created_at", "updated_at"]
+
+    def get_created_by_name(self, obj):
+        u = obj.created_by
+        return (f"{u.first_name} {u.last_name}".strip() or u.email) if u else None
+
+    def get_response_count(self, obj):
+        return obj.responses.count()

@@ -9,6 +9,8 @@ text within a shift). Safe to re-run on every deploy.
 from datetime import date, timedelta
 
 from .models import (
+    CalendarEvent,
+    ChatChannel,
     CleaningTask,
     Department,
     Equipment,
@@ -16,6 +18,7 @@ from .models import (
     Evaluation360Template,
     FOHTaskTemplate,
     FoodSafetyTask,
+    GuestComplaint,
     KitchenChecklistTask,
     LeadershipModule,
     LeadershipActivity,
@@ -28,9 +31,12 @@ from .models import (
     SetupSheet,
     SetupSheetTemplate,
     ShiftTag,
+    Survey,
+    SurveyQuestion,
     TemperatureTarget,
     TrainingPlan,
     User,
+    Vendor,
     WasteReason,
 )
 
@@ -922,6 +928,193 @@ def seed_360_template(store):
         print("    360 evaluation template: already exists.")
 
 
+# ---------------------------------------------------------------------------
+# Phase 8: Calendar, Guest Recovery, Vendors, Team Chat, Surveys
+# ---------------------------------------------------------------------------
+
+def seed_calendar_events(store):
+    """Create sample calendar events."""
+    from datetime import datetime, timedelta
+    from django.utils import timezone
+    
+    today = timezone.now()
+    events = [
+        {
+            "title": "Weekly Manager Meeting",
+            "category": "weekly_task",
+            "starts_at": today.replace(hour=9, minute=0, second=0, microsecond=0),
+            "all_day": False,
+        },
+        {
+            "title": "Team Training Day",
+            "category": "store_event",
+            "starts_at": (today + timedelta(days=7)).replace(hour=14, minute=0),
+            "all_day": False,
+        },
+        {
+            "title": "Inventory Deadline",
+            "category": "deadline",
+            "starts_at": (today + timedelta(days=14)).replace(hour=17, minute=0),
+            "all_day": False,
+        },
+    ]
+    
+    created = 0
+    for event_data in events:
+        _, was_created = CalendarEvent.objects.get_or_create(
+            store=store,
+            title=event_data["title"],
+            defaults={
+                "category": event_data["category"],
+                "starts_at": event_data["starts_at"],
+                "all_day": event_data["all_day"],
+            },
+        )
+        if was_created:
+            created += 1
+    print(f"    Calendar events: +{created} created.")
+
+
+def seed_vendors(store):
+    """Create sample vendor directory."""
+    vendors = [
+        {
+            "name": "Sysco Food Services",
+            "category": "food_beverage",
+            "contact_name": "John Smith",
+            "phone": "555-0100",
+            "tags": ["Primary", "Weekly Delivery"],
+        },
+        {
+            "name": "US Foods",
+            "category": "food_beverage",
+            "contact_name": "Jane Doe",
+            "phone": "555-0101",
+            "tags": ["Backup"],
+        },
+        {
+            "name": "Cintas",
+            "category": "uniforms",
+            "contact_name": "Mike Johnson",
+            "phone": "555-0102",
+            "tags": ["Weekly Delivery"],
+        },
+        {
+            "name": "Ecolab",
+            "category": "cleaning",
+            "contact_name": "Sarah Williams",
+            "phone": "555-0103",
+            "tags": ["Auto-Ship"],
+        },
+        {
+            "name": "Restaurant Depot",
+            "category": "supplies",
+            "contact_name": "",
+            "phone": "555-0104",
+            "tags": [],
+        },
+    ]
+    
+    created = 0
+    for vendor_data in vendors:
+        _, was_created = Vendor.objects.get_or_create(
+            store=store,
+            name=vendor_data["name"],
+            defaults={
+                "category": vendor_data["category"],
+                "contact_name": vendor_data["contact_name"],
+                "phone": vendor_data["phone"],
+                "tags": vendor_data["tags"],
+            },
+        )
+        if was_created:
+            created += 1
+    print(f"    Vendors: +{created} created.")
+
+
+def seed_chat_channels(store):
+    """Create default chat channels."""
+    channels = [
+        {"name": "General", "slug": "general", "is_default": True},
+        {"name": "Operations", "slug": "operations", "is_default": False},
+        {"name": "Kitchen", "slug": "kitchen", "is_default": False},
+        {"name": "FOH", "slug": "foh", "is_default": False},
+    ]
+    
+    created = 0
+    for channel_data in channels:
+        _, was_created = ChatChannel.objects.get_or_create(
+            store=store,
+            slug=channel_data["slug"],
+            defaults={
+                "name": channel_data["name"],
+                "is_default": channel_data["is_default"],
+            },
+        )
+        if was_created:
+            created += 1
+    print(f"    Chat channels: +{created} created.")
+
+
+def seed_sample_survey(store):
+    """Create a sample team feedback survey."""
+    survey, was_created = Survey.objects.get_or_create(
+        store=store,
+        title="Team Engagement Survey",
+        defaults={
+            "status": "active",
+            "is_anonymous": True,
+        },
+    )
+    
+    if was_created:
+        # Add sample questions.
+        questions = [
+            {
+                "text": "How satisfied are you with your work environment?",
+                "kind": "rating",
+                "options": [],
+                "order": 0,
+                "required": True,
+            },
+            {
+                "text": "What do you enjoy most about working here?",
+                "kind": "text",
+                "options": [],
+                "order": 1,
+                "required": False,
+            },
+            {
+                "text": "Do you feel supported by your manager?",
+                "kind": "yes_no",
+                "options": [],
+                "order": 2,
+                "required": True,
+            },
+            {
+                "text": "Which area needs the most improvement?",
+                "kind": "multiple_choice",
+                "options": ["Communication", "Training", "Scheduling", "Equipment", "Other"],
+                "order": 3,
+                "required": False,
+            },
+        ]
+        
+        for q_data in questions:
+            SurveyQuestion.objects.create(
+                survey=survey,
+                text=q_data["text"],
+                kind=q_data["kind"],
+                options=q_data["options"],
+                order=q_data["order"],
+                required=q_data["required"],
+            )
+        
+        print("    Sample survey: +1 created with 4 questions.")
+    else:
+        print("    Sample survey: already exists.")
+
+
 def seed_all_for_store(store):
     """Run every per-store seeder. Idempotent."""
     print(f"  Seeding data for {store}…")
@@ -949,3 +1142,8 @@ def seed_all_for_store(store):
     seed_leadership_programs(store)
     seed_position_tracks(store)
     seed_360_template(store)
+    # Phase 8
+    seed_calendar_events(store)
+    seed_vendors(store)
+    seed_chat_channels(store)
+    seed_sample_survey(store)

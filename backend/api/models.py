@@ -1593,3 +1593,338 @@ class LeadershipNote(models.Model):
     def __str__(self):
         preview = self.text[:50] + "..." if len(self.text) > 50 else self.text
         return f"Note by {self.user.get_full_name()}: {preview}"
+
+
+# =============================================================================
+# Phase 8: Calendar
+# =============================================================================
+
+class CalendarEvent(models.Model):
+    """Store calendar events (tasks, announcements, deadlines, etc.)."""
+    CATEGORY_CHOICES = [
+        ('weekly_task', 'Weekly Task'),
+        ('out_of_school', 'Out of School'),
+        ('store_event', 'Store Event'),
+        ('local_event', 'Local Event'),
+        ('announcement', 'Announcement'),
+        ('deadline', 'Deadline'),
+        ('other', 'Other'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='calendar_events'
+    )
+    title = models.CharField(max_length=200)
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField(null=True, blank=True)
+    all_day = models.BooleanField(default=False)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='calendar_events_created',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['starts_at', '-id']
+        indexes = [
+            models.Index(fields=['store', 'starts_at']),
+            models.Index(fields=['store', 'category']),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.get_category_display()})"
+
+
+# =============================================================================
+# Phase 8: Guest Recovery
+# =============================================================================
+
+class GuestComplaint(models.Model):
+    """Guest complaint tracking for recovery and follow-up."""
+    CATEGORY_CHOICES = [
+        ('order_error', 'Order Error'),
+        ('service', 'Service'),
+        ('food_quality', 'Food Quality'),
+        ('wait_time', 'Wait Time'),
+        ('cleanliness', 'Cleanliness'),
+        ('staff_behavior', 'Staff Behavior'),
+        ('app_rewards', 'App/Rewards'),
+        ('other', 'Other'),
+    ]
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('in_progress', 'In Progress'),
+        ('resolved', 'Resolved'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='guest_complaints'
+    )
+    guest_name = models.CharField(max_length=100)
+    guest_phone = models.CharField(max_length=20, blank=True)
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES)
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    resolution = models.TextField(blank=True)
+    assigned_to = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='assigned_complaints',
+    )
+    occurred_at = models.DateTimeField()
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='complaints_created',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-occurred_at', '-id']
+        indexes = [
+            models.Index(fields=['store', 'status']),
+            models.Index(fields=['store', 'occurred_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.guest_name} - {self.get_category_display()} ({self.status})"
+
+
+# =============================================================================
+# Phase 8: Vendors
+# =============================================================================
+
+class Vendor(models.Model):
+    """Vendor directory with contact info and categorization."""
+    CATEGORY_CHOICES = [
+        ('food_beverage', 'Food & Beverage'),
+        ('supplies', 'Supplies'),
+        ('equipment', 'Equipment'),
+        ('cleaning', 'Cleaning'),
+        ('uniforms', 'Uniforms'),
+        ('marketing', 'Marketing'),
+        ('other', 'Other'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='vendors'
+    )
+    name = models.CharField(max_length=150)
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES)
+    contact_name = models.CharField(max_length=100, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    email = models.EmailField(blank=True)
+    website = models.URLField(blank=True)
+    account_number = models.CharField(max_length=100, blank=True)
+    notes = models.TextField(blank=True)
+    tags = models.JSONField(
+        default=list, blank=True,
+        help_text="List of tags like ['Primary', 'Weekly Delivery', 'Auto-Ship']",
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        indexes = [
+            models.Index(fields=['store', 'category']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_category_display()})"
+
+
+# =============================================================================
+# Phase 8: Team Chat
+# =============================================================================
+
+class ChatChannel(models.Model):
+    """Team chat channels (general, operations, kitchen, foh)."""
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='chat_channels'
+    )
+    name = models.CharField(max_length=80)
+    slug = models.CharField(
+        max_length=30,
+        help_text="URL-friendly identifier like 'general', 'operations', 'kitchen', 'foh'",
+    )
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['store', 'slug'],
+                name='unique_channel_slug_per_store',
+            ),
+        ]
+
+    def __str__(self):
+        return f"#{self.name}"
+
+
+class ChatMembership(models.Model):
+    """User membership in a chat channel."""
+    channel = models.ForeignKey(
+        ChatChannel, on_delete=models.CASCADE, related_name='memberships'
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='chat_memberships'
+    )
+    joined_at = models.DateTimeField(auto_now_add=True)
+    last_read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['joined_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['channel', 'user'],
+                name='unique_membership_per_channel',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} in #{self.channel.name}"
+
+
+class ChatMessage(models.Model):
+    """A single message in a chat channel."""
+    channel = models.ForeignKey(
+        ChatChannel, on_delete=models.CASCADE, related_name='messages'
+    )
+    author = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='chat_messages',
+    )
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+        indexes = [
+            models.Index(fields=['channel', 'created_at']),
+        ]
+
+    def __str__(self):
+        author_name = self.author.get_full_name() if self.author else "Unknown"
+        preview = self.body[:50] + "..." if len(self.body) > 50 else self.body
+        return f"{author_name}: {preview}"
+
+
+# =============================================================================
+# Phase 8: Surveys
+# =============================================================================
+
+class Survey(models.Model):
+    """Anonymous or identified surveys for team feedback."""
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('active', 'Active'),
+        ('closed', 'Closed'),
+        ('archived', 'Archived'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='surveys'
+    )
+    title = models.CharField(max_length=200)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    opens_at = models.DateTimeField(null=True, blank=True)
+    closes_at = models.DateTimeField(null=True, blank=True)
+    is_anonymous = models.BooleanField(
+        default=True,
+        help_text="If True, responses are not linked to users.",
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='surveys_created',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['store', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.get_status_display()})"
+
+
+class SurveyQuestion(models.Model):
+    """A question within a survey."""
+    KIND_CHOICES = [
+        ('text', 'Text'),
+        ('rating', 'Rating'),
+        ('multiple_choice', 'Multiple Choice'),
+        ('yes_no', 'Yes/No'),
+    ]
+
+    survey = models.ForeignKey(
+        Survey, on_delete=models.CASCADE, related_name='questions'
+    )
+    text = models.TextField()
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    options = models.JSONField(
+        default=list, blank=True,
+        help_text="For multiple_choice: list of option strings.",
+    )
+    order = models.PositiveIntegerField(default=0)
+    required = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f"Q{self.order}: {self.text[:50]}"
+
+
+class SurveyResponse(models.Model):
+    """A single user's response to a survey."""
+    survey = models.ForeignKey(
+        Survey, on_delete=models.CASCADE, related_name='responses'
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='survey_responses',
+        help_text="Null if survey is anonymous.",
+    )
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-submitted_at', '-id']
+
+    def __str__(self):
+        user_str = self.user.get_full_name() if self.user else "Anonymous"
+        return f"{user_str} - {self.survey.title}"
+
+
+class SurveyAnswer(models.Model):
+    """A single answer to a survey question."""
+    response = models.ForeignKey(
+        SurveyResponse, on_delete=models.CASCADE, related_name='answers'
+    )
+    question = models.ForeignKey(
+        SurveyQuestion, on_delete=models.CASCADE, related_name='answers'
+    )
+    value = models.JSONField(
+        help_text="Answer value: string for text, int for rating, string for choice, bool for yes/no.",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['response', 'question'],
+                name='unique_answer_per_question',
+            ),
+        ]
+
+    def __str__(self):
+        return f"Answer to {self.question.text[:30]}"

@@ -32,6 +32,14 @@ from .views_leadership import (
     PositionTrackViewSet,
     TrackProgressViewSet,
 )
+from .views_phase8 import (
+    CalendarEventViewSet,
+    ChatChannelViewSet,
+    ChatMessageViewSet,
+    GuestComplaintViewSet,
+    SurveyViewSet,
+    VendorViewSet,
+)
 from .views_setup_sheets import SetupSheetTemplateViewSet, SetupSheetViewSet
 from .views_shift_summary import ShiftSummaryViewSet, ShiftTagViewSet
 from .views_team import (
@@ -147,6 +155,37 @@ router.register(
     r"leadership/notes",
     LeadershipNoteViewSet,
     basename="leadership-note",
+)
+# Phase 8: Calendar, Guest Recovery, Vendors, Team Chat, Surveys
+router.register(
+    r"calendar",
+    CalendarEventViewSet,
+    basename="calendar-event",
+)
+router.register(
+    r"guest-complaints",
+    GuestComplaintViewSet,
+    basename="guest-complaint",
+)
+router.register(
+    r"vendors",
+    VendorViewSet,
+    basename="vendor",
+)
+router.register(
+    r"chat/channels",
+    ChatChannelViewSet,
+    basename="chat-channel",
+)
+router.register(
+    r"chat/messages",
+    ChatMessageViewSet,
+    basename="chat-message",
+)
+router.register(
+    r"surveys",
+    SurveyViewSet,
+    basename="survey",
 )
 
 
