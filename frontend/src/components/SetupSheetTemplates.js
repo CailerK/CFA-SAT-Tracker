@@ -135,18 +135,12 @@ const SetupSheetTemplates = ({ onBack, onNavigate }) => {
     }
   };
 
-  const handleEditTemplate = async (template) => {
-    const name = window.prompt('Rename template', template.name);
-    if (!name?.trim()) return;
-    const description = window.prompt('Description', template.description || '') || '';
-    try {
-      await setupSheetsService.updateTemplate(template.id, {
-        name: name.trim(),
-        description,
-      });
-      await refresh();
-    } catch (err) {
-      console.error('Failed to update setup template:', err);
+  const handleEditTemplate = (template) => {
+    // Open the full Edit Template page (pixel-match of LD Growth's
+    // "Configure Your Template"). The id is threaded through the URL hash so
+    // a refresh lands you back on the same template.
+    if (onNavigate) {
+      onNavigate('setup-sheet-template-edit', { templateId: template.id });
     }
   };
 

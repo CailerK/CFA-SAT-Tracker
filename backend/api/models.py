@@ -477,6 +477,16 @@ class TimeBlock(models.Model):
 
     Belongs to EITHER a template OR a sheet (XOR — enforced in clean()).
     """
+    DAY_CHOICES = [
+        ('monday', 'Monday'),
+        ('tuesday', 'Tuesday'),
+        ('wednesday', 'Wednesday'),
+        ('thursday', 'Thursday'),
+        ('friday', 'Friday'),
+        ('saturday', 'Saturday'),
+        ('sunday', 'Sunday'),
+    ]
+
     template = models.ForeignKey(
         SetupSheetTemplate, on_delete=models.CASCADE,
         related_name='time_blocks', null=True, blank=True,
@@ -485,19 +495,28 @@ class TimeBlock(models.Model):
         SetupSheet, on_delete=models.CASCADE,
         related_name='time_blocks', null=True, blank=True,
     )
+    # Day-of-week for template blocks (sheets are per-week so usually blank).
+    day_of_week = models.CharField(
+        max_length=10, choices=DAY_CHOICES, blank=True,
+    )
     label = models.CharField(max_length=100, blank=True)
     start_time = models.TimeField(null=True, blank=True)
     end_time = models.TimeField(null=True, blank=True)
     position = models.CharField(max_length=100, blank=True)
+    # Structured positions per department:
+    #   {"front_counter": ["Spa", "Opening 1"],
+    #    "drive_thru":   [...],
+    #    "kitchen":      [...]}
+    # The legacy [{role, count}] shape is still tolerated for back-compat.
     positions_needed = models.JSONField(
-        default=list, blank=True,
-        help_text="List of {role, count} pairs.",
+        default=dict, blank=True,
+        help_text="Per-department position list (FC/DT/Kitchen).",
     )
     notes = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ['order', 'id']
+        ordering = ['day_of_week', 'order', 'id']
 
     def clean(self):
         from django.core.exceptions import ValidationError

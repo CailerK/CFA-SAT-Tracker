@@ -234,37 +234,39 @@ const CleaningMaintenance = ({ user }) => {
             <div style={{ padding: 24, color: '#6b7280' }}>No {activeFrequency} cleaning tasks yet.</div>
           )}
           {currentTasks.map(task => (
-            <div key={task.id} className={`task-item ${task.completed ? 'completed' : ''}`}>
+            <div
+              key={task.id}
+              className={`task-item ${task.completed ? 'completed' : ''}`}
+            >
               <button
-                className="task-checkbox"
+                type="button"
+                className={`task-checkbox ${task.completed ? 'checked' : ''}`}
                 onClick={() => toggleTask(task.id)}
-                aria-label={task.completed ? 'Uncomplete' : 'Complete'}
+                role="checkbox"
+                aria-checked={task.completed}
+                aria-label={`${task.text} - Mark as ${task.completed ? 'incomplete' : 'complete'}`}
               >
                 {task.completed && (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
                 )}
               </button>
-              <div className="task-content">
+              <div className="task-text-wrap">
                 <span className="task-text">{task.text}</span>
-                {task.completed && task.completedBy && (
-                  <div className="task-meta">
-                    <span className="meta-user">{task.completedBy}</span>
-                    {task.completedAt && <span className="meta-time">{task.completedAt}</span>}
-                  </div>
-                )}
               </div>
               {canManageTasks && (
                 <button
                   className="task-delete"
-                  aria-label="Delete task"
+                  aria-label={`Delete task: ${task.text}`}
                   onClick={() => deleteTask(task.id)}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 6h18"/>
                     <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
                     <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                    <line x1="10" x2="10" y1="11" y2="17"/>
+                    <line x1="14" x2="14" y1="11" y2="17"/>
                   </svg>
                 </button>
               )}

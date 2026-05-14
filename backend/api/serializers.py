@@ -413,27 +413,30 @@ class TimeBlockSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeBlock
         fields = [
-            "id", "label", "start_time", "end_time",
+            "id", "day_of_week", "label",
+            "start_time", "end_time",
             "position", "positions_needed", "notes", "order",
         ]
         read_only_fields = ["id"]
 
 
 class SetupSheetTemplateSerializer(serializers.ModelSerializer):
-    """A reusable template. `time_blocks_count` is derived for the card UI."""
+    """A reusable template. `time_blocks_count` is derived for the card UI;
+    `time_blocks` is the nested list used by the Edit Template page."""
     time_blocks_count = serializers.IntegerField(read_only=True)
+    time_blocks = TimeBlockSerializer(many=True, read_only=True)
     created_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = SetupSheetTemplate
         fields = [
             "id", "name", "description",
-            "time_blocks_count",
+            "time_blocks_count", "time_blocks",
             "created_by", "created_by_name",
             "archived_at", "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "time_blocks_count", "created_by_name",
+            "id", "time_blocks_count", "time_blocks", "created_by_name",
             "created_at", "updated_at",
         ]
 
@@ -545,12 +548,24 @@ class CleaningTaskSerializer(serializers.ModelSerializer):
         ]
 
     def get_today_completion(self, obj):
-        prefetched = getattr(obj, "today_completion_list", None)
+        # `today_completion` is a misnomer for non-daily tasks: it represents
+        # the most recent completion within the active period for the task's
+        # frequency, so the UI checkbox reflects "done this week/month/quarter".
+        from .views_cleaning import period_window
+        start, end = period_window(obj.frequency)
+        prefetched = getattr(obj, "period_completion_list", None)
         if prefetched is not None:
-            comp = prefetched[0] if prefetched else None
+            comp = next(
+                (c for c in prefetched if start <= c.date <= end),
+                None,
+            )
         else:
-            from django.utils import timezone
-            comp = obj.completions.filter(date=timezone.localdate()).first()
+            comp = (
+                obj.completions
+                .filter(date__gte=start, date__lte=end)
+                .order_by('-date')
+                .first()
+            )
         return CleaningCompletionSerializer(comp).data if comp else None
 
 

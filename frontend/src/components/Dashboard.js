@@ -17,6 +17,7 @@ import GuestRecovery from './GuestRecovery';
 import Vendors from './Vendors';
 import Settings from './Settings';
 import SetupSheetTemplates from './SetupSheetTemplates';
+import SetupSheetTemplateEdit from './SetupSheetTemplateEdit';
 import SetupSheetBuilder from './SetupSheetBuilder';
 import SavedSetups from './SavedSetups';
 import ShiftSummary from './ShiftSummary';
@@ -41,13 +42,20 @@ import New360Evaluation from './New360Evaluation';
 
 // Read the current page from the URL hash so browser refresh / back / forward
 // preserve navigation state. Hash format: '#/settings' → 'settings'.
-const pageFromHash = () => {
+// Optionally, '#/page/:param' returns { page: 'page', param: ':param' } so
+// detail pages (e.g. setup-sheet-template-edit) can keep their id on refresh.
+const pageInfoFromHash = () => {
   const raw = (window.location.hash || '').replace(/^#\/?/, '');
-  return raw || 'dashboard';
+  if (!raw) return { page: 'dashboard', param: null };
+  const [page, ...rest] = raw.split('/');
+  return { page: page || 'dashboard', param: rest.length ? rest.join('/') : null };
 };
+const pageFromHash = () => pageInfoFromHash().page;
+const paramFromHash = () => pageInfoFromHash().param;
 
 const Dashboard = ({ user, onLogout }) => {
   const [currentPage, setCurrentPageRaw] = useState(pageFromHash);
+  const [currentParam, setCurrentParam] = useState(paramFromHash);
   const [notificationCount, setNotificationCount] = useState(0);
   const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
@@ -68,7 +76,7 @@ const Dashboard = ({ user, onLogout }) => {
   // Sentinel: if the page string starts with '__not_implemented__:', show
   // a quick alert instead of routing. The portion after the colon is the
   // feature name used in the message.
-  const setCurrentPage = useCallback((page) => {
+  const setCurrentPage = useCallback((page, param = null) => {
     if (typeof page === 'string' && page.startsWith('__not_implemented__')) {
       const featureName = page.split(':')[1] || 'This feature';
       // eslint-disable-next-line no-alert
@@ -76,7 +84,13 @@ const Dashboard = ({ user, onLogout }) => {
       return;
     }
     setCurrentPageRaw(page);
-    const targetHash = page === 'dashboard' ? '' : `#/${page}`;
+    setCurrentParam(param);
+    const targetHash =
+      page === 'dashboard'
+        ? ''
+        : param != null
+          ? `#/${page}/${param}`
+          : `#/${page}`;
     if (window.location.hash !== targetHash) {
       // Use replaceState when targetHash is empty to avoid leaving '#' in the URL.
       if (targetHash) {
@@ -93,7 +107,11 @@ const Dashboard = ({ user, onLogout }) => {
 
   // Sync component state when the user hits browser back/forward.
   useEffect(() => {
-    const onHashChange = () => setCurrentPageRaw(pageFromHash());
+    const onHashChange = () => {
+      const info = pageInfoFromHash();
+      setCurrentPageRaw(info.page);
+      setCurrentParam(info.param);
+    };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
@@ -360,7 +378,12 @@ const Dashboard = ({ user, onLogout }) => {
         ) : currentPage === 'setup-sheet-templates' ? (
           <SetupSheetTemplates 
             onBack={() => setCurrentPage('dashboard')} 
-            onNavigate={(page, data) => setCurrentPage(page)}
+            onNavigate={(page, data) => setCurrentPage(page, data?.templateId ?? null)}
+          />
+        ) : currentPage === 'setup-sheet-template-edit' ? (
+          <SetupSheetTemplateEdit
+            templateId={currentParam}
+            onBack={() => setCurrentPage('setup-sheet-templates')}
           />
         ) : currentPage === 'shift-summary' ? (
           <ShiftSummary 

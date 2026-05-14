@@ -41,6 +41,20 @@ const setupSheetsService = {
     });
   },
 
+  /** Atomically replace a template's time blocks. Each block:
+   *  { day_of_week, start_time, end_time, label, order,
+   *    positions_needed: { front_counter: [], drive_thru: [], kitchen: [] } }
+   */
+  async saveTemplateTimeBlocks(id, timeBlocks) {
+    return apiService.request(
+      `/setup-sheets/templates/${id}/save-time-blocks/`,
+      {
+        method: "POST",
+        body: JSON.stringify({ time_blocks: timeBlocks }),
+      }
+    );
+  },
+
   // ---------------- Sheets ----------------
 
   /** List sheets. Filters: mine (bool), status, q. */

@@ -15,6 +15,7 @@ Persistent file storage on Railway requires a volume mount which we'll add
 in a polish phase.
 """
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
@@ -38,6 +39,31 @@ from .serializers import (
 from .viewsets import StoreScopedViewSet
 
 
+VALID_DAYS = {d for d, _ in TimeBlock.DAY_CHOICES}
+VALID_DEPARTMENTS = {"front_counter", "drive_thru", "kitchen"}
+
+
+def _normalize_positions(raw):
+    """Coerce a positions_needed payload into the canonical
+    {front_counter: [...], drive_thru: [...], kitchen: [...]} shape.
+    Tolerates legacy [{role, count}] lists by treating them as flat
+    front_counter entries."""
+    out = {dept: [] for dept in VALID_DEPARTMENTS}
+    if isinstance(raw, dict):
+        for dept in VALID_DEPARTMENTS:
+            items = raw.get(dept) or []
+            if isinstance(items, list):
+                out[dept] = [str(item).strip() for item in items if str(item).strip()]
+    elif isinstance(raw, list):
+        # Legacy shape — drop into front_counter.
+        out["front_counter"] = [
+            (item.get("role") if isinstance(item, dict) else str(item)) or ""
+            for item in raw
+        ]
+        out["front_counter"] = [s.strip() for s in out["front_counter"] if s and s.strip()]
+    return out
+
+
 class SetupSheetTemplateViewSet(StoreScopedViewSet):
     """CRUD for reusable setup sheet templates."""
 
@@ -47,7 +73,7 @@ class SetupSheetTemplateViewSet(StoreScopedViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset().filter(archived_at__isnull=True)
-        return qs.order_by("-updated_at", "-id")
+        return qs.prefetch_related("time_blocks").order_by("-updated_at", "-id")
 
     def perform_create(self, serializer):
         serializer.save(store=self.request.user.store, created_by=self.request.user)
@@ -55,6 +81,66 @@ class SetupSheetTemplateViewSet(StoreScopedViewSet):
     def perform_destroy(self, instance):
         instance.archived_at = timezone.now()
         instance.save(update_fields=["archived_at"])
+
+    @action(detail=True, methods=["post"], url_path="save-time-blocks")
+    def save_time_blocks(self, request, pk=None):
+        """Atomically replace this template's time blocks with the supplied list.
+
+        Body: {"time_blocks": [
+            {"day_of_week": "monday",
+             "start_time": "05:00",
+             "end_time":   "06:00",
+             "label":      "",
+             "order":      0,
+             "positions_needed": {
+                "front_counter": ["Spa", "Opening 1"],
+                "drive_thru":    ["Order Taker"],
+                "kitchen":       []}},
+            ...]}
+        """
+        template = self.get_object()
+        blocks = request.data.get("time_blocks")
+        if not isinstance(blocks, list):
+            raise ValidationError({"time_blocks": "Expected a list."})
+
+        cleaned = []
+        for i, b in enumerate(blocks):
+            if not isinstance(b, dict):
+                raise ValidationError({"time_blocks": f"Item {i} must be an object."})
+            day = (b.get("day_of_week") or "").lower().strip()
+            if day and day not in VALID_DAYS:
+                raise ValidationError(
+                    {"time_blocks": f"Item {i} has invalid day_of_week '{day}'."}
+                )
+            cleaned.append({
+                "day_of_week": day,
+                "label": (b.get("label") or "")[:100],
+                "start_time": b.get("start_time") or None,
+                "end_time": b.get("end_time") or None,
+                "position": (b.get("position") or "")[:100],
+                "positions_needed": _normalize_positions(b.get("positions_needed")),
+                "notes": b.get("notes") or "",
+                "order": int(b.get("order") or i),
+            })
+
+        with transaction.atomic():
+            template.time_blocks.all().delete()
+            TimeBlock.objects.bulk_create([
+                TimeBlock(template=template, **c) for c in cleaned
+            ])
+            # Bump updated_at so the templates list reflects the change.
+            template.save(update_fields=["updated_at"])
+
+        # Return the fresh template payload (with embedded time_blocks).
+        template = (
+            SetupSheetTemplate.objects
+            .prefetch_related("time_blocks")
+            .get(pk=template.pk)
+        )
+        return Response(
+            SetupSheetTemplateSerializer(template).data,
+            status=status.HTTP_200_OK,
+        )
 
 
 class SetupSheetViewSet(StoreScopedViewSet):

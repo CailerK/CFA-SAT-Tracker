@@ -11,7 +11,8 @@ Cleaning & Maintenance endpoints.
   GET    /api/cleaning/tasks/history/?range=30d            recent completions
 """
 
-from datetime import timedelta
+from calendar import monthrange
+from datetime import date as _date_cls, timedelta
 
 from django.db.models import Prefetch
 from django.utils import timezone
@@ -31,6 +32,41 @@ from .viewsets import StoreScopedViewSet
 
 def _today():
     return timezone.localdate()
+
+
+def period_window(frequency, today=None):
+    """Return (start_date, end_date) inclusive for the active period of `frequency`.
+
+    Daily     : today only.
+    Weekly    : Sunday..Saturday containing `today` (resets midnight Sat→Sun;
+                operationally the new week starts Monday since CFA is closed Sunday).
+    Monthly   : first..last day of `today`'s month (resets midnight on the 1st).
+    Quarterly : first day of Jan/Apr/Jul/Oct .. last day of Mar/Jun/Sep/Dec
+                containing `today`.
+    """
+    if today is None:
+        today = _today()
+    if frequency == 'daily':
+        return today, today
+    if frequency == 'weekly':
+        # Mon=0..Sun=6 → days since Sunday: Sun=0, Mon=1, ..., Sat=6.
+        days_since_sunday = (today.weekday() + 1) % 7
+        start = today - timedelta(days=days_since_sunday)
+        end = start + timedelta(days=6)
+        return start, end
+    if frequency == 'monthly':
+        start = today.replace(day=1)
+        end = today.replace(day=monthrange(today.year, today.month)[1])
+        return start, end
+    if frequency == 'quarterly':
+        q_index = (today.month - 1) // 3
+        start_month = q_index * 3 + 1
+        end_month = start_month + 2
+        start = _date_cls(today.year, start_month, 1)
+        end = _date_cls(today.year, end_month, monthrange(today.year, end_month)[1])
+        return start, end
+    # Unknown frequency — fall back to single day.
+    return today, today
 
 
 class CleaningTaskViewSet(StoreScopedViewSet):
@@ -54,9 +90,17 @@ class CleaningTaskViewSet(StoreScopedViewSet):
             qs = qs.filter(scope=scope)
         if frequency:
             qs = qs.filter(frequency=frequency)
-        today_qs = CleaningCompletion.objects.filter(date=_today())
+        # Prefetch every completion that could fall inside any active period
+        # window (the widest is quarterly). The serializer narrows per-task by
+        # the task's own frequency.
+        q_start, _q_end = period_window('quarterly', _today())
+        period_qs = (
+            CleaningCompletion.objects
+            .filter(date__gte=q_start)
+            .order_by('-date')
+        )
         return qs.prefetch_related(
-            Prefetch("completions", queryset=today_qs, to_attr="today_completion_list")
+            Prefetch("completions", queryset=period_qs, to_attr="period_completion_list")
         ).order_by("scope", "frequency", "order", "id")
 
     def perform_destroy(self, instance):
@@ -66,15 +110,35 @@ class CleaningTaskViewSet(StoreScopedViewSet):
     @action(detail=True, methods=["post"], url_path="complete")
     def complete(self, request, pk=None):
         task = self.get_object()
+        today = _today()
+        start, end = period_window(task.frequency, today)
+        # If already completed within the active period, return the existing row
+        # rather than creating a duplicate. This is what makes weekly/monthly/
+        # quarterly checkboxes "stick" until the period ends.
+        existing = (
+            CleaningCompletion.objects
+            .filter(task=task, date__gte=start, date__lte=end)
+            .order_by('-date')
+            .first()
+        )
+        notes = request.data.get("notes")
+        if existing is not None:
+            if notes is not None:
+                existing.notes = notes[:1000]
+                existing.save(update_fields=["notes"])
+            return Response(
+                CleaningCompletionSerializer(existing).data,
+                status=status.HTTP_200_OK,
+            )
         completion, created = CleaningCompletion.objects.get_or_create(
-            task=task, date=_today(),
+            task=task, date=today,
             defaults={
                 "completed_by": request.user,
-                "notes": (request.data.get("notes") or "")[:1000],
+                "notes": (notes or "")[:1000],
             },
         )
-        if not created and request.data.get("notes") is not None:
-            completion.notes = request.data["notes"][:1000]
+        if not created and notes is not None:
+            completion.notes = notes[:1000]
             completion.save(update_fields=["notes"])
         return Response(
             CleaningCompletionSerializer(completion).data,
@@ -84,17 +148,24 @@ class CleaningTaskViewSet(StoreScopedViewSet):
     @action(detail=True, methods=["post"], url_path="uncomplete")
     def uncomplete(self, request, pk=None):
         task = self.get_object()
-        CleaningCompletion.objects.filter(task=task, date=_today()).delete()
+        # Clear any completion within the current period so the box unchecks
+        # immediately regardless of which day in the period it was marked.
+        start, end = period_window(task.frequency, _today())
+        CleaningCompletion.objects.filter(
+            task=task, date__gte=start, date__lte=end,
+        ).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["get"], url_path="counts")
     def counts(self, request):
-        """For the page header: per-frequency completion counts for today.
+        """For the page header: per-frequency completion counts for the
+        currently-active period of each frequency.
 
         Query: ?scope=foh|kitchen
         Response: {daily: {done, total}, weekly: {...}, monthly: {...}, quarterly: {...}}
         """
         scope = request.query_params.get("scope", "foh")
+        today = _today()
         qs = (
             CleaningTask.objects
             .filter(store=request.user.store, scope=scope,
@@ -103,13 +174,19 @@ class CleaningTaskViewSet(StoreScopedViewSet):
         out = {}
         for freq, _ in CleaningTask.FREQUENCY_CHOICES:
             total = qs.filter(frequency=freq).count()
-            done = CleaningCompletion.objects.filter(
-                task__store=request.user.store,
-                task__scope=scope,
-                task__frequency=freq,
-                task__archived_at__isnull=True,
-                date=_today(),
-            ).count()
+            start, end = period_window(freq, today)
+            done = (
+                CleaningCompletion.objects
+                .filter(
+                    task__store=request.user.store,
+                    task__scope=scope,
+                    task__frequency=freq,
+                    task__archived_at__isnull=True,
+                    date__gte=start,
+                    date__lte=end,
+                )
+                .values('task_id').distinct().count()
+            )
             out[freq] = {"done": done, "total": total}
         return Response(out)
 
