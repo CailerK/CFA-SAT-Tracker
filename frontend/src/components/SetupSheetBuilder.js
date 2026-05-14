@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import setupSheetsService from '../services/setupSheets';
 import './SetupSheetBuilder.css';
 
 const IconClipboard = (props) => (
@@ -28,7 +29,25 @@ const IconChevronDown = (props) => (
 const SetupSheetBuilder = ({ onNavigate, user }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [templates, setTemplates] = useState([]);
+  const [uploadStatus, setUploadStatus] = useState(null); // 'uploading'|'success'|'error'
+  const [uploadMessage, setUploadMessage] = useState('');
   const fileInputRef = useRef(null);
+
+  // Load templates so the "Load Previous Setup" dropdown reflects reality.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await setupSheetsService.listTemplates();
+        const rows = res.results || res || [];
+        if (!cancelled) setTemplates(rows);
+      } catch (err) {
+        console.error('Failed to load templates:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -39,13 +58,39 @@ const SetupSheetBuilder = ({ onNavigate, user }) => {
     setIsDragging(false);
   };
 
+  // Create a brand-new draft sheet, then attach the uploaded file to it.
+  // Server-side parsing is deferred; for now we just acknowledge the file.
+  const uploadFileAsNewSheet = async (file) => {
+    setUploadStatus('uploading');
+    setUploadMessage(`Uploading ${file.name}…`);
+    try {
+      const today = new Date();
+      const sheet = await setupSheetsService.createSheet({
+        name: file.name.replace(/\.[^/.]+$/, '') || 'Untitled setup',
+        status: 'draft',
+        week_start: today.toISOString().slice(0, 10),
+        week_end: new Date(today.getTime() + 6 * 86400000)
+          .toISOString().slice(0, 10),
+      });
+      await setupSheetsService.uploadFile(sheet.id, file);
+      setUploadStatus('success');
+      setUploadMessage(
+        `Saved "${sheet.name}" — file received (parsing is coming in a future update).`
+      );
+      // Navigate to the saved-sheets list so the user sees their new draft.
+      setTimeout(() => onNavigate && onNavigate('saved-setups'), 1200);
+    } catch (err) {
+      console.error('Upload failed:', err);
+      setUploadStatus('error');
+      setUploadMessage(err.message || 'Upload failed.');
+    }
+  };
+
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
     const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      alert(`File dropped: ${files[0].name}`);
-    }
+    if (files.length > 0) uploadFileAsNewSheet(files[0]);
   };
 
   const handleClickUpload = () => {
@@ -53,9 +98,7 @@ const SetupSheetBuilder = ({ onNavigate, user }) => {
   };
 
   const handleFileChange = (e) => {
-    if (e.target.files.length > 0) {
-      alert(`File selected: ${e.target.files[0].name}`);
-    }
+    if (e.target.files.length > 0) uploadFileAsNewSheet(e.target.files[0]);
   };
 
   return (
@@ -215,15 +258,34 @@ const SetupSheetBuilder = ({ onNavigate, user }) => {
                   onChange={(e) => setSelectedTemplate(e.target.value)}
                 >
                   <option value="">Select a saved template...</option>
-                  <option value="newmain">NewMain</option>
-                  <option value="main-copy">Main (Copy)</option>
-                  <option value="9-15">9/15 - 9/22</option>
-                  <option value="summer">Summer</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
                 </select>
                 <IconChevronDown className="ssb-load-chevron" />
               </div>
             </div>
           </section>
+
+          {/* Upload status feedback */}
+          {uploadStatus && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: '10px 14px',
+                borderRadius: 8,
+                fontSize: 14,
+                background: uploadStatus === 'error' ? '#fee2e2'
+                  : uploadStatus === 'success' ? '#dcfce7'
+                  : '#dbeafe',
+                color: uploadStatus === 'error' ? '#991b1b'
+                  : uploadStatus === 'success' ? '#166534'
+                  : '#1e40af',
+              }}
+            >
+              {uploadMessage}
+            </div>
+          )}
         </div>
       </div>
     </div>

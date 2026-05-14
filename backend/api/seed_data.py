@@ -6,7 +6,14 @@ they don't already exist (matched by a sensible natural key — e.g., task
 text within a shift). Safe to re-run on every deploy.
 """
 
-from .models import FOHTaskTemplate, ShiftTag
+from datetime import date, timedelta
+
+from .models import (
+    FOHTaskTemplate,
+    SetupSheet,
+    SetupSheetTemplate,
+    ShiftTag,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -140,8 +147,55 @@ def seed_shift_tags(store):
 # Top-level entry point
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Setup Sheets — sample templates + a saved sheet (mirrors hardcoded UI data)
+# ---------------------------------------------------------------------------
+
+SAMPLE_TEMPLATES = [
+    {"name": "NewMain"},
+    {"name": "Main (Copy)"},
+    {"name": "9/15 - 9/22"},
+    {"name": "Summer"},
+]
+
+
+def seed_setup_templates(store):
+    created = 0
+    for t in SAMPLE_TEMPLATES:
+        _, was_created = SetupSheetTemplate.objects.get_or_create(
+            store=store, name=t["name"],
+            defaults={"description": ""},
+        )
+        if was_created:
+            created += 1
+    print(f"    Setup sheet templates: +{created} created.")
+
+
+def seed_sample_saved_setup(store):
+    """Create one sample saved sheet so SavedSetups.js isn't empty on first
+    visit. Idempotent — keyed off (store, name)."""
+    # Week range matching the demo card: Apr 18 – Apr 25, 2026
+    name = "4-19-25"
+    if SetupSheet.objects.filter(store=store, name=name).exists():
+        print("    Sample saved setup: already exists, skipping.")
+        return
+    SetupSheet.objects.create(
+        store=store, name=name,
+        week_start=date(2026, 4, 18),
+        week_end=date(2026, 4, 25),
+        is_shared=True,
+        employees_count=560,
+        areas_count=94,
+        hours=0,
+        status="published",
+    )
+    print("    Sample saved setup: created (4-19-25).")
+
+
 def seed_all_for_store(store):
     """Run every per-store seeder. Idempotent."""
     print(f"  Seeding data for {store}…")
     seed_foh_tasks(store)
     seed_shift_tags(store)
+    seed_setup_templates(store)
+    seed_sample_saved_setup(store)

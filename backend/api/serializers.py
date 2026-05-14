@@ -10,10 +10,14 @@ from rest_framework import serializers
 from .models import (
     FOHTaskCompletion,
     FOHTaskTemplate,
+    SetupSheet,
+    SetupSheetShare,
+    SetupSheetTemplate,
     ShiftSummary,
     ShiftTag,
     Store,
     StoreSettings,
+    TimeBlock,
     User,
     UserPreferences,
 )
@@ -224,3 +228,107 @@ class ShiftSummarySerializer(serializers.ModelSerializer):
 
     def get_shift_lead_initials(self, obj):
         return obj.shift_lead.initials if obj.shift_lead else None
+
+
+# ============================================================================
+# Phase 2: Setup Sheets
+# ============================================================================
+
+class TimeBlockSerializer(serializers.ModelSerializer):
+    """Nested under a Template or a Sheet. Frontend reads/writes these as
+    part of the parent's `time_blocks` list."""
+
+    class Meta:
+        model = TimeBlock
+        fields = [
+            "id", "label", "start_time", "end_time",
+            "position", "positions_needed", "notes", "order",
+        ]
+        read_only_fields = ["id"]
+
+
+class SetupSheetTemplateSerializer(serializers.ModelSerializer):
+    """A reusable template. `time_blocks_count` is derived for the card UI."""
+    time_blocks_count = serializers.IntegerField(read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SetupSheetTemplate
+        fields = [
+            "id", "name", "description",
+            "time_blocks_count",
+            "created_by", "created_by_name",
+            "archived_at", "created_at", "updated_at",
+        ]
+        read_only_fields = [
+            "id", "time_blocks_count", "created_by_name",
+            "created_at", "updated_at",
+        ]
+
+    def get_created_by_name(self, obj):
+        u = obj.created_by
+        if not u:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+
+class SetupSheetShareSerializer(serializers.ModelSerializer):
+    """Per-user share row, returned nested on a SetupSheet."""
+    shared_with_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SetupSheetShare
+        fields = ["id", "shared_with", "shared_with_name", "permission", "created_at"]
+        read_only_fields = ["id", "shared_with_name", "created_at"]
+
+    def get_shared_with_name(self, obj):
+        u = obj.shared_with
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+
+class SetupSheetSerializer(serializers.ModelSerializer):
+    """A saved weekly setup sheet."""
+    owner_name = serializers.SerializerMethodField()
+    week_range = serializers.SerializerMethodField()
+    time_blocks = TimeBlockSerializer(many=True, read_only=True)
+    shares = SetupSheetShareSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SetupSheet
+        fields = [
+            "id", "name",
+            "week_start", "week_end", "week_range",
+            "is_shared",
+            "owner", "owner_name",
+            "employees_count", "areas_count", "hours",
+            "source_template",
+            "status",
+            "time_blocks", "shares",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = [
+            "id", "owner_name", "week_range", "time_blocks", "shares",
+            "created_at", "updated_at",
+        ]
+
+    def get_owner_name(self, obj):
+        u = obj.owner
+        if not u:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+    def get_week_range(self, obj):
+        # "Apr 18 – Apr 25, 2026" — convenience for the SavedSetups list UI.
+        if not obj.week_start:
+            return ""
+        if not obj.week_end:
+            return obj.week_start.strftime("%b %-d, %Y")
+        if obj.week_start.year == obj.week_end.year:
+            return (
+                f"{obj.week_start.strftime('%b %-d')} – "
+                f"{obj.week_end.strftime('%b %-d, %Y')}"
+            )
+        return (
+            f"{obj.week_start.strftime('%b %-d, %Y')} – "
+            f"{obj.week_end.strftime('%b %-d, %Y')}"
+        )

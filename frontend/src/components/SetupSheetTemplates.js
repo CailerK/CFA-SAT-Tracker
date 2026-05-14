@@ -1,5 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './SetupSheetTemplates.css';
+import setupSheetsService from '../services/setupSheets';
+
+// Format an ISO datetime like "2026-04-18T18:32:11.244Z" → "Apr 18, 2026"
+const formatDate = (iso) => {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+    });
+  } catch { return ''; }
+};
 
 // Icon components (Lucide-matching)
 const IconLayoutDashboard = (props) => (
@@ -81,12 +92,32 @@ const getCurrentDate = () => {
 
 const SetupSheetTemplates = ({ onBack, onNavigate }) => {
   const [activeTab, setActiveTab] = useState('templates');
-  const [templates] = useState([
-    { id: 1, name: 'NewMain', updatedAt: 'Apr 18, 2026', timeBlocks: 10 },
-    { id: 2, name: 'Main (Copy)', updatedAt: 'Dec 26, 2025', timeBlocks: 11 },
-    { id: 3, name: '9/15 - 9/22', updatedAt: 'Sep 14, 2025', timeBlocks: 5 },
-    { id: 4, name: 'Summer', updatedAt: 'Aug 21, 2025', timeBlocks: 12 },
-  ]);
+  const [templates, setTemplates] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load templates from the backend on mount.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await setupSheetsService.listTemplates();
+        const rows = res.results || res || [];
+        if (!cancelled) {
+          setTemplates(rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            updatedAt: formatDate(r.updated_at),
+            timeBlocks: r.time_blocks_count || 0,
+          })));
+        }
+      } catch (err) {
+        console.error('Failed to load setup templates:', err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const tabs = [
     { id: 'templates', label: 'Templates', Icon: IconLayoutDashboard },

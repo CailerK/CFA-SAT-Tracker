@@ -346,17 +346,172 @@ class Document(models.Model):
 
 # Setup Sheets & Scheduling
 class SetupSheet(models.Model):
-    """Setup sheets for restaurant operations"""
+    """A saved weekly setup sheet (one week's roster + time blocks).
+
+    Phase 2 added: store, week_start/week_end, owner, is_shared,
+    employees_count/areas_count/hours summary fields, source_template,
+    status. Old fields (department, schedule_date, shift_type, is_template)
+    are kept nullable for back-compat with any legacy rows.
+    """
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('published', 'Published'),
+        ('archived', 'Archived'),
+    ]
+
     name = models.CharField(max_length=100)
-    department = models.ForeignKey(Department, on_delete=models.CASCADE)
-    schedule_date = models.DateField()
-    shift_type = models.CharField(max_length=20, choices=[('opening', 'Opening'), ('closing', 'Closing'), ('mid', 'Mid')])
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    # Multi-tenant scoping (Phase 0 pattern). Nullable for old rows.
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE,
+        related_name='setup_sheets',
+        null=True, blank=True,
+    )
+    # Owner — separate from created_by because a sheet can be transferred.
+    owner = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='owned_setup_sheets',
+    )
+    week_start = models.DateField(null=True, blank=True)
+    week_end = models.DateField(null=True, blank=True)
+    is_shared = models.BooleanField(default=False)
+    employees_count = models.PositiveIntegerField(default=0)
+    areas_count = models.PositiveIntegerField(default=0)
+    hours = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    source_template = models.ForeignKey(
+        'SetupSheetTemplate', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='derived_sheets',
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='draft'
+    )
+
+    # Legacy fields — nullable so they don't block creation of new rows.
+    department = models.ForeignKey(
+        Department, on_delete=models.SET_NULL, null=True, blank=True,
+    )
+    schedule_date = models.DateField(null=True, blank=True)
+    shift_type = models.CharField(
+        max_length=20,
+        choices=[('opening', 'Opening'), ('closing', 'Closing'), ('mid', 'Mid')],
+        blank=True,
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_setup_sheets',
+    )
     is_template = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+        indexes = [
+            models.Index(fields=['store', 'status']),
+            models.Index(fields=['store', 'week_start']),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class SetupSheetTemplate(models.Model):
+    """A reusable template that new SetupSheets can be cloned from."""
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE,
+        related_name='setup_sheet_templates',
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_setup_templates',
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+        indexes = [models.Index(fields=['store'])]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def time_blocks_count(self):
+        # Cheap denorm — count time blocks attached to this template.
+        return self.time_blocks.count()
+
+
+class TimeBlock(models.Model):
+    """A row in a setup sheet or template — represents a position/area
+    staffed during a specific time window.
+
+    Belongs to EITHER a template OR a sheet (XOR — enforced in clean()).
+    """
+    template = models.ForeignKey(
+        SetupSheetTemplate, on_delete=models.CASCADE,
+        related_name='time_blocks', null=True, blank=True,
+    )
+    sheet = models.ForeignKey(
+        SetupSheet, on_delete=models.CASCADE,
+        related_name='time_blocks', null=True, blank=True,
+    )
+    label = models.CharField(max_length=100, blank=True)
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    position = models.CharField(max_length=100, blank=True)
+    positions_needed = models.JSONField(
+        default=list, blank=True,
+        help_text="List of {role, count} pairs.",
+    )
+    notes = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if bool(self.template_id) == bool(self.sheet_id):
+            raise ValidationError(
+                "A TimeBlock must belong to exactly one of template or sheet."
+            )
+
+
+class SetupSheetShare(models.Model):
+    """Per-user sharing of a setup sheet."""
+    PERMISSION_CHOICES = [
+        ('view', 'View'),
+        ('edit', 'Edit'),
+    ]
+
+    sheet = models.ForeignKey(
+        SetupSheet, on_delete=models.CASCADE, related_name='shares'
+    )
+    shared_with = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='shared_setup_sheets'
+    )
+    permission = models.CharField(
+        max_length=10, choices=PERMISSION_CHOICES, default='view'
+    )
+    shared_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='setup_sheets_shared_by_me',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['sheet', 'shared_with'],
+                name='unique_share_per_user',
+            ),
+        ]
+
 
 class SetupTask(models.Model):
-    """Individual tasks within setup sheets"""
+    """Individual tasks within setup sheets (legacy model kept for back-compat)."""
     setup_sheet = models.ForeignKey(SetupSheet, on_delete=models.CASCADE, related_name='tasks')
     task_name = models.CharField(max_length=200)
     assigned_to = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)

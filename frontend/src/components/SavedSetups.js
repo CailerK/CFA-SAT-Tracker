@@ -1,6 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import './SetupSheetTemplates.css'; // reuse banner + tab styles
 import './SavedSetups.css';
+import setupSheetsService from '../services/setupSheets';
+
+// "2026-05-13T17:30Z" → "Updated 12 minutes ago" — quick relative-time helper.
+const relativeTime = (iso) => {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return '';
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return 'Updated just now';
+  if (min < 60) return `Updated ${min} minute${min === 1 ? '' : 's'} ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `Updated ${hr} hour${hr === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hr / 24);
+  if (days < 30) return `Updated ${days} day${days === 1 ? '' : 's'} ago`;
+  return `Updated ${new Date(iso).toLocaleDateString()}`;
+};
 
 // Icons
 const IconLayoutDashboard = (props) => (
@@ -124,6 +140,37 @@ const getCurrentDate = () => {
 const SavedSetups = ({ onNavigate, user }) => {
   const [activeTab] = useState('saved');
   const [searchQuery, setSearchQuery] = useState('');
+  const [savedSetups, setSavedSetups] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load from backend on mount.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await setupSheetsService.listSheets();
+        const rows = res.results || res || [];
+        if (!cancelled) {
+          setSavedSetups(rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            weekRange: r.week_range || '',
+            isShared: Boolean(r.is_shared),
+            owner: r.owner_name || '',
+            employees: r.employees_count || 0,
+            areas: r.areas_count || 0,
+            hours: Number(r.hours || 0),
+            updatedAt: relativeTime(r.updated_at),
+          })));
+        }
+      } catch (err) {
+        console.error('Failed to load saved setups:', err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const tabs = [
     { id: 'templates', label: 'Templates', Icon: IconLayoutDashboard },
@@ -131,20 +178,6 @@ const SavedSetups = ({ onNavigate, user }) => {
     { id: 'saved', label: 'Saved', Icon: IconCalendar },
     { id: 'summary', label: 'Summary', Icon: IconFileText },
     { id: 'history', label: 'History', Icon: IconHistory },
-  ];
-
-  const savedSetups = [
-    {
-      id: 1,
-      name: '4-19-25',
-      weekRange: 'Apr 18 – Apr 25, 2026',
-      isShared: true,
-      owner: 'Savannah Holloway',
-      employees: 560,
-      areas: 94,
-      hours: 0,
-      updatedAt: 'Updated 12 minutes ago',
-    },
   ];
 
   const handleTabClick = (tabId) => {

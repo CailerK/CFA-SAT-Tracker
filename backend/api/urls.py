@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from . import views, views_stores
 from .views_foh import FOHTaskTemplateViewSet
+from .views_setup_sheets import SetupSheetTemplateViewSet, SetupSheetViewSet
 from .views_shift_summary import ShiftSummaryViewSet, ShiftTagViewSet
 
 
@@ -14,6 +15,16 @@ router.register(
 )
 router.register(
     r"shift-summaries", ShiftSummaryViewSet, basename="shift-summary"
+)
+# Setup Sheets — templates first so /setup-sheets/templates/ doesn't collide
+# with /setup-sheets/:pk/.
+router.register(
+    r"setup-sheets/templates",
+    SetupSheetTemplateViewSet,
+    basename="setup-sheet-template",
+)
+router.register(
+    r"setup-sheets", SetupSheetViewSet, basename="setup-sheet"
 )
 
 
