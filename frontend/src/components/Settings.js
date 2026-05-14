@@ -10,7 +10,6 @@ const TABS = [
   { id: 'access',       label: 'User Access',   icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
   { id: 'users',        label: 'User Management', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, adminOnly: true },
   { id: 'notifications',label: 'Notifications', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
-  { id: 'appearance',   label: 'Appearance',    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> },
 ];
 
 const Toggle = ({ checked, onChange }) => (
@@ -95,10 +94,6 @@ const Settings = ({ onBack, currentUser }) => {
   const [notifComplaint,setNotifComplaint]= useState(true);
   const [emailDigest,   setEmailDigest]   = useState(false);
 
-  // Appearance (per-user preferences)
-  const [darkMode,     setDarkMode]     = useState(false);
-  const [compactMode,  setCompactMode]  = useState(false);
-
   // ---------- Load from backend on mount ----------
   useEffect(() => {
     let cancelled = false;
@@ -129,8 +124,6 @@ const Settings = ({ onBack, currentUser }) => {
         setTeamMemberCompletion(Boolean(access.team_member_completion));
         // User preferences
         setLanguage(prefs.language || 'english');
-        setDarkMode(Boolean(prefs.dark_mode));
-        setCompactMode(Boolean(prefs.compact_mode));
         const notif = prefs.notifications || {};
         setNotifEval(Boolean(notif.eval_due));
         setNotifTask(Boolean(notif.task_reminder));
@@ -199,11 +192,6 @@ const Settings = ({ onBack, currentUser }) => {
     })
   );
 
-  const saveAppearance = () => withSaveStatus(() =>
-    settingsService.updatePreferences({
-      dark_mode: darkMode, compact_mode: compactMode,
-    })
-  );
 
   // Single dispatch from each panel's Save Changes button.
   const saveCurrentTab = () => {
@@ -213,7 +201,6 @@ const Settings = ({ onBack, currentUser }) => {
       case 'features':      return saveFeatures();
       case 'access':        return saveAccess();
       case 'notifications': return saveNotifications();
-      case 'appearance':    return saveAppearance();
       default: return null;
     }
   };
@@ -542,59 +529,6 @@ const Settings = ({ onBack, currentUser }) => {
           {/* ── User Management ── */}
           {activeTab === 'users' && canManageUsers && (
             <UserManagement currentUser={currentUser} />
-          )}
-
-          {/* ── Appearance ── */}
-          {activeTab === 'appearance' && (
-            <div className="stg-panel">
-              <div className="stg-panel-header">
-                <h2>Appearance</h2>
-                <p>Customize the look and feel of the application</p>
-              </div>
-
-              <div className="stg-section">
-                <h3 className="stg-section-title">Display Options</h3>
-                <div className="stg-toggle-row">
-                  <div className="stg-toggle-info">
-                    <span className="stg-toggle-label">Dark Mode</span>
-                    <span className="stg-toggle-desc">Enable dark mode for the application</span>
-                  </div>
-                  <Toggle checked={darkMode} onChange={setDarkMode} />
-                </div>
-                <div className="stg-toggle-row">
-                  <div className="stg-toggle-info">
-                    <span className="stg-toggle-label">Compact Mode</span>
-                    <span className="stg-toggle-desc">Use compact layout to show more content on screen</span>
-                  </div>
-                  <Toggle checked={compactMode} onChange={setCompactMode} />
-                </div>
-              </div>
-
-              <div className="stg-section">
-                <h3 className="stg-section-title">Color Theme</h3>
-                <div className="stg-theme-swatches">
-                  {['#E51636','#2563eb','#059669','#7c3aed','#d97706'].map(color => (
-                    <button
-                      key={color}
-                      className={`stg-swatch ${color === '#E51636' ? 'selected' : ''}`}
-                      style={{ backgroundColor: color }}
-                      aria-label={color}
-                    />
-                  ))}
-                </div>
-                <p className="stg-field-desc" style={{ marginTop: 8 }}>Brand red is the default Chick-fil-A theme color.</p>
-              </div>
-
-              <div className="stg-footer">
-                <button
-                  className="stg-btn-primary"
-                  onClick={saveCurrentTab}
-                  disabled={saveStatus === 'saving' || isLoading}
-                >
-                  {saveButtonLabel()}
-                </button>
-              </div>
-            </div>
           )}
 
         </div>

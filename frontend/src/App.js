@@ -18,6 +18,9 @@ function App() {
     storeId: raw.company_id,
     role: raw.role,
     department: raw.department,
+    isSuperuser: raw.is_superuser,
+    isAdmin: raw.is_admin,
+    store: raw.store,
   });
 
   // On app load, ask the backend whether our session cookie is valid.
