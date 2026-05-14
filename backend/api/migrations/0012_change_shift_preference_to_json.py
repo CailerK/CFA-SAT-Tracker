@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0001_initial'),
+        ('api', '0011_phase8_calendar_guests_vendors_chat_surveys'),
     ]
 
     operations = [
