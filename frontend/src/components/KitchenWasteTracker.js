@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import kitchenService from '../services/kitchen';
 import './SetupSheetTemplates.css'; // banner
 import './KitchenDashboard.css';     // kitchen nav
 import './KitchenWasteTracker.css';
@@ -84,14 +85,82 @@ const TODAY_ENTRIES = [
   { id: 16, name: 'Filet',                qty: 1, unit: 'pieces',   price: 1.02, time: '9:40 AM'  },
 ];
 
+// Format a backend ISO datetime as "9:40 AM" for the entries list.
+const formatTime = (iso) => {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  } catch { return ''; }
+};
+
+// Normalize a backend WasteEntry to the row shape the existing UI uses.
+const normalizeEntry = (raw) => ({
+  id: raw.id,
+  name: raw.menu_item_name || 'Item',
+  qty: raw.qty,
+  unit: raw.unit || 'pieces',
+  price: Number(raw.unit_price_at_time || 0),
+  time: formatTime(raw.recorded_at),
+  // Keep raw menu_item id around so we can re-log etc.
+  menuItemId: raw.menu_item,
+});
+
 const KitchenWasteTracker = ({ onNavigate, user }) => {
   const [mode, setMode] = useState('waste'); // waste | donations
   const [activeMeal, setActiveMeal] = useState('lunch');
   const [selectedReason, setSelectedReason] = useState(null);
-  const [entries, setEntries] = useState(TODAY_ENTRIES);
+  const [entries, setEntries] = useState([]);
   const [customName, setCustomName] = useState('');
   const [customQty, setCustomQty] = useState('');
   const [customPrice, setCustomPrice] = useState('');
+
+  // Server-loaded catalogs.
+  const [menuItemsRaw, setMenuItemsRaw] = useState([]); // [{id, name, emoji, unit_price, meal_period_slug}]
+  const [reasonsRaw, setReasonsRaw] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load menu items for the active meal whenever it changes.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await kitchenService.listMenuItems({ meal: activeMeal });
+        if (!cancelled) setMenuItemsRaw(res.results || res || []);
+      } catch (err) {
+        console.error('Failed to load menu items:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeMeal]);
+
+  // Load reasons + today's entries on mount.
+  const refreshEntries = useCallback(async () => {
+    try {
+      const res = await kitchenService.listEntries({ date: 'today' });
+      const rows = res.results || res || [];
+      setEntries(rows.map(normalizeEntry));
+    } catch (err) {
+      console.error('Failed to load waste entries:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const reasons = await kitchenService.listReasons();
+        if (!cancelled) {
+          setReasonsRaw(reasons.results || reasons || []);
+        }
+      } catch (err) {
+        console.error('Failed to load waste reasons:', err);
+      } finally {
+        await refreshEntries();
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [refreshEntries]);
 
   const tabs = [
     { id: 'home', label: 'Home', Icon: IconLayoutDashboard },
@@ -116,25 +185,67 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
     }
   };
 
-  const menuItems = MENU_ITEMS_BY_PERIOD[activeMeal] || [];
+  // Map backend menu items to the existing UI shape ({id, name, emoji, price}).
+  const menuItems = useMemo(
+    () => menuItemsRaw.map((m) => ({
+      id: m.id,
+      name: m.name,
+      emoji: m.emoji,
+      price: Number(m.unit_price || 0),
+    })),
+    [menuItemsRaw]
+  );
   const totalWaste = useMemo(() => entries.reduce((s, e) => s + e.qty * e.price, 0), [entries]);
 
-  const handleItemTap = (item) => {
+  // Tap a menu tile → POST a new waste entry with qty 1 and the selected reason.
+  const handleItemTap = async (item) => {
+    // Optimistic insert at the top.
+    const tempId = `tmp-${Date.now()}`;
     const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     setEntries((prev) => [
-      { id: Date.now(), name: item.name, qty: 1, unit: 'pieces', price: item.price, time: now },
+      { id: tempId, name: item.name, qty: 1, unit: 'pieces', price: item.price, time: now, menuItemId: item.id },
       ...prev,
     ]);
+    try {
+      const created = await kitchenService.logEntry({
+        menu_item: item.id,
+        qty: 1,
+        unit: 'pieces',
+        reason: selectedReason || null,
+      });
+      // Swap the temp row with the real one.
+      setEntries((prev) => prev.map((e) =>
+        e.id === tempId ? normalizeEntry(created) : e
+      ));
+    } catch (err) {
+      console.error('Log waste entry failed:', err);
+      // Roll back.
+      setEntries((prev) => prev.filter((e) => e.id !== tempId));
+    }
   };
 
-  const handleDeleteEntry = (id) => setEntries((prev) => prev.filter((e) => e.id !== id));
+  const handleDeleteEntry = async (id) => {
+    const prev = entries;
+    setEntries((curr) => curr.filter((e) => e.id !== id));
+    // tmp-* IDs are local-only, no backend roundtrip.
+    if (typeof id === 'string' && id.startsWith('tmp-')) return;
+    try {
+      await kitchenService.deleteEntry(id);
+    } catch (err) {
+      console.error('Delete waste entry failed:', err);
+      setEntries(prev);
+    }
+  };
 
+  // "Custom Entry" form — for items that don't appear in the catalog yet.
+  // For now we can't POST a custom entry without a menu_item FK, so we treat
+  // this as a local-only add. (Future: allow creating ad-hoc menu items.)
   const canAddCustom = customName.trim() && customQty && customPrice;
   const handleAddCustom = () => {
     if (!canAddCustom) return;
     const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     setEntries((prev) => [
-      { id: Date.now(), name: customName.trim(), qty: Number(customQty), unit: 'pieces', price: Number(customPrice), time: now },
+      { id: `tmp-${Date.now()}`, name: customName.trim(), qty: Number(customQty), unit: 'pieces', price: Number(customPrice), time: now },
       ...prev,
     ]);
     setCustomName(''); setCustomQty(''); setCustomPrice('');

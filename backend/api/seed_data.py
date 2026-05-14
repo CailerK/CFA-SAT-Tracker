@@ -11,9 +11,13 @@ from datetime import date, timedelta
 from .models import (
     CleaningTask,
     FOHTaskTemplate,
+    KitchenChecklistTask,
+    MealPeriod,
+    MenuItem,
     SetupSheet,
     SetupSheetTemplate,
     ShiftTag,
+    WasteReason,
 )
 
 
@@ -240,11 +244,177 @@ def seed_cleaning_tasks(store):
     print(f"    Cleaning tasks: +{created} created.")
 
 
+# ---------------------------------------------------------------------------
+# Kitchen Checklists — opening / transition / closing
+# Mirrors the hardcoded lists in frontend/src/components/KitchenChecklists.js
+# ---------------------------------------------------------------------------
+
+KITCHEN_OPENING_TASKS = [
+    "Turn on grills and fryers",
+    "Check walk-in cooler temperatures",
+    "Stock breading station",
+    "Prep chicken for the day",
+    "Set up frying station",
+    "Stock sauces and dressings",
+    "Wipe down all prep surfaces",
+    "Check ice machine",
+    "Set up dish station",
+    "Verify daily prep list",
+]
+
+KITCHEN_TRANSITION_TASKS = [
+    "Dishes",
+    "Needs to have enough wraps",
+    "Prep chicken",
+    "Restock breading area",
+    "Check fryer oil",
+    "Clean fryer baskets",
+    "Restock wraps and parchment",
+    "Wipe down low surfaces",
+    "Top off sauces",
+    "Check temps on hot hold",
+    "Sweep kitchen floor",
+    "Take out trash",
+    "Restock seasoning",
+    "Clean lowboy",
+    "Verify daily counts",
+]
+
+KITCHEN_CLOSING_TASKS = [
+    "Break down fry station",
+    "Filter fryers",
+    "Clean grills",
+    "Wipe down all prep tables",
+    "Sweep and mop kitchen floor",
+    "Take out trash and break down boxes",
+    "Restock for next day's open",
+    "Wash all dishes",
+    "Run sanitizer cycle",
+    "Wipe down walk-in cooler",
+    "Lock storage areas",
+    "Turn off equipment",
+    "Empty mop bucket",
+    "Final temperature checks",
+]
+
+
+def seed_kitchen_checklists(store):
+    plan = [
+        ("opening", KITCHEN_OPENING_TASKS),
+        ("transition", KITCHEN_TRANSITION_TASKS),
+        ("closing", KITCHEN_CLOSING_TASKS),
+    ]
+    created = 0
+    for shift, items in plan:
+        for order, text in enumerate(items):
+            _, was_created = KitchenChecklistTask.objects.get_or_create(
+                store=store, shift=shift, text=text,
+                defaults={"order": order},
+            )
+            if was_created:
+                created += 1
+    print(f"    Kitchen checklist tasks: +{created} created.")
+
+
+# ---------------------------------------------------------------------------
+# Meal Periods — global catalog (not per-store)
+# ---------------------------------------------------------------------------
+
+MEAL_PERIODS = [
+    {"slug": "breakfast", "label": "Breakfast", "emoji": "🌅", "order": 0},
+    {"slug": "lunch", "label": "Lunch", "emoji": "🥪", "order": 1},
+    {"slug": "dinner", "label": "Dinner", "emoji": "🌙", "order": 2},
+]
+
+
+def seed_meal_periods():
+    created = 0
+    for mp in MEAL_PERIODS:
+        _, was_created = MealPeriod.objects.get_or_create(
+            slug=mp["slug"],
+            defaults={"label": mp["label"], "emoji": mp["emoji"], "order": mp["order"]},
+        )
+        if was_created:
+            created += 1
+    print(f"  Meal periods: +{created} created.")
+
+
+# ---------------------------------------------------------------------------
+# Menu Items — lunch menu mirrors KitchenWasteTracker.js MENU_ITEMS_BY_PERIOD
+# ---------------------------------------------------------------------------
+
+LUNCH_MENU_ITEMS = [
+    {"name": "Spicy Filet", "emoji": "🌶️", "unit_price": "1.25"},
+    {"name": "Filet", "emoji": "🍗", "unit_price": "1.02"},
+    {"name": "Grilled Filet", "emoji": "🥩", "unit_price": "1.12"},
+    {"name": "Nuggets", "emoji": "🍗", "unit_price": "0.15"},
+    {"name": "Grilled Nuggets", "emoji": "🥩", "unit_price": "0.17"},
+    {"name": "Strips", "emoji": "🍗", "unit_price": "0.53"},
+    {"name": "Mac & Cheese", "emoji": "🧀", "unit_price": "1.01"},
+    {"name": "White Bun", "emoji": "🍞", "unit_price": "0.16"},
+    {"name": "Multigrain Bun", "emoji": "🌾", "unit_price": "0.33"},
+    {"name": "Gluten Free Bun", "emoji": "🌱", "unit_price": "0.85"},
+    {"name": "Sandwich", "emoji": "🥪", "unit_price": "1.00"},
+]
+
+
+def seed_menu_items(store):
+    from decimal import Decimal
+    try:
+        lunch = MealPeriod.objects.get(slug="lunch")
+    except MealPeriod.DoesNotExist:
+        print("    Menu items: skipping — lunch meal period missing.")
+        return
+    created = 0
+    for order, item in enumerate(LUNCH_MENU_ITEMS):
+        _, was_created = MenuItem.objects.get_or_create(
+            store=store, meal_period=lunch, name=item["name"],
+            defaults={
+                "emoji": item["emoji"],
+                "unit_price": Decimal(item["unit_price"]),
+                "order": order,
+            },
+        )
+        if was_created:
+            created += 1
+    print(f"    Menu items: +{created} created (lunch).")
+
+
+# ---------------------------------------------------------------------------
+# Waste Reasons — mirrors WASTE_REASONS in KitchenWasteTracker.js
+# ---------------------------------------------------------------------------
+
+WASTE_REASONS = [
+    {"slug": "overproduction", "label": "Overproduction", "emoji": "📦"},
+    {"slug": "quality", "label": "Quality Issues", "emoji": "⚠️"},
+    {"slug": "expired", "label": "Expired", "emoji": "⏰"},
+    {"slug": "dropped", "label": "Dropped", "emoji": "💧"},
+]
+
+
+def seed_waste_reasons(store):
+    created = 0
+    for order, r in enumerate(WASTE_REASONS):
+        _, was_created = WasteReason.objects.get_or_create(
+            store=store, slug=r["slug"],
+            defaults={"label": r["label"], "emoji": r["emoji"], "order": order},
+        )
+        if was_created:
+            created += 1
+    print(f"    Waste reasons: +{created} created.")
+
+
 def seed_all_for_store(store):
     """Run every per-store seeder. Idempotent."""
     print(f"  Seeding data for {store}…")
+    # Global catalog (run before per-store seeds that reference it).
+    seed_meal_periods()
+    # Per-store seeds.
     seed_foh_tasks(store)
     seed_shift_tags(store)
     seed_setup_templates(store)
     seed_sample_saved_setup(store)
     seed_cleaning_tasks(store)
+    seed_kitchen_checklists(store)
+    seed_menu_items(store)
+    seed_waste_reasons(store)

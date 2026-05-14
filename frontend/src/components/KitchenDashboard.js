@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import kitchenService from '../services/kitchen';
 import './SetupSheetTemplates.css'; // reuse sst-banner/tabs (container too)
 import './KitchenDashboard.css';
 
@@ -78,8 +79,44 @@ const getGreeting = () => {
 };
 const getCurrentDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
+// Default skeleton used while the summary endpoint is loading.
+const DEFAULT_PROGRESS = { overall: 0, opening: 0, transition: 0, closing: 0 };
+const DEFAULT_CARDS = [
+  { id: 'food-safety', title: 'Food Safety', emoji: '🛡️',
+    stats: [{ label: 'Checklists', value: '—' }, { label: 'Temp Checks', value: '—' }],
+    progress: 0, page: 'kitchen-safety' },
+  { id: 'waste', title: 'Waste Tracker', emoji: '🗑️',
+    stats: [{ label: "Today's Waste", value: '$0.00' }, { label: 'Items Tracked', value: '0' }],
+    progress: 0, page: 'kitchen-waste' },
+  { id: 'equipment', title: 'Equipment Status', emoji: '🔧',
+    stats: [{ label: 'Operational', value: '—' }, { label: 'Needs Work', value: '—' }],
+    progress: 0, page: 'kitchen-equipment' },
+  { id: 'checklists', title: 'Shift Checklists', emoji: '📋',
+    stats: [{ label: 'Completed', value: '0/0' }, { label: 'Rate', value: '0%' }],
+    progress: 0, page: 'kitchen-checklists' },
+];
+
 const KitchenDashboard = ({ onNavigate, user }) => {
   const [activeTab] = useState('home');
+  const [progressData, setProgressData] = useState(DEFAULT_PROGRESS);
+  const [cards, setCards] = useState(DEFAULT_CARDS);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const summary = await kitchenService.getSummary();
+        if (cancelled) return;
+        if (summary.progress) setProgressData(summary.progress);
+        if (Array.isArray(summary.cards) && summary.cards.length) {
+          setCards(summary.cards);
+        }
+      } catch (err) {
+        console.error('Failed to load kitchen summary:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const tabs = [
     { id: 'home', label: 'Home', Icon: IconLayoutDashboard },
@@ -104,61 +141,7 @@ const KitchenDashboard = ({ onNavigate, user }) => {
     }
   };
 
-  const progressData = {
-    overall: 29,
-    opening: 100,
-    transition: 0,
-    closing: 0,
-  };
-
-  const cards = [
-    {
-      id: 'food-safety',
-      title: 'Food Safety',
-      emoji: '🛡️',
-      attentionLabel: '1 issue need attention',
-      stats: [
-        { label: 'Checklists', value: '0/33', sublabel: 'completed' },
-        { label: 'Temp Checks', value: '0/9', sublabel: 'recorded' },
-      ],
-      alert: '13 overdue tasks',
-      progress: 100,
-      page: 'kitchen-safety',
-    },
-    {
-      id: 'waste',
-      title: 'Waste Tracker',
-      emoji: '🗑️',
-      stats: [
-        { label: "Today's Waste", value: '$7.18', sublabel: 'total cost' },
-        { label: 'Items Tracked', value: '20', sublabel: 'entries' },
-      ],
-      progress: 0,
-      page: 'kitchen-waste',
-    },
-    {
-      id: 'equipment',
-      title: 'Equipment Status',
-      emoji: '🔧',
-      stats: [
-        { label: 'Operational', value: '24/24', sublabel: 'equipment' },
-        { label: 'Needs Work', value: '22', sublabel: 'items' },
-      ],
-      progress: 0,
-      page: 'kitchen-equipment',
-    },
-    {
-      id: 'checklists',
-      title: 'Shift Checklists',
-      emoji: '📋',
-      stats: [
-        { label: 'Completed', value: '24/84', sublabel: 'tasks done' },
-        { label: 'Rate', value: '29%', sublabel: 'completion' },
-      ],
-      progress: 29,
-      page: 'kitchen-checklists',
-    },
-  ];
+  // progressData and cards now come from /api/kitchen/summary/ (see useEffect above).
 
   return (
     <div className="sst-page">

@@ -12,6 +12,10 @@ from .models import (
     CleaningTask,
     FOHTaskCompletion,
     FOHTaskTemplate,
+    KitchenChecklistCompletion,
+    KitchenChecklistTask,
+    MealPeriod,
+    MenuItem,
     SetupSheet,
     SetupSheetShare,
     SetupSheetTemplate,
@@ -22,6 +26,8 @@ from .models import (
     TimeBlock,
     User,
     UserPreferences,
+    WasteEntry,
+    WasteReason,
 )
 
 
@@ -382,3 +388,110 @@ class CleaningTaskSerializer(serializers.ModelSerializer):
             from django.utils import timezone
             comp = obj.completions.filter(date=timezone.localdate()).first()
         return CleaningCompletionSerializer(comp).data if comp else None
+
+
+# ============================================================================
+# Phase 4: Kitchen Checklists
+# ============================================================================
+
+class KitchenChecklistCompletionSerializer(serializers.ModelSerializer):
+    completed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = KitchenChecklistCompletion
+        fields = ["id", "date", "completed_at", "completed_by", "completed_by_name"]
+        read_only_fields = ["id", "completed_at", "completed_by_name"]
+
+    def get_completed_by_name(self, obj):
+        u = obj.completed_by
+        if not u:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+
+class KitchenChecklistTaskSerializer(serializers.ModelSerializer):
+    today_completion = serializers.SerializerMethodField()
+
+    class Meta:
+        model = KitchenChecklistTask
+        fields = [
+            "id", "shift", "text", "order",
+            "archived_at", "today_completion",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "today_completion", "created_at", "updated_at"]
+
+    def get_today_completion(self, obj):
+        prefetched = getattr(obj, "today_completion_list", None)
+        if prefetched is not None:
+            comp = prefetched[0] if prefetched else None
+        else:
+            from django.utils import timezone
+            comp = obj.completions.filter(date=timezone.localdate()).first()
+        return KitchenChecklistCompletionSerializer(comp).data if comp else None
+
+
+# ============================================================================
+# Phase 4: Waste Tracker
+# ============================================================================
+
+class MealPeriodSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MealPeriod
+        fields = ["id", "slug", "label", "emoji", "order"]
+
+
+class MenuItemSerializer(serializers.ModelSerializer):
+    meal_period_slug = serializers.CharField(source="meal_period.slug", read_only=True)
+
+    class Meta:
+        model = MenuItem
+        fields = [
+            "id", "name", "emoji", "unit_price", "order",
+            "meal_period", "meal_period_slug",
+            "archived_at", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "meal_period_slug", "archived_at", "created_at", "updated_at"]
+
+
+class WasteReasonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WasteReason
+        fields = ["id", "slug", "label", "emoji", "order", "is_active"]
+        read_only_fields = ["id"]
+
+
+class WasteEntrySerializer(serializers.ModelSerializer):
+    """A logged waste entry. menu_item_id required on create; the rest is
+    looked up server-side at logging time."""
+    menu_item_name = serializers.CharField(source="menu_item.name", read_only=True)
+    menu_item_emoji = serializers.CharField(source="menu_item.emoji", read_only=True)
+    meal_period_slug = serializers.CharField(
+        source="menu_item.meal_period.slug", read_only=True
+    )
+    reason_label = serializers.CharField(source="reason.label", read_only=True)
+    recorded_by_name = serializers.SerializerMethodField()
+    total_cost = serializers.FloatField(read_only=True)
+
+    class Meta:
+        model = WasteEntry
+        fields = [
+            "id",
+            "menu_item", "menu_item_name", "menu_item_emoji", "meal_period_slug",
+            "qty", "unit",
+            "unit_price_at_time", "total_cost",
+            "reason", "reason_label",
+            "notes",
+            "recorded_at", "recorded_by", "recorded_by_name",
+        ]
+        read_only_fields = [
+            "id", "menu_item_name", "menu_item_emoji", "meal_period_slug",
+            "unit_price_at_time", "total_cost", "reason_label",
+            "recorded_at", "recorded_by", "recorded_by_name",
+        ]
+
+    def get_recorded_by_name(self, obj):
+        u = obj.recorded_by
+        if not u:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.email

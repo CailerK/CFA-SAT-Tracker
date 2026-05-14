@@ -773,3 +773,173 @@ class CleaningCompletion(models.Model):
 
     def __str__(self):
         return f"{self.task} on {self.date}"
+
+
+# =============================================================================
+# Phase 4: Kitchen Checklists (mirror of FOH Tasks but kitchen-scoped)
+# =============================================================================
+
+class KitchenChecklistTask(models.Model):
+    """A recurring kitchen checklist task for a given shift."""
+    SHIFT_CHOICES = [
+        ('opening', 'Opening'),
+        ('transition', 'Transition'),
+        ('closing', 'Closing'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='kitchen_checklist_tasks'
+    )
+    shift = models.CharField(max_length=20, choices=SHIFT_CHOICES)
+    text = models.CharField(max_length=300)
+    order = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['shift', 'order', 'id']
+        indexes = [models.Index(fields=['store', 'shift'])]
+
+    def __str__(self):
+        return f"[kitchen/{self.shift}] {self.text}"
+
+
+class KitchenChecklistCompletion(models.Model):
+    template = models.ForeignKey(
+        KitchenChecklistTask, on_delete=models.CASCADE,
+        related_name='completions',
+    )
+    date = models.DateField()
+    completed_at = models.DateTimeField(auto_now_add=True)
+    completed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='kitchen_checklist_completions',
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['template', 'date'],
+                name='unique_kitchen_completion_per_day',
+            ),
+        ]
+        indexes = [models.Index(fields=['date'])]
+
+
+# =============================================================================
+# Phase 4: Waste Tracker
+# =============================================================================
+
+class MealPeriod(models.Model):
+    """Global catalog of meal periods — same for every store."""
+    slug = models.CharField(max_length=20, unique=True)  # 'breakfast'|'lunch'|'dinner'
+    label = models.CharField(max_length=40)
+    emoji = models.CharField(max_length=10, blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.label
+
+
+class MenuItem(models.Model):
+    """A menu item per store with a unit price for waste tracking."""
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='menu_items'
+    )
+    meal_period = models.ForeignKey(
+        MealPeriod, on_delete=models.CASCADE, related_name='items'
+    )
+    name = models.CharField(max_length=100)
+    emoji = models.CharField(max_length=10, blank=True)
+    unit_price = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    order = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['meal_period', 'order', 'name']
+        indexes = [models.Index(fields=['store', 'meal_period'])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['store', 'meal_period', 'name'],
+                name='unique_menu_item_per_meal',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.name} (${self.unit_price})"
+
+
+class WasteReason(models.Model):
+    """Per-store catalog of waste reasons."""
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='waste_reasons'
+    )
+    slug = models.CharField(max_length=30)  # 'overproduction', 'quality', etc.
+    label = models.CharField(max_length=60)
+    emoji = models.CharField(max_length=10, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['store', 'slug'],
+                name='unique_waste_reason_per_store',
+            ),
+        ]
+
+    def __str__(self):
+        return self.label
+
+
+class WasteEntry(models.Model):
+    """A single waste log entry."""
+    UNIT_CHOICES = [
+        ('pieces', 'Pieces'),
+        ('portions', 'Portions'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='waste_entries'
+    )
+    menu_item = models.ForeignKey(
+        MenuItem, on_delete=models.PROTECT, related_name='waste_entries'
+    )
+    qty = models.PositiveIntegerField(default=1)
+    unit = models.CharField(max_length=20, choices=UNIT_CHOICES, default='pieces')
+    # Snapshot the price at log time so historical totals don't drift if menu
+    # prices later change.
+    unit_price_at_time = models.DecimalField(
+        max_digits=8, decimal_places=2, default=0
+    )
+    reason = models.ForeignKey(
+        WasteReason, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='entries',
+    )
+    recorded_at = models.DateTimeField(auto_now_add=True)
+    recorded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='waste_entries_logged',
+    )
+    notes = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ['-recorded_at', '-id']
+        indexes = [
+            models.Index(fields=['store', 'recorded_at']),
+            models.Index(fields=['store', 'menu_item']),
+        ]
+
+    @property
+    def total_cost(self):
+        return float(self.unit_price_at_time) * float(self.qty)
+
+    def __str__(self):
+        return f"{self.qty}x {self.menu_item.name} ({self.unit})"

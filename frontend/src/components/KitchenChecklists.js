@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import kitchenService from '../services/kitchen';
 import './SetupSheetTemplates.css'; // banner
 import './KitchenDashboard.css';     // kitchen nav
 import './KitchenChecklists.css';
@@ -62,20 +63,36 @@ const SHIFT_TABS = [
   { id: 'closing', label: 'Closing', emoji: '🌙', totalTasks: CLOSING_TASK_COUNT },
 ];
 
+// Normalize a backend KitchenChecklistTask row to {id, text, completed}.
+const normalizeRow = (raw) => ({
+  id: raw.id,
+  text: raw.text,
+  completed: Boolean(raw.today_completion),
+});
+
 const KitchenChecklists = ({ onNavigate, user }) => {
   const [activeShift, setActiveShift] = useState('transition');
-
-  // Per-shift task state. Opening pre-seeded as fully complete to match LD Growth "✓ Done".
-  const [shiftState, setShiftState] = useState(() => {
-    const openingTasks = Array.from({ length: OPENING_TASK_COUNT }, (_, i) => ({
-      id: `o-${i}`, text: `Opening task ${i + 1}`, completed: true,
-    }));
-    const transitionTasks = TRANSITION_TASKS.map((text, i) => ({ id: `t-${i}`, text, completed: false }));
-    const closingTasks = Array.from({ length: CLOSING_TASK_COUNT }, (_, i) => ({
-      id: `c-${i}`, text: `Closing task ${i + 1}`, completed: false,
-    }));
-    return { opening: openingTasks, transition: transitionTasks, closing: closingTasks };
+  const [shiftState, setShiftState] = useState({
+    opening: [], transition: [], closing: [],
   });
+  const [isLoading, setIsLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    try {
+      const grouped = await kitchenService.listChecklistGrouped();
+      setShiftState({
+        opening: (grouped.opening || []).map(normalizeRow),
+        transition: (grouped.transition || []).map(normalizeRow),
+        closing: (grouped.closing || []).map(normalizeRow),
+      });
+    } catch (err) {
+      console.error('Failed to load kitchen checklists:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
 
   const tabs = [
     { id: 'home', label: 'Home', Icon: IconLayoutDashboard },
@@ -100,11 +117,24 @@ const KitchenChecklists = ({ onNavigate, user }) => {
     }
   };
 
-  const toggleTask = (taskId) => {
+  const toggleTask = async (taskId) => {
+    const target = shiftState[activeShift].find((t) => t.id === taskId);
+    if (!target) return;
+    const willBeCompleted = !target.completed;
+    // Optimistic flip
     setShiftState((s) => ({
       ...s,
-      [activeShift]: s[activeShift].map((t) => t.id === taskId ? { ...t, completed: !t.completed } : t),
+      [activeShift]: s[activeShift].map((t) =>
+        t.id === taskId ? { ...t, completed: willBeCompleted } : t
+      ),
     }));
+    try {
+      if (willBeCompleted) await kitchenService.completeChecklistTask(taskId);
+      else await kitchenService.uncompleteChecklistTask(taskId);
+    } catch (err) {
+      console.error('Kitchen checklist toggle failed:', err);
+      refresh();
+    }
   };
 
   const activeTasks = shiftState[activeShift] || [];
