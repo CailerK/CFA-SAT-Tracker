@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from . import views, views_stores
 from .views_cleaning import CleaningTaskViewSet
+from .views_user_management import UserManagementViewSet
 from .views_equipment import (
     EquipmentCategoryViewSet,
     EquipmentViewSet,
@@ -198,6 +199,12 @@ router.register(
     r"notifications",
     NotificationViewSet,
     basename="notification",
+)
+# User Management (Admin/Superadmin only)
+router.register(
+    r"users",
+    UserManagementViewSet,
+    basename="user-management",
 )
 
 

@@ -162,6 +162,123 @@ class UserMeSerializer(serializers.ModelSerializer):
         read_only_fields = fields  # everything is read-only on this endpoint
 
 
+class UserManagementListSerializer(serializers.ModelSerializer):
+    """Serializer for listing users in the user management interface."""
+    initials = serializers.CharField(read_only=True)
+    store_name = serializers.CharField(source='store.name', read_only=True)
+    store_number = serializers.CharField(source='store.store_number', read_only=True)
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "email",
+            "username",
+            "first_name",
+            "last_name",
+            "full_name",
+            "initials",
+            "role",
+            "phone",
+            "is_admin",
+            "is_superuser",
+            "is_staff",
+            "is_demo_user",
+            "store_name",
+            "store_number",
+            "shift_preference",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "initials", "full_name", "store_name", 
+                            "store_number", "created_at", "updated_at"]
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip() or obj.email
+
+
+class UserManagementDetailSerializer(serializers.ModelSerializer):
+    """Serializer for creating/updating users in the user management interface."""
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    initials = serializers.CharField(read_only=True)
+    store_name = serializers.CharField(source='store.name', read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "email",
+            "username",
+            "first_name",
+            "last_name",
+            "initials",
+            "role",
+            "phone",
+            "password",
+            "is_admin",
+            "is_superuser",
+            "is_staff",
+            "is_demo_user",
+            "store",
+            "store_name",
+            "company_id",
+            "shift_preference",
+            "manager",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "initials", "store_name", "created_at", "updated_at"]
+
+    def validate(self, data):
+        """Prevent non-superusers from modifying admin/superuser flags."""
+        request = self.context.get('request')
+        if request and not request.user.is_superuser:
+            # Regular admins cannot change these fields
+            protected_fields = ['is_superuser', 'is_staff']
+            for field in protected_fields:
+                if field in data:
+                    raise serializers.ValidationError({
+                        field: "Only superusers can modify this field."
+                    })
+            
+            # Regular admins can't promote others to admin
+            if 'is_admin' in data and data['is_admin']:
+                if not self.instance or not self.instance.is_admin:
+                    raise serializers.ValidationError({
+                        'is_admin': "Only superusers can promote users to admin."
+                    })
+        
+        return data
+
+    def create(self, validated_data):
+        """Create a new user with proper password hashing."""
+        password = validated_data.pop('password', None)
+        user = User(**validated_data)
+        
+        if password:
+            user.set_password(password)
+        else:
+            # Set a random password if none provided
+            user.set_password(User.objects.make_random_password())
+        
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        """Update user, handling password separately."""
+        password = validated_data.pop('password', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        if password:
+            instance.set_password(password)
+        
+        instance.save()
+        return instance
+
+
 # ============================================================================
 # Phase 1: FOH Daily Tasks
 # ============================================================================

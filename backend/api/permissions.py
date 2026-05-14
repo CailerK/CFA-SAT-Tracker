@@ -67,3 +67,48 @@ class IsSelfOrManager(BasePermission):
         # The object is the user themselves, or has a `user` attribute that is.
         target = getattr(obj, "user", obj)
         return getattr(target, "pk", None) == request.user.pk
+
+
+class CanManageUsers(BasePermission):
+    """
+    Permission for user management:
+    - Superadmins: Can manage all users (view, create, edit, delete)
+    - Admins (is_admin=True): Can view/edit all users, but cannot:
+      * Delete or demote other admins/superusers
+      * Change admin/superuser status
+      * Delete themselves
+    - Regular managers: No access to user management
+    """
+
+    message = "You don't have permission to manage users."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        # Must be either superuser or have is_admin flag
+        return user.is_superuser or user.is_admin
+
+    def has_object_permission(self, request, view, obj):
+        """Object-level permission for editing/deleting specific users."""
+        user = request.user
+        target_user = obj
+        
+        # Superusers can do anything
+        if user.is_superuser:
+            return True
+        
+        # Admins (non-superuser) have restrictions
+        if user.is_admin:
+            # Can't delete themselves
+            if view.action == 'destroy' and target_user.pk == user.pk:
+                return False
+            
+            # Can't modify other admins or superusers
+            if target_user.is_superuser or (target_user.is_admin and target_user.pk != user.pk):
+                if view.action in ['update', 'partial_update', 'destroy']:
+                    return False
+            
+            return True
+        
+        return False

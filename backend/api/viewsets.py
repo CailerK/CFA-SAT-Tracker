@@ -28,9 +28,8 @@ class StoreScopedViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user or not user.is_authenticated:
             return qs.none()
-        # Superusers see everything (handy for the admin panel).
-        if user.is_superuser:
-            return qs
+        # All users (including superusers) are scoped to their assigned store.
+        # Django admin panel still works for cross-store access.
         store_id = getattr(user, "store_id", None)
         if store_id is None:
             # User isn't linked to a store yet — they see nothing in the API,
@@ -47,7 +46,7 @@ class StoreScopedViewSet(viewsets.ModelViewSet):
         """
         user = self.request.user
         store = getattr(user, "store", None)
-        if store is None and not user.is_superuser:
+        if store is None:
             raise PermissionDenied(
                 "You must be assigned to a store before creating records."
             )

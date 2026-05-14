@@ -340,7 +340,7 @@ const Dashboard = ({ user, onLogout }) => {
         ) : currentPage === 'vendors' ? (
           <Vendors onBack={() => setCurrentPage('dashboard')} />
         ) : currentPage === 'settings' ? (
-          <Settings onBack={() => setCurrentPage('dashboard')} />
+          <Settings onBack={() => setCurrentPage('dashboard')} currentUser={user} />
         ) : currentPage === 'setup-sheet-templates' ? (
           <SetupSheetTemplates 
             onBack={() => setCurrentPage('dashboard')} 
