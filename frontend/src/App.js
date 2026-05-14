@@ -47,6 +47,12 @@ function App() {
     // LoginPage already called apiService.login() which set the session cookie.
     // Re-fetch the user from the backend so the shape matches what checkSession
     // sees (avoids snake_case vs camelCase drift between login and refresh).
+    // Clear any stale URL hash so users always land on the dashboard after login.
+    window.history.replaceState(
+      null,
+      '',
+      window.location.pathname + window.location.search
+    );
     checkSession();
   };
 
