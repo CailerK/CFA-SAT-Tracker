@@ -589,6 +589,164 @@ These rules apply everywhere — flag any place they're violated.
 
 ---
 
+## Phase 10 — Production Hardening
+
+### Rate Limiting
+
+#### Login Endpoint:
+- [ ] Attempt 6 failed logins in a row → 6th attempt is blocked with 429 Too Many Requests.
+- [ ] Rate limit: 5 attempts per 15 minutes per IP address.
+- [ ] After 15 minutes, can attempt login again.
+- [ ] Successful login does not count against rate limit.
+
+#### Forgot Password Endpoint:
+- [ ] Attempt 4 password reset requests in an hour → 4th attempt is blocked with 429.
+- [ ] Rate limit: 3 attempts per hour per IP address.
+- [ ] After 1 hour, can request password reset again.
+
+### Email Service (Setup Required)
+
+#### Password Reset Flow:
+- [ ] Request password reset → email received within 1 minute.
+- [ ] Email contains valid reset link with uid and token.
+- [ ] Click reset link → redirects to frontend reset password page.
+- [ ] Submit new password → password is updated successfully.
+- [ ] Old password no longer works, new password works.
+- [ ] Reset link expires after 24 hours.
+
+#### Email Configuration:
+- [ ] `RESEND_API_KEY` or `SENDGRID_API_KEY` set in Railway environment.
+- [ ] `DEFAULT_FROM_EMAIL` set to valid sender address.
+- [ ] `FRONTEND_URL` set to production frontend URL.
+- [ ] Test email sending from Django shell: `send_mail(...)` works.
+
+### Sentry Error Tracking (Setup Required)
+
+#### Configuration:
+- [ ] `SENTRY_DSN` environment variable set in Railway.
+- [ ] Sentry SDK installed: `sentry-sdk[django]` in requirements.txt.
+- [ ] Sentry initialized in `settings.py` with DjangoIntegration.
+- [ ] Environment set to 'production' in Sentry config.
+
+#### Error Capture:
+- [ ] Trigger a test error (e.g., divide by zero in a view).
+- [ ] Error appears in Sentry dashboard within 30 seconds.
+- [ ] Error includes: stack trace, request data, user info, environment.
+- [ ] Can navigate to error in Sentry and see full context.
+
+#### Performance Monitoring:
+- [ ] Sentry captures transaction performance data.
+- [ ] Can see slow endpoints in Sentry Performance tab.
+- [ ] Transaction sample rate set to 10% (configurable).
+
+#### Alerts:
+- [ ] Sentry alert configured for error rate > 5/minute.
+- [ ] Sentry alert configured for 5xx response rate > 1%.
+- [ ] Alerts sent to email/Slack when triggered.
+
+### Database Performance
+
+#### Query Optimization:
+- [ ] List endpoints use `select_related()` for foreign keys.
+- [ ] List endpoints use `prefetch_related()` for many-to-many and reverse FKs.
+- [ ] No N+1 query problems (check with Django Debug Toolbar in dev).
+- [ ] Most list endpoints return in < 200ms.
+- [ ] Detail endpoints return in < 100ms.
+
+#### Connection Pooling:
+- [ ] `CONN_MAX_AGE` set to 600 in database config.
+- [ ] Database connections are reused across requests.
+- [ ] No connection timeout errors under load.
+
+### Postgres Backups
+
+#### Railway Backups:
+- [ ] Go to Railway → Postgres Service → Backups tab.
+- [ ] Verify daily backups are running.
+- [ ] Latest backup is less than 24 hours old.
+- [ ] Can download a backup file.
+
+#### Restore Testing (Staging):
+- [ ] Download a backup from Railway.
+- [ ] Restore to a test database: `pg_restore -d test_db backup.dump`.
+- [ ] Verify data integrity after restore.
+- [ ] Test application against restored database.
+
+### Security Checklist
+
+- [ ] `SECRET_KEY` is in environment variable (not in code).
+- [ ] `DEBUG=False` in production.
+- [ ] `ALLOWED_HOSTS` configured with production domain.
+- [ ] CORS configured for frontend domain only (not `*`).
+- [ ] CSRF protection enabled (default Django behavior).
+- [ ] HTTPS enforced (Railway handles this automatically).
+- [ ] Rate limiting active on auth endpoints.
+- [ ] No sensitive data in logs or error messages.
+
+### Environment Variables
+
+#### Required Variables Set in Railway:
+- [ ] `SECRET_KEY`
+- [ ] `DEBUG=False`
+- [ ] `ALLOWED_HOSTS`
+- [ ] `FRONTEND_URL`
+- [ ] `DATABASE_URL` (provided by Railway)
+- [ ] `RESEND_API_KEY` or `SENDGRID_API_KEY`
+- [ ] `DEFAULT_FROM_EMAIL`
+- [ ] `SENTRY_DSN`
+
+### Deployment Checks
+
+#### Pre-Deployment:
+- [ ] Run `python manage.py check --deploy` → no warnings.
+- [ ] Run `python manage.py migrate --plan` → migrations are safe.
+- [ ] All tests pass: `python manage.py test`.
+- [ ] Frontend builds successfully: `npm run build`.
+- [ ] No ESLint errors in frontend code.
+
+#### Post-Deployment:
+- [ ] Application loads successfully at production URL.
+- [ ] Can log in with test account.
+- [ ] All API endpoints return 200 or expected status codes.
+- [ ] No 500 errors in Railway logs.
+- [ ] Sentry receives first transaction/error.
+- [ ] Database migrations applied successfully.
+
+### Monitoring & Alerts
+
+#### Health Check Endpoint:
+- [ ] `GET /api/health/` returns 200 with status: healthy.
+- [ ] Health check verifies database connection.
+- [ ] Health check returns 503 if database is down.
+
+#### Railway Monitoring:
+- [ ] CPU usage < 80% under normal load.
+- [ ] Memory usage < 80% under normal load.
+- [ ] No deployment failures in history.
+- [ ] Logs are accessible and readable.
+
+#### Sentry Monitoring:
+- [ ] Sentry dashboard shows recent transactions.
+- [ ] No critical errors in last 24 hours.
+- [ ] Performance metrics look normal (< 1s avg response time).
+- [ ] Alerts are configured and working.
+
+### Performance Testing (Optional)
+
+#### Load Testing:
+- [ ] Use tool like Apache Bench or Locust to simulate 100 concurrent users.
+- [ ] All endpoints respond in < 1 second under load.
+- [ ] No 500 errors under load.
+- [ ] Database connection pool handles concurrent requests.
+- [ ] Memory usage remains stable under load.
+
+#### Stress Testing:
+- [ ] Gradually increase load to find breaking point.
+- [ ] Application degrades gracefully (slow responses, not crashes).
+- [ ] Can recover after load is reduced.
+
+---
+
 ## Bugs / oddities log
 
 > Use this section as you test. Format:

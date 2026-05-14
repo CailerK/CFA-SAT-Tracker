@@ -179,7 +179,7 @@ const QuickActions = ({ onPageChange, onCustomize, customActions }) => {
         </svg>
       ),
       iconBg: 'green',
-      page: 'chat'
+      page: 'team-chat'
     },
     {
       id: 'settings',
@@ -205,7 +205,7 @@ const QuickActions = ({ onPageChange, onCustomize, customActions }) => {
         </svg>
       ),
       iconBg: 'purple',
-      page: 'team-evaluations'
+      page: 'leadership-360'
     },
     {
       id: 'foh-tasks',
@@ -287,7 +287,7 @@ const QuickActions = ({ onPageChange, onCustomize, customActions }) => {
         </svg>
       ),
       iconBg: 'pink',
-      page: 'documentation'
+      page: 'team-documentation'
     },
     {
       id: 'leadership',
@@ -314,13 +314,14 @@ const QuickActions = ({ onPageChange, onCustomize, customActions }) => {
         </svg>
       ),
       iconBg: 'rose',
-      page: 'analytics'
+      page: 'kitchen-analytics'
     }
   ];
 
   // Filter items based on customActions or fall back to default set
+  // customActions can be either an array of strings (from backend) or array of objects
   const selectedIds = customActions && customActions.length > 0
-    ? customActions.map((a) => a.id)
+    ? customActions.map((a) => typeof a === 'string' ? a : a.id)
     : DEFAULT_ACTION_IDS;
   const visibleItems = quickActionItems.filter((item) => selectedIds.includes(item.id));
 

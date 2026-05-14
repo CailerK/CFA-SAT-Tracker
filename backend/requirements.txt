@@ -13,3 +13,6 @@ dj-database-url==2.1.0
 
 # Image handling (Django ImageField uses this for User.avatar)
 Pillow==10.2.0
+
+# Rate limiting for auth endpoints (Phase 10)
+django-ratelimit==4.1.0

@@ -45,13 +45,22 @@
 
 .notification-container {
   position: relative;
+}
+
+.notification-button {
+  background: none;
+  border: none;
   cursor: pointer;
   padding: 8px;
   border-radius: 8px;
   transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
-.notification-container:hover {
+.notification-button:hover {
   background-color: #f3f4f6;
 }
 
@@ -60,7 +69,7 @@
   transition: color 0.2s ease;
 }
 
-.notification-container:hover .notification-bell {
+.notification-button:hover .notification-bell {
   color: #374151;
 }
 

@@ -4,6 +4,10 @@ import Sidebar from './Sidebar';
 import QuickActions from './QuickActions';
 import CustomizeInsightsModal from './CustomizeInsightsModal';
 import CustomizeActionsModal from './CustomizeActionsModal';
+import NotificationDropdown from './NotificationDropdown';
+import notificationService from '../services/notifications';
+import preferencesService from '../services/preferences';
+import dashboardService from '../services/dashboard';
 import FOHTasks from './FOHTasks';
 import CleaningMaintenance from './CleaningMaintenance';
 import WeeklyDigest from './WeeklyDigest';
@@ -44,9 +48,11 @@ const pageFromHash = () => {
 
 const Dashboard = ({ user, onLogout }) => {
   const [currentPage, setCurrentPageRaw] = useState(pageFromHash);
-  const [notificationCount, setNotificationCount] = useState(42); // Dynamic notification count
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef(null);
+  const notificationRef = useRef(null);
 
   // Wrap setCurrentPage so it also updates the URL hash. This way a refresh
   // lands on the same page instead of bouncing back to the dashboard.
@@ -87,16 +93,78 @@ const Dashboard = ({ user, onLogout }) => {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
         setProfileDropdownOpen(false);
       }
+      if (notificationRef.current && !notificationRef.current.contains(e.target)) {
+        setNotificationDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Load notification count on mount and periodically
+  useEffect(() => {
+    const loadNotificationCount = async () => {
+      try {
+        const data = await notificationService.getUnreadCount();
+        setNotificationCount(data.unread_count || 0);
+      } catch (error) {
+        console.error('Failed to load notification count:', error);
+      }
+    };
+
+    loadNotificationCount();
+    // Poll every 30 seconds
+    const interval = setInterval(loadNotificationCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Load user preferences and insights on mount
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        const prefs = await preferencesService.getPreferences();
+        setCustomInsights(prefs.insight_ids || []);
+        setCustomActions(prefs.quick_action_ids || []);
+      } catch (error) {
+        console.error('Failed to load preferences:', error);
+      }
+    };
+
+    const loadInsightsCatalog = async () => {
+      try {
+        const data = await dashboardService.getInsightsCatalog();
+        setInsightsCatalog(data.insights || []);
+      } catch (error) {
+        console.error('Failed to load insights catalog:', error);
+      }
+    };
+
+    loadPreferences();
+    loadInsightsCatalog();
+  }, []);
+
+  // Load insights values when customInsights changes
+  useEffect(() => {
+    if (customInsights.length > 0) {
+      const loadInsightsValues = async () => {
+        try {
+          const data = await dashboardService.getInsightsValues(customInsights);
+          setInsightsValues(data.values || {});
+        } catch (error) {
+          console.error('Failed to load insights values:', error);
+        }
+      };
+      loadInsightsValues();
+    }
+  }, [customInsights]);
 
   // State for customize modals
   const [isCustomizeInsightsOpen, setIsCustomizeInsightsOpen] = useState(false);
   const [isCustomizeActionsOpen, setIsCustomizeActionsOpen] = useState(false);
   const [customInsights, setCustomInsights] = useState([]);
   const [customActions, setCustomActions] = useState([]);
+  const [insightsValues, setInsightsValues] = useState({});
+  const [insightsCatalog, setInsightsCatalog] = useState([]);
 
   // Get current date for greeting
   const getCurrentDate = () => {
@@ -129,14 +197,27 @@ const Dashboard = ({ user, onLogout }) => {
             <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
           </div>
           <div className="nav-right">
-            <div className="notification-container">
-              <svg className="notification-bell" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-              {notificationCount > 0 && (
-                <div className="notification-badge">{notificationCount}</div>
-              )}
+            <div className="notification-container" ref={notificationRef}>
+              <button 
+                className="notification-button"
+                onClick={() => setNotificationDropdownOpen(!notificationDropdownOpen)}
+              >
+                <svg className="notification-bell" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                {notificationCount > 0 && (
+                  <div className="notification-badge">{notificationCount}</div>
+                )}
+              </button>
+              <NotificationDropdown
+                isOpen={notificationDropdownOpen}
+                onClose={() => setNotificationDropdownOpen(false)}
+                onNavigate={(page) => {
+                  setCurrentPage(page);
+                  setNotificationDropdownOpen(false);
+                }}
+              />
             </div>
             <div className="profile-container" ref={profileDropdownRef}>
               <button className="profile-button" onClick={toggleProfileDropdown}>
@@ -424,7 +505,7 @@ const Dashboard = ({ user, onLogout }) => {
 
                   <button
                     className="insight-card insight-emerald"
-                    onClick={() => setCurrentPage('kitchen-checklist')}
+                    onClick={() => setCurrentPage('kitchen-checklists')}
                   >
                     <div className="insight-card-blur" aria-hidden="true"></div>
                     <div className="insight-card-body">
@@ -459,7 +540,7 @@ const Dashboard = ({ user, onLogout }) => {
 
                   <button
                     className="insight-card insight-red"
-                    onClick={() => setCurrentPage('documentation')}
+                    onClick={() => setCurrentPage('team-documentation')}
                   >
                     <div className="insight-card-blur" aria-hidden="true"></div>
                     <div className="insight-card-body">
@@ -495,20 +576,33 @@ const Dashboard = ({ user, onLogout }) => {
       <CustomizeInsightsModal
         isOpen={isCustomizeInsightsOpen}
         onClose={() => setIsCustomizeInsightsOpen(false)}
-        onSave={(insights) => {
-          setCustomInsights(insights);
-          setIsCustomizeInsightsOpen(false);
+        onSave={async (insights) => {
+          try {
+            await preferencesService.updateInsights(insights);
+            setCustomInsights(insights);
+            setIsCustomizeInsightsOpen(false);
+          } catch (error) {
+            console.error('Failed to save insights:', error);
+            alert('Failed to save insights. Please try again.');
+          }
         }}
         currentInsights={customInsights}
+        catalog={insightsCatalog}
       />
 
       {/* Customize Quick Actions Modal */}
       <CustomizeActionsModal
         isOpen={isCustomizeActionsOpen}
         onClose={() => setIsCustomizeActionsOpen(false)}
-        onSave={(actions) => {
-          setCustomActions(actions);
-          setIsCustomizeActionsOpen(false);
+        onSave={async (actions) => {
+          try {
+            await preferencesService.updateQuickActions(actions);
+            setCustomActions(actions);
+            setIsCustomizeActionsOpen(false);
+          } catch (error) {
+            console.error('Failed to save quick actions:', error);
+            alert('Failed to save quick actions. Please try again.');
+          }
         }}
         currentActions={customActions}
       />

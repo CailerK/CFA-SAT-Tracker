@@ -12,6 +12,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django_ratelimit.decorators import ratelimit
 from .models import User
 from .serializers import UserMeSerializer
 import json
@@ -45,8 +46,12 @@ def api_status(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @csrf_exempt
+@ratelimit(key='ip', rate='5/15m', method='POST', block=True)
 def login_view(request):
-    """Handle user login with email and password"""
+    """Handle user login with email and password
+    
+    Rate limited to 5 attempts per 15 minutes per IP address.
+    """
     try:
         data = json.loads(request.body)
         email = data.get('email')
@@ -105,8 +110,12 @@ def current_user(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @csrf_exempt
+@ratelimit(key='ip', rate='3/1h', method='POST', block=True)
 def forgot_password(request):
-    """Handle forgot password request"""
+    """Handle forgot password request
+    
+    Rate limited to 3 attempts per hour per IP address.
+    """
     try:
         data = json.loads(request.body)
         email = data.get('email')
