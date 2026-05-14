@@ -14,6 +14,8 @@ const UserManagement = ({ currentUser }) => {
   const [filterRole, setFilterRole] = useState('all');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [tempPassword, setTempPassword] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
 
   const isSuperuser = currentUser?.isSuperuser;
   const isAdmin = currentUser?.isAdmin;
@@ -48,7 +50,7 @@ const UserManagement = ({ currentUser }) => {
       username: '',
       firstName: '',
       lastName: '',
-      role: 'team_member',
+      role: '',
       phone: '',
       password: '',
       isAdmin: false,
@@ -56,12 +58,33 @@ const UserManagement = ({ currentUser }) => {
       isStaff: false,
       isDemoUser: false,
       store: currentUser?.store?.id || null,
-      shiftPreference: 'flex',
+      shiftPreference: {
+        monday: { available: false, hours: '' },
+        tuesday: { available: false, hours: '' },
+        wednesday: { available: false, hours: '' },
+        thursday: { available: false, hours: '' },
+        friday: { available: false, hours: '' },
+        saturday: { available: false, hours: '' },
+      },
     });
     setShowModal(true);
   };
 
   const handleEditUser = (user) => {
+    // Parse shift preference - handle both old format (string) and new format (object)
+    let shiftPref = {
+      monday: { available: false, hours: '' },
+      tuesday: { available: false, hours: '' },
+      wednesday: { available: false, hours: '' },
+      thursday: { available: false, hours: '' },
+      friday: { available: false, hours: '' },
+      saturday: { available: false, hours: '' },
+    };
+    
+    if (user.shiftPreference && typeof user.shiftPreference === 'object') {
+      shiftPref = user.shiftPreference;
+    }
+
     setEditingUser({
       id: user.id,
       email: user.email,
@@ -76,7 +99,7 @@ const UserManagement = ({ currentUser }) => {
       isStaff: user.isStaff,
       isDemoUser: user.isDemoUser,
       store: user.store || currentUser?.store?.id,
-      shiftPreference: user.shiftPreference || 'flex',
+      shiftPreference: shiftPref,
     });
     setShowModal(true);
   };
@@ -92,9 +115,6 @@ const UserManagement = ({ currentUser }) => {
         role: editingUser.role,
         phone: editingUser.phone,
         is_admin: editingUser.isAdmin,
-        is_superuser: editingUser.isSuperuser,
-        is_staff: editingUser.isStaff,
-        is_demo_user: editingUser.isDemoUser,
         store: editingUser.store,
         shift_preference: editingUser.shiftPreference,
       };
@@ -127,7 +147,7 @@ const UserManagement = ({ currentUser }) => {
     }
   };
 
-  const handleDeleteUser = async (user) => {
+  const handleDeleteUser = (user) => {
     if (user.id === currentUser.id) {
       alert("You cannot delete your own account.");
       return;
@@ -138,14 +158,22 @@ const UserManagement = ({ currentUser }) => {
       return;
     }
 
-    if (window.confirm(`Are you sure you want to delete ${user.fullName || user.email}?`)) {
-      try {
-        await api.request(`/users/${user.id}/`, { method: 'DELETE' });
-        loadData();
-      } catch (err) {
-        console.error('Failed to delete user:', err);
-        alert(err.message || 'Failed to delete user');
-      }
+    // Show custom delete confirmation modal
+    setUserToDelete(user);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    try {
+      await api.request(`/users/${userToDelete.id}/`, { method: 'DELETE' });
+      setShowDeleteModal(false);
+      setUserToDelete(null);
+      loadData();
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      alert(err.message || 'Failed to delete user');
     }
   };
 
@@ -178,6 +206,31 @@ const UserManagement = ({ currentUser }) => {
     if (!isAdmin) return false;
     // Admins can't delete other admins or superusers
     return !user.isSuperuser && !user.isAdmin;
+  };
+
+  const updateShiftDay = (day, field, value) => {
+    setEditingUser({
+      ...editingUser,
+      shiftPreference: {
+        ...editingUser.shiftPreference,
+        [day]: {
+          ...editingUser.shiftPreference[day],
+          [field]: value,
+        },
+      },
+    });
+  };
+
+  const isFormValid = () => {
+    if (!editingUser) return false;
+    return (
+      editingUser.firstName?.trim() &&
+      editingUser.lastName?.trim() &&
+      editingUser.email?.trim() &&
+      editingUser.username?.trim() &&
+      editingUser.role &&
+      (editingUser.id || editingUser.password?.trim())
+    );
   };
 
   const filteredUsers = users.filter(user => {
@@ -400,29 +453,44 @@ const UserManagement = ({ currentUser }) => {
                   </div>
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Role *</label>
-                    <select
-                      value={editingUser.role}
-                      onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
-                      required
-                    >
-                      {roles.map(role => (
-                        <option key={role.value} value={role.value}>{role.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Shift Preference</label>
-                    <select
-                      value={editingUser.shiftPreference}
-                      onChange={(e) => setEditingUser({...editingUser, shiftPreference: e.target.value})}
-                    >
-                      <option value="day">Day</option>
-                      <option value="night">Night</option>
-                      <option value="flex">Flexible</option>
-                    </select>
+                <div className="form-group">
+                  <label>Role *</label>
+                  <select
+                    value={editingUser.role}
+                    onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
+                    required
+                  >
+                    <option value="">Select a role...</option>
+                    {roles.map(role => (
+                      <option key={role.value} value={role.value}>{role.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Weekly Availability</label>
+                  <div className="shift-calendar">
+                    {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].map(day => (
+                      <div key={day} className="shift-day">
+                        <label className="shift-day-header">
+                          <input
+                            type="checkbox"
+                            checked={editingUser.shiftPreference[day].available}
+                            onChange={(e) => updateShiftDay(day, 'available', e.target.checked)}
+                          />
+                          <span>{day.charAt(0).toUpperCase() + day.slice(1)}</span>
+                        </label>
+                        {editingUser.shiftPreference[day].available && (
+                          <input
+                            type="text"
+                            className="shift-hours"
+                            placeholder="e.g., 9am-5pm"
+                            value={editingUser.shiftPreference[day].hours}
+                            onChange={(e) => updateShiftDay(day, 'hours', e.target.value)}
+                          />
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -445,9 +513,8 @@ const UserManagement = ({ currentUser }) => {
                 )}
 
                 {/* Permission checkboxes */}
-                <div className="form-group">
-                  {/* Admins can set admin checkbox when CREATING, but not when editing existing admins */}
-                  {(isSuperuser || (isAdmin && !editingUser.id)) && (
+                {(isSuperuser || (isAdmin && !editingUser.id)) && (
+                  <div className="form-group">
                     <label className="checkbox-label">
                       <input
                         type="checkbox"
@@ -457,36 +524,18 @@ const UserManagement = ({ currentUser }) => {
                       />
                       <span>Admin (can manage users)</span>
                     </label>
-                  )}
-                  
-                  {/* Only superusers can manage superuser and demo flags */}
-                  {isSuperuser && (
-                    <>
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={editingUser.isSuperuser}
-                          onChange={(e) => setEditingUser({...editingUser, isSuperuser: e.target.checked, isStaff: e.target.checked})}
-                        />
-                        <span>Superuser (full system access)</span>
-                      </label>
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={editingUser.isDemoUser}
-                          onChange={(e) => setEditingUser({...editingUser, isDemoUser: e.target.checked})}
-                        />
-                        <span>Demo User</span>
-                      </label>
-                    </>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">
+                <button 
+                  type="submit" 
+                  className="btn-primary"
+                  disabled={!isFormValid()}
+                >
                   {editingUser.id ? 'Save Changes' : 'Create User'}
                 </button>
               </div>
@@ -525,6 +574,40 @@ const UserManagement = ({ currentUser }) => {
             <div className="modal-footer">
               <button className="btn-primary" onClick={() => setShowPasswordModal(false)}>
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && userToDelete && (
+        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
+          <div className="modal-content modal-small delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="delete-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="15" y1="9" x2="9" y2="15"/>
+                  <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+              </div>
+              <h3>Delete User</h3>
+              <button className="modal-close" onClick={() => setShowDeleteModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="delete-message">
+                Are you sure you want to delete <strong>{userToDelete.fullName || userToDelete.email}</strong>?
+              </p>
+              <p className="delete-warning">
+                This action cannot be undone. All data associated with this user will be permanently removed.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowDeleteModal(false)}>
+                Cancel
+              </button>
+              <button className="btn-danger" onClick={confirmDeleteUser}>
+                Delete User
               </button>
             </div>
           </div>

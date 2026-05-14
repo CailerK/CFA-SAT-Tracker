@@ -228,27 +228,30 @@ class UserManagementDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "initials", "store_name", "created_at", "updated_at"]
+        read_only_fields = [
+            "id", 
+            "initials", 
+            "store_name", 
+            "created_at", 
+            "updated_at",
+            "is_superuser",  # Can only be set via Django admin or server-side
+            "is_staff",      # Can only be set via Django admin or server-side
+            "is_demo_user",  # Can only be set via Django admin or server-side
+        ]
 
     def validate(self, data):
         """
-        Prevent non-superusers from modifying admin/superuser flags.
+        Validate user data.
+        
+        Note: is_superuser, is_staff, and is_demo_user are read-only fields
+        and can only be set via Django admin or server-side scripts.
         
         Admins can:
         - Create new admins (is_admin=True on new users)
-        - NOT modify is_superuser or is_staff
         - NOT change is_admin on existing admins (can only modify non-admins)
         """
         request = self.context.get('request')
         if request and not request.user.is_superuser:
-            # Regular admins cannot change these fields
-            protected_fields = ['is_superuser', 'is_staff']
-            for field in protected_fields:
-                if field in data:
-                    raise serializers.ValidationError({
-                        field: "Only superusers can modify this field."
-                    })
-            
             # For UPDATES: Regular admins can't modify is_admin on existing admins
             if self.instance and self.instance.is_admin:
                 if 'is_admin' in data and data['is_admin'] != self.instance.is_admin:

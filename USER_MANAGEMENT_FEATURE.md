@@ -11,9 +11,13 @@ Added in-app user management interface for superadmins and admins to create, edi
 - ✅ Create new users
 - ✅ Edit any user (including other admins)
 - ✅ Delete any user (except themselves)
-- ✅ Change admin/superuser status
+- ✅ Change admin status
+- ❌ **Cannot change superuser status** (must be set via Django admin or server)
+- ❌ **Cannot change demo user status** (must be set via Django admin or server)
 - ✅ Reset passwords
 - ✅ Assign users to stores (if multiple stores exist)
+
+**Note:** Superuser and demo user flags can only be set directly on the server via Django admin panel or management commands for security reasons.
 
 ### Admins (is_admin=True, is_superuser=False)
 - ✅ View all users in their store (EXCEPT superusers - they are hidden)
@@ -115,9 +119,9 @@ Located in **Settings → User Management** tab (only visible to admins/superuse
 - Role (dropdown)
 - Shift Preference (Day/Night/Flexible)
 - Store (superusers only, when multiple stores exist)
-- Admin checkbox (superusers only)
-- Superuser checkbox (superusers only)
-- Demo User checkbox (superusers only)
+- Admin checkbox (visible to superusers and admins when creating users)
+
+**Note:** Superuser and demo user flags are not available in the UI and must be set via Django admin panel or server-side scripts.
 
 ### Password Reset Flow
 

@@ -188,6 +188,142 @@
   font-weight: 500;
 }
 
+/* Delete Confirmation Modal */
+.delete-modal .modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 16px;
+}
+
+.delete-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #fee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.delete-icon svg {
+  stroke: #dc3545;
+}
+
+.delete-modal h3 {
+  margin: 0;
+  flex: 1;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.delete-message {
+  font-size: 16px;
+  color: #374151;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.delete-message strong {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.delete-warning {
+  font-size: 14px;
+  color: #6b7280;
+  background: #fef3c7;
+  border-left: 3px solid #f59e0b;
+  padding: 12px;
+  border-radius: 4px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.btn-danger {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-danger:hover {
+  background: #c82333;
+}
+
+.btn-danger:active {
+  background: #bd2130;
+}
+
+/* Shift Calendar */
+.shift-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.shift-day {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shift-day-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
+}
+
+.shift-day-header input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.shift-day-header span {
+  min-width: 100px;
+}
+
+.shift-hours {
+  margin-left: 26px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  width: calc(100% - 26px);
+  max-width: 300px;
+}
+
+.shift-hours:focus {
+  outline: none;
+  border-color: #E51636;
+  box-shadow: 0 0 0 3px rgba(229, 22, 54, 0.1);
+}
+
+/* Disabled button state */
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .action-buttons {
   display: flex;
   gap: 8px;
