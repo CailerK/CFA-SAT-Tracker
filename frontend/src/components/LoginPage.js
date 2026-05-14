@@ -208,19 +208,6 @@ const LoginPage = ({ onLogin }) => {
           </div>
         )}
 
-        <div className="demo-credentials">
-          <p className="demo-title">Test Credentials:</p>
-          <div className="credentials-section">
-            <p className="credentials-label">Team Member:</p>
-            <p className="demo-text">Email: demouser@gmail.com</p>
-            <p className="demo-text">Password: demouser</p>
-          </div>
-          <div className="credentials-section">
-            <p className="credentials-label">Store Manager:</p>
-            <p className="demo-text">Email: admin@gmail.com</p>
-            <p className="demo-text">Password: admin</p>
-          </div>
-        </div>
       </div>
     </div>
   );
