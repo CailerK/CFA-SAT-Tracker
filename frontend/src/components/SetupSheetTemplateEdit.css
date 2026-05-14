@@ -209,6 +209,34 @@
 }
 .sste-banner-dismiss-icon { width: 16px; height: 16px; }
 
+/* ---------- Template details (name + description) ---------- */
+.sste-details {
+  margin-bottom: 16px;
+}
+
+.sste-details-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .sste-details-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    gap: 16px;
+  }
+}
+
+.sste-details-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.sste-required {
+  color: #E51636;
+  font-weight: 600;
+}
+
 /* ---------- Day helper ---------- */
 .sste-day-helper {
   background: #f9fafb;

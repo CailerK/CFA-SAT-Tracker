@@ -123,15 +123,11 @@ const SetupSheetTemplates = ({ onBack, onNavigate }) => {
     { id: 'history', label: 'History', Icon: IconHistory },
   ];
 
-  const handleCreateTemplate = async () => {
-    const name = window.prompt('Template name');
-    if (!name?.trim()) return;
-    const description = window.prompt('Template description', '') || '';
-    try {
-      await setupSheetsService.createTemplate({ name: name.trim(), description });
-      await refresh();
-    } catch (err) {
-      console.error('Failed to create setup template:', err);
+  const handleCreateTemplate = () => {
+    // Open the full-page create flow (pixel-match of LD Growth's
+    // "Configure Your Template"). Replaces the old window.prompt UX.
+    if (onNavigate) {
+      onNavigate('setup-sheet-template-new');
     }
   };
 

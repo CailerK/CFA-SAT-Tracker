@@ -26,15 +26,31 @@ const cleaningService = {
   },
 
   /** POST: create a task (manager+). */
-  async create({ scope, name, frequency, days = [], supplies = [], links = [], estimated_minutes = null, order = 0 }) {
+  async create({
+    scope, name, frequency,
+    area = "", description = "",
+    days = [], supplies = [], links = [],
+    estimated_minutes = null,
+    assignee = null,
+    order = 0,
+  }) {
     return apiService.request("/cleaning/tasks/", {
       method: "POST",
       body: JSON.stringify({
-        scope, name, frequency,
+        scope, name, area, description, frequency,
         days, supplies, links,
-        estimated_minutes, order,
+        estimated_minutes, assignee, order,
       }),
     });
+  },
+
+  /** GET team members in the requester's store, for the Assign To picker. */
+  async searchTeamMembers({ q = "", limit = 10 } = {}) {
+    const params = new URLSearchParams({ status: "active" });
+    if (q) params.set("q", q);
+    const res = await apiService.request(`/team/members/?${params}`);
+    const rows = res.results || res || [];
+    return rows.slice(0, limit);
   },
 
   async update(id, patch) {

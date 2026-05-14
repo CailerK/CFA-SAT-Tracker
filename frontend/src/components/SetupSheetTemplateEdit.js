@@ -86,13 +86,21 @@ const normalizeIncoming = (b, idx) => {
 };
 
 // ----- Component -----
-const SetupSheetTemplateEdit = ({ templateId, onBack }) => {
+// Single component that handles BOTH create and edit modes:
+//   * `templateId` falsy  → create mode (POST then save-time-blocks)
+//   * `templateId` truthy → edit mode (PATCH name/desc + save-time-blocks)
+const SetupSheetTemplateEdit = ({ templateId, onBack, onCreated }) => {
+  const isCreate = !templateId;
   const [template, setTemplate] = useState(null);
+  // Editable template metadata (name + description). In edit mode these are
+  // seeded from the loaded template; in create mode they start blank.
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [blocks, setBlocks] = useState([]);
   const [activeDay, setActiveDay] = useState('monday');
   // Per-block department selection (so the user's tab choice persists per block).
   const [blockDept, setBlockDept] = useState({}); // { [_key]: 'front_counter' }
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!isCreate);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -108,6 +116,8 @@ const SetupSheetTemplateEdit = ({ templateId, onBack }) => {
     try {
       const tpl = await setupSheetsService.getTemplate(templateId);
       setTemplate(tpl);
+      setName(tpl.name || '');
+      setDescription(tpl.description || '');
       const incoming = (tpl.time_blocks || [])
         .map(normalizeIncoming)
         .sort((a, b) => {
@@ -245,7 +255,11 @@ const SetupSheetTemplateEdit = ({ templateId, onBack }) => {
 
   // ----- Save -----
   const handleSave = async () => {
-    if (!templateId) return;
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setErrorMsg('Template name is required.');
+      return;
+    }
     setIsSaving(true);
     setErrorMsg('');
     setSuccessMsg('');
@@ -258,12 +272,41 @@ const SetupSheetTemplateEdit = ({ templateId, onBack }) => {
         order: typeof b.order === 'number' ? b.order : i,
         positions_needed: b.positions_needed,
       }));
-      const updated = await setupSheetsService.saveTemplateTimeBlocks(templateId, payload);
+
+      let id = templateId;
+      if (isCreate) {
+        // Create the template first so we have an id to attach blocks to.
+        const created = await setupSheetsService.createTemplate({
+          name: trimmedName,
+          description: description.trim(),
+        });
+        id = created.id;
+        setTemplate(created);
+      } else {
+        // Patch name/description if they changed.
+        const patch = {};
+        if (template?.name !== trimmedName) patch.name = trimmedName;
+        if ((template?.description || '') !== description.trim()) {
+          patch.description = description.trim();
+        }
+        if (Object.keys(patch).length > 0) {
+          const patched = await setupSheetsService.updateTemplate(templateId, patch);
+          setTemplate(patched);
+        }
+      }
+
+      const updated = await setupSheetsService.saveTemplateTimeBlocks(id, payload);
       setTemplate(updated);
+      setName(updated.name || '');
+      setDescription(updated.description || '');
       const incoming = (updated.time_blocks || []).map(normalizeIncoming);
       setBlocks(incoming);
-      setSuccessMsg('Template saved.');
+      setSuccessMsg(isCreate ? 'Template created.' : 'Template saved.');
       setTimeout(() => setSuccessMsg(''), 2500);
+
+      // In create mode, hop into edit mode for the newly-created template so
+      // the URL hash carries the id and refresh keeps the user here.
+      if (isCreate && onCreated) onCreated(id);
     } catch (err) {
       console.error('Save failed', err);
       setErrorMsg(err.message || 'Could not save template.');
@@ -291,9 +334,15 @@ const SetupSheetTemplateEdit = ({ templateId, onBack }) => {
           <div className="sste-hero-row">
             <div className="sste-hero-text">
               <h1 className="sste-hero-title">
-                Edit Template: {template?.name || ''}
+                {isCreate
+                  ? 'Create New Template'
+                  : `Edit Template: ${template?.name || ''}`}
               </h1>
-              <p className="sste-hero-sub">Modify your existing template</p>
+              <p className="sste-hero-sub">
+                {isCreate
+                  ? 'Set up a new template from scratch'
+                  : 'Modify your existing template'}
+              </p>
             </div>
             <div className="sste-hero-actions">
               <button className="sste-btn sste-btn-ghost-light" onClick={onBack}>
@@ -311,11 +360,44 @@ const SetupSheetTemplateEdit = ({ templateId, onBack }) => {
             <button
               className="sste-btn sste-btn-primary"
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || !name.trim()}
             >
               <IconSave className="sste-btn-icon"/>
-              {isSaving ? 'Saving…' : 'Save Template'}
+              {isSaving ? 'Saving…' : isCreate ? 'Create Template' : 'Save Template'}
             </button>
+          </div>
+
+          {/* Template details (name + description) — visible in both modes */}
+          <div className="sste-details">
+            <div className="sste-details-grid">
+              <div className="sste-details-field">
+                <label className="sste-block-label" htmlFor="sste-name">
+                  Template Name <span className="sste-required">*</span>
+                </label>
+                <input
+                  id="sste-name"
+                  type="text"
+                  className="sste-input"
+                  placeholder="e.g., Summer Schedule"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoFocus={isCreate}
+                />
+              </div>
+              <div className="sste-details-field">
+                <label className="sste-block-label" htmlFor="sste-description">
+                  Description
+                </label>
+                <input
+                  id="sste-description"
+                  type="text"
+                  className="sste-input"
+                  placeholder="Optional notes about this template"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
 
           {errorMsg && (

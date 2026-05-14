@@ -534,18 +534,27 @@ class CleaningCompletionSerializer(serializers.ModelSerializer):
 class CleaningTaskSerializer(serializers.ModelSerializer):
     """Cleaning task with today's completion attached (mirrors FOH pattern)."""
     today_completion = serializers.SerializerMethodField()
+    assignee_name = serializers.SerializerMethodField()
 
     class Meta:
         model = CleaningTask
         fields = [
-            "id", "scope", "name", "frequency",
+            "id", "scope", "name", "area", "description", "frequency",
             "days", "supplies", "links", "estimated_minutes", "order",
+            "assignee", "assignee_name",
             "today_completion", "archived_at",
             "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "today_completion", "archived_at", "created_at", "updated_at",
+            "id", "assignee_name", "today_completion",
+            "archived_at", "created_at", "updated_at",
         ]
+
+    def get_assignee_name(self, obj):
+        u = obj.assignee
+        if not u:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.email
 
     def get_today_completion(self, obj):
         # `today_completion` is a misnomer for non-daily tasks: it represents

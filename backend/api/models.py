@@ -768,6 +768,10 @@ class CleaningTask(models.Model):
     )
     scope = models.CharField(max_length=20, choices=SCOPE_CHOICES, default='foh')
     name = models.CharField(max_length=200)
+    # Free-form area label (e.g. "Coffee Station", "Dining Room").
+    area = models.CharField(max_length=120, blank=True)
+    # Detailed cleaning instructions surfaced from the create-task modal.
+    description = models.TextField(blank=True)
     frequency = models.CharField(
         max_length=20, choices=FREQUENCY_CHOICES, default='daily'
     )
@@ -782,6 +786,12 @@ class CleaningTask(models.Model):
         help_text="List of {label, url} objects.",
     )
     estimated_minutes = models.PositiveIntegerField(null=True, blank=True)
+    # Optional default assignee. Tasks are still completable by anyone — this
+    # is just a "owner" hint surfaced to the team.
+    assignee = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='assigned_cleaning_tasks',
+    )
     order = models.PositiveIntegerField(default=0)
     archived_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

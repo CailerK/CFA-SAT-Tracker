@@ -3,6 +3,7 @@ import './CleaningMaintenance.css';
 import cleaningService from '../services/cleaning';
 import useCentralDayRefresh from '../hooks/useCentralDayRefresh';
 import { isManagerOrAbove } from '../utils/access';
+import CreateCleaningTaskModal from './CreateCleaningTaskModal';
 
 const SCOPE = 'foh';
 
@@ -38,8 +39,6 @@ const CleaningMaintenance = ({ user }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [showAddTask, setShowAddTask] = useState(false);
-  const [newTaskName, setNewTaskName] = useState('');
-  const [newTaskFrequency, setNewTaskFrequency] = useState('daily');
   const canManageTasks = isManagerOrAbove(user);
 
   const refresh = useCallback(async () => {
@@ -115,37 +114,27 @@ const CleaningMaintenance = ({ user }) => {
     }
   };
 
-  const handleAddTask = async () => {
-    if (!canManageTasks) return;
-    const name = newTaskName.trim();
-    if (!name) return;
-    try {
-      const created = await cleaningService.create({
-        scope: SCOPE,
-        name,
-        frequency: newTaskFrequency,
-        order: (tasks[newTaskFrequency] || []).length,
-      });
-      const normalized = normalizeRow(created);
-      setTasks(prev => ({
-        ...prev,
-        [newTaskFrequency]: [...(prev[newTaskFrequency] || []), normalized],
-      }));
-      setCounts(prev => ({
-        ...prev,
-        [newTaskFrequency]: {
-          ...prev[newTaskFrequency],
-          total: (prev[newTaskFrequency]?.total || 0) + 1,
-        },
-      }));
-      setNewTaskName('');
-      setShowAddTask(false);
-      setActiveFrequency(newTaskFrequency);
-      setErrorMsg('');
-    } catch (err) {
-      console.error('Add cleaning task failed:', err);
-      setErrorMsg(err.message || 'Could not add task. Manager role required.');
-    }
+  // Called by the create-task modal once the backend has accepted the new
+  // task. We slot it into the local list optimistically and refresh counts
+  // so the period totals stay accurate.
+  const handleTaskCreated = (created) => {
+    if (!created || !created.frequency) return;
+    const freq = created.frequency;
+    const normalized = normalizeRow(created);
+    setTasks(prev => ({
+      ...prev,
+      [freq]: [...(prev[freq] || []), normalized],
+    }));
+    setCounts(prev => ({
+      ...prev,
+      [freq]: {
+        ...prev[freq],
+        total: (prev[freq]?.total || 0) + 1,
+      },
+    }));
+    setActiveFrequency(freq);
+    setShowAddTask(false);
+    setErrorMsg('');
   };
 
   const deleteTask = async (taskId) => {
@@ -274,161 +263,13 @@ const CleaningMaintenance = ({ user }) => {
           ))}
         </div>
 
-        {/* Add Task Modal */}
+        {/* Create Cleaning Task modal (pixel-match of LD Growth design) */}
         {showAddTask && (
-          <div
-            onClick={() => setShowAddTask(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                background: '#fff',
-                borderRadius: '16px',
-                width: '90%',
-                maxWidth: '480px',
-                overflow: 'hidden',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-              }}
-            >
-              <div
-                style={{
-                  background: '#E51636',
-                  color: '#fff',
-                  padding: '20px 24px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <h2 style={{ margin: 0, fontSize: '20px' }}>Add Cleaning Task</h2>
-                <button
-                  onClick={() => setShowAddTask(false)}
-                  style={{
-                    background: 'rgba(255,255,255,0.2)',
-                    border: 'none',
-                    color: '#fff',
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '18px',
-                  }}
-                  aria-label="Close"
-                >
-                  ×
-                </button>
-              </div>
-              <div style={{ padding: '24px' }}>
-                <div style={{ marginBottom: '20px' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      marginBottom: '8px',
-                      color: '#374151',
-                    }}
-                  >
-                    Task Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newTaskName}
-                    onChange={(e) => setNewTaskName(e.target.value)}
-                    placeholder="e.g., Wipe down high chairs"
-                    autoFocus
-                    maxLength={200}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-                <div style={{ marginBottom: '20px' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      marginBottom: '8px',
-                      color: '#374151',
-                    }}
-                  >
-                    Frequency
-                  </label>
-                  <select
-                    value={newTaskFrequency}
-                    onChange={(e) => setNewTaskFrequency(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      background: '#fff',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                  </select>
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '12px',
-                    justifyContent: 'flex-end',
-                  }}
-                >
-                  <button
-                    onClick={() => setShowAddTask(false)}
-                    style={{
-                      padding: '10px 20px',
-                      background: '#f3f4f6',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleAddTask}
-                    disabled={!newTaskName.trim()}
-                    style={{
-                      padding: '10px 20px',
-                      background: newTaskName.trim() ? '#E51636' : '#fca5a5',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: newTaskName.trim() ? 'pointer' : 'not-allowed',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    + Create Task
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <CreateCleaningTaskModal
+            scope={SCOPE}
+            onClose={() => setShowAddTask(false)}
+            onCreated={handleTaskCreated}
+          />
         )}
 
         {/* Progress Footer */}

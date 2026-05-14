@@ -385,6 +385,12 @@ const Dashboard = ({ user, onLogout }) => {
             templateId={currentParam}
             onBack={() => setCurrentPage('setup-sheet-templates')}
           />
+        ) : currentPage === 'setup-sheet-template-new' ? (
+          <SetupSheetTemplateEdit
+            templateId={null}
+            onBack={() => setCurrentPage('setup-sheet-templates')}
+            onCreated={(id) => setCurrentPage('setup-sheet-template-edit', String(id))}
+          />
         ) : currentPage === 'shift-summary' ? (
           <ShiftSummary 
             user={user}
