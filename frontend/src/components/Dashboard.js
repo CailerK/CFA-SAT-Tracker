@@ -53,6 +53,14 @@ const Dashboard = ({ user, onLogout }) => {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef(null);
   const notificationRef = useRef(null);
+  
+  // State for customize modals - MUST be declared before useEffect hooks that use them
+  const [isCustomizeInsightsOpen, setIsCustomizeInsightsOpen] = useState(false);
+  const [isCustomizeActionsOpen, setIsCustomizeActionsOpen] = useState(false);
+  const [customInsights, setCustomInsights] = useState([]);
+  const [customActions, setCustomActions] = useState([]);
+  const [insightsValues, setInsightsValues] = useState({});
+  const [insightsCatalog, setInsightsCatalog] = useState([]);
 
   // Wrap setCurrentPage so it also updates the URL hash. This way a refresh
   // lands on the same page instead of bouncing back to the dashboard.
@@ -157,14 +165,6 @@ const Dashboard = ({ user, onLogout }) => {
       loadInsightsValues();
     }
   }, [customInsights]);
-
-  // State for customize modals
-  const [isCustomizeInsightsOpen, setIsCustomizeInsightsOpen] = useState(false);
-  const [isCustomizeActionsOpen, setIsCustomizeActionsOpen] = useState(false);
-  const [customInsights, setCustomInsights] = useState([]);
-  const [customActions, setCustomActions] = useState([]);
-  const [insightsValues, setInsightsValues] = useState({});
-  const [insightsCatalog, setInsightsCatalog] = useState([]);
 
   // Get current date for greeting
   const getCurrentDate = () => {
