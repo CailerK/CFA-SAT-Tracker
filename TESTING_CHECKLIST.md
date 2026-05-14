@@ -170,7 +170,48 @@ These rules apply everywhere — flag any place they're violated.
 ---
 
 ## Phase 4 — Kitchen Dashboard, Checklists, Waste Tracker
-_(To be added after Phase 4 ships.)_
+
+### `/kitchen` (Kitchen Dashboard)
+
+- [ ] On load, the **overall progress** bar and per-shift mini-percentages (🌅 / 🔄 / 🌙) reflect real checklist completion for today (not always 29% / 100% / 0% / 0%).
+- [ ] The four cards (Food Safety, Waste Tracker, Equipment, Shift Checklists) show real values:
+  - **Waste card** shows actual `$X.XX` today's-cost + entries count (was hardcoded $7.18 / 20).
+  - **Checklists card** shows real "Completed X/Y" and rate %.
+  - **Equipment card** shows "Phase 5" placeholders for now (real data lands later).
+- [ ] Clicking any card navigates to the right kitchen sub-page.
+
+### Kitchen → Lists (`/kitchen-checklists`)
+
+- [ ] On load, Transition tab is active. Click Opening / Closing → tasks for that shift load.
+- [ ] Each shift's task count comes from the seeded list (Opening 10, Transition 15, Closing 14 — verify those numbers match the seeder).
+- [ ] Click a task row → checkmark fills in → persists across refresh.
+- [ ] Switch tabs → completion state is per-shift per-day.
+- [ ] As `demouser@gmail.com`: completion works (this was the fix from Phase 1); template CRUD blocked.
+
+### Kitchen → Waste (`/kitchen-waste`)
+
+- [ ] Meal-period tabs (Breakfast / Lunch / Dinner) toggle. Lunch shows the 11 seeded menu items (Spicy Filet, Filet, Grilled Filet, Nuggets, Grilled Nuggets, Strips, Mac & Cheese, White Bun, Multigrain Bun, Gluten Free Bun, Sandwich).
+- [ ] **Tap a menu tile** → new entry appears immediately at the top of Today's Entries with qty 1 + the unit price.
+- [ ] **Refresh page** → entries persist (loaded from `/api/kitchen/waste/entries/?date=today`).
+- [ ] **Select a waste reason** chip (Overproduction / Quality / Expired / Dropped) → next tap saves the reason with that entry.
+- [ ] **X delete button** on a row → optimistically removes + persists on backend.
+- [ ] **"Today's Waste" KPI total** at the top updates as you add/remove entries.
+
+#### Known limitation:
+- The "Custom Entry" form (bottom of the Waste page) creates local-only rows for now — they vanish on refresh. Real custom-item creation lands later.
+
+### Kitchen → Analytics (`/kitchen-analytics`)
+
+- [ ] KPI cards (Today / This Week / Yesterday / Top Item) display real values from `/api/kitchen/waste/kpis/`. Empty fresh DB → all $0.00.
+- [ ] After logging waste (do it from `/kitchen-waste` first, come back) → KPIs reflect what you logged.
+- [ ] **Goals card** shows your store's waste goal targets (default $100 / $600 / $2500). The "Today" bar fills proportionally as you log waste.
+- [ ] **30-day trend line chart** is empty/flat on a fresh DB; gets a real curve once you've logged on multiple days.
+- [ ] **Top Wasted Items** list shows the items you've logged in the past 30 days, sorted by total cost, with colored dots.
+- [ ] **Range selector** (Last 7/14/30/90 Days, This Month, Last Month) re-fetches trend + top items when changed.
+- [ ] As `demouser@gmail.com`: can read all analytics. Can't change goals (manager-only).
+
+### Kitchen → Safety, Equip
+- [ ] Pages render without crashing (real backend lands in Phase 5).
 
 ---
 

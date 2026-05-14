@@ -384,7 +384,7 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
         <section className="kwt-reason-card">
           <p className="kwt-section-label">Waste Reason</p>
           <div className="kwt-reasons">
-            {WASTE_REASONS.map((r) => (
+            {reasonsRaw.map((r) => (
               <button
                 key={r.id}
                 type="button"

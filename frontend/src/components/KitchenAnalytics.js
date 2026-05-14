@@ -1,4 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import kitchenService from '../services/kitchen';
+
+// Map the UI range label to the backend's range string (e.g. "Last 30 Days" → "30d").
+const rangeToDays = (label) => {
+  if (!label) return '30d';
+  const m = label.match(/(\d+)/);
+  if (m) return `${m[1]}d`;
+  if (/month/i.test(label)) return '30d';
+  return '30d';
+};
 import './SetupSheetTemplates.css'; // banner
 import './KitchenDashboard.css';     // kitchen tabs (kd-nav*)
 import './KitchenAnalytics.css';
@@ -150,6 +160,37 @@ const LineChart = ({ data, width = 472, height = 280, padL = 50, padR = 5, padT 
 const KitchenAnalytics = ({ onNavigate, user }) => {
   const [activeSubTab, setActiveSubTab] = useState('overview');
   const [range, setRange] = useState('Last 30 Days');
+  const [kpisData, setKpisData] = useState(null);   // {today, this_week, yesterday, top_item}
+  const [trendPoints, setTrendPoints] = useState([]);
+  const [topItems, setTopItems] = useState([]);
+  const [goalsData, setGoalsData] = useState({ daily: 100, weekly: 600, monthly: 2500 });
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load all analytics endpoints whenever the range changes.
+  useEffect(() => {
+    let cancelled = false;
+    const days = rangeToDays(range);
+    (async () => {
+      try {
+        const [kpis, trend, top, goals] = await Promise.all([
+          kitchenService.getKPIs(),
+          kitchenService.getTrend({ range: days }),
+          kitchenService.getTopItems({ range: days }),
+          kitchenService.getGoals(),
+        ]);
+        if (cancelled) return;
+        setKpisData(kpis);
+        setTrendPoints(trend.points || []);
+        setTopItems(top.items || []);
+        setGoalsData(goals);
+      } catch (err) {
+        console.error('Failed to load kitchen analytics:', err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [range]);
 
   const tabs = [
     { id: 'home', label: 'Home', Icon: IconLayoutDashboard },
@@ -174,21 +215,44 @@ const KitchenAnalytics = ({ onNavigate, user }) => {
     }
   };
 
-  // DEMO DATA: all numbers hardcoded. See FAKE_DATA.md.
-  const kpis = [
-    { emoji: '💰', label: 'Today',     value: '$7.18',  trendEmoji: <><IconArrowDown className="ka-kpi-trend-icon" /><span className="ka-kpi-trend-text">-45%</span></> },
-    { emoji: '📅', label: 'This Week', value: '$20.32', sub: '204 items' },
-    { emoji: '⏰', label: 'Yesterday', value: '$13.14', sub: 'total waste' },
-    { emoji: '⚠️', label: 'Top Item',  value: 'Filet',  sub: '$4.08' },
-  ];
+  // KPIs computed from /api/kitchen/waste/kpis/ (loaded above).
+  const kpis = useMemo(() => {
+    if (!kpisData) return [];
+    const today = kpisData.today || {};
+    const week = kpisData.this_week || {};
+    const yesterday = kpisData.yesterday || {};
+    const top = kpisData.top_item || {};
+    const deltaPct = today.delta_vs_yesterday_pct;
+    return [
+      {
+        emoji: '💰', label: 'Today',
+        value: `$${Number(today.cost || 0).toFixed(2)}`,
+        trendEmoji: deltaPct != null ? (
+          <>
+            {deltaPct < 0 ? <IconArrowDown className="ka-kpi-trend-icon" /> : null}
+            <span className="ka-kpi-trend-text">{deltaPct > 0 ? '+' : ''}{deltaPct}%</span>
+          </>
+        ) : null,
+      },
+      { emoji: '📅', label: 'This Week', value: `$${Number(week.cost || 0).toFixed(2)}`, sub: `${week.count || 0} items` },
+      { emoji: '⏰', label: 'Yesterday', value: `$${Number(yesterday.cost || 0).toFixed(2)}`, sub: 'total waste' },
+      { emoji: '⚠️', label: 'Top Item',  value: top.name || '—', sub: top.cost ? `$${Number(top.cost).toFixed(2)}` : '' },
+    ];
+  }, [kpisData]);
 
-  const goals = [
-    { label: 'Daily Goal',   value: 7.18,   target: 100,    vsYesterday: 45.4 },
-    { label: 'Weekly Goal',  value: 20.32,  target: 600,    vsYesterday: null },
-    { label: 'Monthly Goal', value: 252.07, target: 2500,   vsYesterday: null },
-  ];
+  // Goals from /api/kitchen/waste/goals/ + current totals from KPIs.
+  const goals = useMemo(() => {
+    const todayCost = Number(kpisData?.today?.cost || 0);
+    const weekCost = Number(kpisData?.this_week?.cost || 0);
+    // We don't have a real "monthly" total yet — use weekly as a proxy.
+    return [
+      { label: 'Daily Goal',   value: todayCost, target: Number(goalsData.daily || 0), vsYesterday: kpisData?.today?.delta_vs_yesterday_pct ?? null },
+      { label: 'Weekly Goal',  value: weekCost,  target: Number(goalsData.weekly || 0), vsYesterday: null },
+      { label: 'Monthly Goal', value: weekCost,  target: Number(goalsData.monthly || 0), vsYesterday: null },
+    ];
+  }, [goalsData, kpisData]);
 
-  const trendTotal = useMemo(() => TREND_POINTS.reduce((s, p) => s + p.y, 0), []);
+  const trendTotal = useMemo(() => trendPoints.reduce((s, p) => s + (p.y || 0), 0), [trendPoints]);
 
   return (
     <div className="sst-page">
@@ -350,7 +414,7 @@ const KitchenAnalytics = ({ onNavigate, user }) => {
                   </div>
                 </div>
                 <div className="ka-chart-wrap">
-                  <LineChart data={TREND_POINTS} />
+                  <LineChart data={trendPoints.length ? trendPoints : [{ label: '—', y: 0 }]} />
                 </div>
               </div>
 
@@ -363,20 +427,30 @@ const KitchenAnalytics = ({ onNavigate, user }) => {
                   </div>
                 </div>
                 <div className="ka-top-list">
-                  {TOP_ITEMS.map((item) => (
-                    <button key={item.name} type="button" className="ka-top-row">
-                      <span className="ka-top-dot" style={{ backgroundColor: item.color }}></span>
-                      <div className="ka-top-text">
-                        <p className="ka-top-name">{item.name}</p>
-                        <p className="ka-top-items">{item.items} items</p>
-                      </div>
-                      <div className="ka-top-right">
-                        <p className="ka-top-cost">${item.cost.toFixed(2)}</p>
-                        <p className="ka-top-pct">{item.pct}%</p>
-                      </div>
-                      <IconChevronDown className="ka-top-chev" />
-                    </button>
-                  ))}
+                  {topItems.length === 0 && (
+                    <p style={{ padding: 12, color: '#6b7280', fontSize: 14 }}>
+                      {isLoading ? 'Loading…' : 'No waste logged in this range yet.'}
+                    </p>
+                  )}
+                  {topItems.map((item, idx) => {
+                    // Generate colors from a palette so first-rendered items get distinct dots.
+                    const palette = ['#E51636', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'];
+                    const color = palette[idx % palette.length];
+                    return (
+                      <button key={item.id} type="button" className="ka-top-row">
+                        <span className="ka-top-dot" style={{ backgroundColor: color }}></span>
+                        <div className="ka-top-text">
+                          <p className="ka-top-name">{item.emoji ? `${item.emoji} ` : ''}{item.name}</p>
+                          <p className="ka-top-items">{item.items} items</p>
+                        </div>
+                        <div className="ka-top-right">
+                          <p className="ka-top-cost">${Number(item.cost || 0).toFixed(2)}</p>
+                          <p className="ka-top-pct">{item.pct}%</p>
+                        </div>
+                        <IconChevronDown className="ka-top-chev" />
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
