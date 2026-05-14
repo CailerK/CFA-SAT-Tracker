@@ -288,8 +288,98 @@ These rules apply everywhere — flag any place they're violated.
 
 ---
 
-## Phase 7 — Leadership
-_(To be added — pause for user's program list first.)_
+## Phase 7 — Leadership 360 + Team Development
+
+### `/leadership/development` (Leadership Development)
+
+#### As any user:
+- [ ] Page loads with "Active Plan" card showing "The Heart of Leadership" at 0% progress.
+- [ ] "Browse Plans" section shows all 14 leadership programs as cards with titles, descriptions, and durations.
+- [ ] Programs display in correct order: Heart of Leadership, Restaurant Culture Builder (8 weeks), Team Development Expert (10 weeks), Strategic Leadership Mastery (12 weeks), Communication & Influence Excellence (10 weeks), Operational Excellence Leader (10 weeks), Innovation & Change Champion (9 weeks), Hospitality Leader (8 weeks), Conflict Resolution & Problem Solving (9 weeks), Emotional Intelligence Leader (10 weeks), Situational Leadership Mastery (12 weeks), Complete Ownership of an Area (10 weeks), Resilience Mastery (12 weeks), Work Ethic Excellence (10 weeks).
+- [ ] Click "Continue" on a program card → navigates to program detail view (if wired).
+- [ ] Each program card shows the correct emoji icon and duration label.
+
+### `/leadership/360` (Leadership 360 Evaluations)
+
+#### As manager:
+- [ ] Page loads with "New 360 Evaluation" button visible.
+- [ ] Empty state shows "No evaluations yet" message when no evaluations exist.
+- [ ] Click "+ New 360 Evaluation" → opens modal/form to create evaluation.
+- [ ] Create evaluation form allows selecting: evaluatee (team member), template (Leadership 360 Assessment), due date, and evaluators (peers, manager, direct reports).
+- [ ] After creating evaluation → appears in list with status "In Progress", 0% progress, evaluatee name, due date.
+- [ ] Click on evaluation card → opens detail view showing evaluators list with their completion status.
+
+#### As team member (evaluatee):
+- [ ] Can see evaluations where they are the evaluatee.
+- [ ] Shows progress bar indicating how many evaluators have completed.
+- [ ] Cannot create new evaluations (button hidden or disabled).
+
+#### As team member (evaluator):
+- [ ] Can see evaluations where they are assigned as an evaluator.
+- [ ] Click "Complete Evaluation" → opens response form with questions.
+- [ ] Submit responses → evaluation progress updates, their status shows "Completed".
+- [ ] Once all evaluators complete → evaluation status changes to "Completed".
+
+### `/team-development` (Team Development / Position Tracks)
+
+#### As any user:
+- [ ] Page loads with 4 position tracks displayed: Team Member, Trainer, Zone Leader, Shift Lead.
+- [ ] Each track card shows description and current team members at that level.
+- [ ] Progress indicators show how many team members are at each level.
+- [ ] Filter by position → updates the team member list.
+- [ ] Search box filters team members by name.
+
+#### As manager:
+- [ ] Can assign team members to position tracks.
+- [ ] Can update progress for team members (completed steps, current step).
+- [ ] Stats card shows: Total team members, In progress count, Completed count.
+
+#### As team member:
+- [ ] Can view their own position track progress.
+- [ ] Can see their current position and next steps.
+- [ ] Cannot edit other team members' progress.
+
+### `/leadership/notes` (Personal Leadership Notes)
+
+#### As any user:
+- [ ] Can create personal leadership development notes.
+- [ ] Notes list shows all their notes in reverse chronological order.
+- [ ] Can edit and delete their own notes.
+- [ ] Cannot see other users' notes (personal only).
+- [ ] Rich text editor or textarea for note content.
+
+### API Endpoints (Backend Testing)
+
+#### Leadership Programs:
+- [ ] `GET /api/leadership/modules/` returns 14 programs with correct titles and descriptions.
+- [ ] Programs are ordered correctly (0-13).
+- [ ] Each program has at least one activity seeded.
+
+#### 360 Evaluations:
+- [ ] `GET /api/leadership/360/templates/` returns "Leadership 360 Assessment" template.
+- [ ] `POST /api/leadership/360/` creates new evaluation (manager-only).
+- [ ] `GET /api/leadership/360/` returns evaluations for current user (as evaluatee or evaluator).
+- [ ] `POST /api/leadership/360/:id/respond/` allows evaluator to submit responses.
+- [ ] `GET /api/leadership/360/stats/` returns total, in_progress, completed counts.
+
+#### Position Tracks:
+- [ ] `GET /api/team-development/tracks/` returns 4 tracks: Team Member, Trainer, Zone Leader, Shift Lead.
+- [ ] `GET /api/team-development/progress/` returns progress for current user (or all if manager).
+- [ ] `POST /api/team-development/progress/` creates progress record (manager-only).
+- [ ] `PATCH /api/team-development/progress/:id/` updates progress.
+
+#### Leadership Areas & Notes:
+- [ ] `GET /api/leadership/areas/` returns user's selected focus areas.
+- [ ] `POST /api/leadership/areas/` creates new focus area.
+- [ ] `GET /api/leadership/notes/` returns user's personal notes.
+- [ ] `POST /api/leadership/notes/` creates new note.
+
+### Permissions Testing:
+- [ ] Team members can view leadership programs and their own progress.
+- [ ] Team members can complete evaluations where they're assigned as evaluators.
+- [ ] Team members cannot create 360 evaluations (manager-only).
+- [ ] Team members cannot edit other users' position track progress.
+- [ ] Managers can create evaluations, assign tracks, and view all progress.
 
 ---
 

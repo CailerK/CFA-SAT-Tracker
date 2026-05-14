@@ -1399,3 +1399,197 @@ class QuickLink(models.Model):
 
     def __str__(self):
         return self.label
+
+
+# =============================================================================
+# Phase 7: Leadership 360 + Team Development
+# =============================================================================
+
+class Evaluation360Template(models.Model):
+    """A reusable template for 360 evaluations with sections/questions."""
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='evaluation_360_templates'
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    sections_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of sections/question groups in this template.",
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class Evaluation360(models.Model):
+    """A single 360 evaluation instance for an evaluatee."""
+    STATUS_CHOICES = [
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='evaluations_360'
+    )
+    evaluatee = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='evaluations_360_received'
+    )
+    template = models.ForeignKey(
+        Evaluation360Template, on_delete=models.PROTECT,
+        related_name='evaluations',
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='in_progress'
+    )
+    due_date = models.DateField(null=True, blank=True)
+    progress_percent = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['store', 'evaluatee']),
+            models.Index(fields=['store', 'status']),
+        ]
+
+    def __str__(self):
+        return f"360 for {self.evaluatee.get_full_name()} ({self.status})"
+
+
+class EvaluationEvaluator(models.Model):
+    """An evaluator assigned to a 360 evaluation (peer, manager, direct report)."""
+    TYPE_CHOICES = [
+        ('peer', 'Peer'),
+        ('manager', 'Manager'),
+        ('direct_report', 'Direct Report'),
+    ]
+
+    evaluation = models.ForeignKey(
+        Evaluation360, on_delete=models.CASCADE, related_name='evaluators'
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='evaluations_360_given'
+    )
+    evaluator_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    invited_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    responses = models.JSONField(
+        default=dict, blank=True,
+        help_text="Answers to the template's questions.",
+    )
+
+    class Meta:
+        ordering = ['invited_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['evaluation', 'user'],
+                name='unique_evaluator_per_evaluation',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} ({self.evaluator_type})"
+
+
+class PositionTrack(models.Model):
+    """Career progression track (team-member → trainer → zone-leader → shift-lead)."""
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='position_tracks'
+    )
+    name = models.CharField(
+        max_length=60,
+        help_text="e.g., 'team-member', 'trainer', 'zone-leader', 'shift-lead'",
+    )
+    description = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+        indexes = [models.Index(fields=['store'])]
+
+    def __str__(self):
+        return self.name
+
+
+class TrackProgress(models.Model):
+    """A user's progress through a position track."""
+    STATUS_CHOICES = [
+        ('not_started', 'Not Started'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+    ]
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='track_progress'
+    )
+    track = models.ForeignKey(
+        PositionTrack, on_delete=models.CASCADE, related_name='user_progress'
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='not_started'
+    )
+    completed_steps = models.PositiveIntegerField(default=0)
+    current_step = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['track__order', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'track'],
+                name='unique_track_progress_per_user',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.track.name}"
+
+
+class LeadershipArea(models.Model):
+    """A user's selected leadership focus area (e.g., 'kitchen', 'drive-thru')."""
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='leadership_areas'
+    )
+    area_key = models.CharField(
+        max_length=60,
+        help_text="Slug identifier like 'kitchen', 'drive-thru', 'food-safety'.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'area_key'],
+                name='unique_leadership_area_per_user',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.area_key}"
+
+
+class LeadershipNote(models.Model):
+    """Personal leadership development notes."""
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='leadership_notes'
+    )
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        preview = self.text[:50] + "..." if len(self.text) > 50 else self.text
+        return f"Note by {self.user.get_full_name()}: {preview}"

@@ -24,6 +24,14 @@ from .views_kitchen import (
     waste_top_items,
     waste_trend,
 )
+from .views_leadership import (
+    Evaluation360TemplateViewSet,
+    Evaluation360ViewSet,
+    LeadershipAreaViewSet,
+    LeadershipNoteViewSet,
+    PositionTrackViewSet,
+    TrackProgressViewSet,
+)
 from .views_setup_sheets import SetupSheetTemplateViewSet, SetupSheetViewSet
 from .views_shift_summary import ShiftSummaryViewSet, ShiftTagViewSet
 from .views_team import (
@@ -108,6 +116,37 @@ router.register(
 )
 router.register(
     r"setup-sheets", SetupSheetViewSet, basename="setup-sheet"
+)
+# Phase 7: Leadership 360 + Team Development
+router.register(
+    r"leadership/360/templates",
+    Evaluation360TemplateViewSet,
+    basename="evaluation-360-template",
+)
+router.register(
+    r"leadership/360",
+    Evaluation360ViewSet,
+    basename="evaluation-360",
+)
+router.register(
+    r"team-development/tracks",
+    PositionTrackViewSet,
+    basename="position-track",
+)
+router.register(
+    r"team-development/progress",
+    TrackProgressViewSet,
+    basename="track-progress",
+)
+router.register(
+    r"leadership/areas",
+    LeadershipAreaViewSet,
+    basename="leadership-area",
+)
+router.register(
+    r"leadership/notes",
+    LeadershipNoteViewSet,
+    basename="leadership-note",
 )
 
 

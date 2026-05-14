@@ -1,0 +1,206 @@
+"""
+Phase 7: Leadership 360 + Team Development viewsets.
+
+All viewsets inherit from StoreScopedViewSet to enforce multi-tenancy.
+"""
+
+from django.db import models
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from .models import (
+    Evaluation360,
+    Evaluation360Template,
+    EvaluationEvaluator,
+    LeadershipArea,
+    LeadershipNote,
+    PositionTrack,
+    TrackProgress,
+)
+from .permissions import IsManagerOrAbove
+from .serializers import (
+    Evaluation360Serializer,
+    Evaluation360TemplateSerializer,
+    EvaluationEvaluatorSerializer,
+    LeadershipAreaSerializer,
+    LeadershipNoteSerializer,
+    PositionTrackSerializer,
+    TrackProgressSerializer,
+)
+from .viewsets import StoreScopedViewSet
+
+
+class Evaluation360TemplateViewSet(StoreScopedViewSet):
+    """
+    CRUD for 360 evaluation templates.
+    Manager+ can create/edit templates; all authenticated users can read.
+    """
+    queryset = Evaluation360Template.objects.all()
+    serializer_class = Evaluation360TemplateSerializer
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsManagerOrAbove()]
+        return super().get_permissions()
+
+
+class Evaluation360ViewSet(StoreScopedViewSet):
+    """
+    CRUD for 360 evaluations.
+    Manager+ can create evaluations; evaluatees + evaluators can view theirs.
+    """
+    queryset = Evaluation360.objects.select_related(
+        'evaluatee', 'template', 'store'
+    ).prefetch_related('evaluators__user')
+    serializer_class = Evaluation360Serializer
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsManagerOrAbove()]
+        return super().get_permissions()
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # Filter: show evaluations where the user is either the evaluatee
+        # or one of the evaluators.
+        user = self.request.user
+        return qs.filter(
+            models.Q(evaluatee=user) | models.Q(evaluators__user=user)
+        ).distinct()
+
+    @action(detail=True, methods=['post'], url_path='respond')
+    def respond(self, request, pk=None):
+        """
+        POST /api/leadership/360/:id/respond/
+        Body: { "responses": {...} }
+        
+        Allows an evaluator to submit their responses for this evaluation.
+        """
+        evaluation = self.get_object()
+        user = request.user
+        
+        # Find the evaluator record for this user.
+        try:
+            evaluator = evaluation.evaluators.get(user=user)
+        except EvaluationEvaluator.DoesNotExist:
+            return Response(
+                {"detail": "You are not an evaluator for this evaluation."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Update the evaluator's responses.
+        evaluator.responses = request.data.get('responses', {})
+        evaluator.completed_at = timezone.now()
+        evaluator.save()
+        
+        # Recalculate progress_percent: count how many evaluators have completed.
+        total = evaluation.evaluators.count()
+        completed = evaluation.evaluators.filter(completed_at__isnull=False).count()
+        evaluation.progress_percent = round((completed / total) * 100) if total > 0 else 0
+        
+        # If all evaluators have completed, mark the evaluation as completed.
+        if completed == total:
+            evaluation.status = 'completed'
+            evaluation.completed_at = timezone.now()
+        
+        evaluation.save()
+        
+        return Response(
+            Evaluation360Serializer(evaluation, context={'request': request}).data,
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        """
+        GET /api/leadership/360/stats/
+        Returns: { "total": X, "in_progress": Y, "completed": Z }
+        """
+        qs = self.get_queryset()
+        return Response({
+            "total": qs.count(),
+            "in_progress": qs.filter(status='in_progress').count(),
+            "completed": qs.filter(status='completed').count(),
+        })
+
+
+class PositionTrackViewSet(StoreScopedViewSet):
+    """
+    CRUD for position tracks (career progression paths).
+    Manager+ can create/edit; all authenticated users can read.
+    """
+    queryset = PositionTrack.objects.all()
+    serializer_class = PositionTrackSerializer
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsManagerOrAbove()]
+        return super().get_permissions()
+
+
+class TrackProgressViewSet(StoreScopedViewSet):
+    """
+    CRUD for user progress through position tracks.
+    Users can view their own progress; managers can update anyone's.
+    """
+    queryset = TrackProgress.objects.select_related('user', 'track')
+    serializer_class = TrackProgressSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # Non-managers can only see their own progress.
+        if not self.request.user.is_manager_or_above:
+            qs = qs.filter(user=self.request.user)
+        return qs
+
+    def get_permissions(self):
+        # Managers can create/update any user's progress.
+        # Team members can only update their own.
+        if self.action in ['create', 'update', 'partial_update']:
+            # We'll check ownership in perform_update if not a manager.
+            return super().get_permissions()
+        return super().get_permissions()
+
+    def perform_update(self, serializer):
+        # If not a manager, ensure they're only updating their own record.
+        if not self.request.user.is_manager_or_above:
+            if serializer.instance.user != self.request.user:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("You can only update your own progress.")
+        serializer.save()
+
+
+class LeadershipAreaViewSet(StoreScopedViewSet):
+    """
+    CRUD for user's selected leadership focus areas.
+    Users can manage their own areas.
+    """
+    queryset = LeadershipArea.objects.select_related('user')
+    serializer_class = LeadershipAreaSerializer
+
+    def get_queryset(self):
+        # Users can only see/manage their own leadership areas.
+        return LeadershipArea.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        # Auto-set the user to the current user.
+        serializer.save(user=self.request.user)
+
+
+class LeadershipNoteViewSet(StoreScopedViewSet):
+    """
+    CRUD for personal leadership development notes.
+    Users can only see/manage their own notes.
+    """
+    queryset = LeadershipNote.objects.select_related('user')
+    serializer_class = LeadershipNoteSerializer
+
+    def get_queryset(self):
+        # Users can only see their own notes.
+        return LeadershipNote.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        # Auto-set the user to the current user.
+        serializer.save(user=self.request.user)

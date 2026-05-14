@@ -13,12 +13,16 @@ from .models import (
     Department,
     Equipment,
     EquipmentCategory,
+    Evaluation360Template,
     FOHTaskTemplate,
     FoodSafetyTask,
     KitchenChecklistTask,
+    LeadershipModule,
+    LeadershipActivity,
     MaintenanceSchedule,
     MealPeriod,
     MenuItem,
+    PositionTrack,
     QuickLink,
     QuickLinkCategory,
     SetupSheet,
@@ -734,6 +738,190 @@ def seed_quick_links(store):
     print(f"    Quick links: +{cat_created} categories, +{link_created} links.")
 
 
+# ---------------------------------------------------------------------------
+# Phase 7: Leadership Programs (14 programs from LD Growth)
+# ---------------------------------------------------------------------------
+
+LEADERSHIP_PROGRAMS = [
+    {
+        "slug": "heart-of-leadership",
+        "title": "The Heart of Leadership",
+        "description": "Build a foundation of character-based leadership focused on serving others first. This plan develops the essential leadership traits that inspire team members to follow you because of who you are, not just your position.",
+        "duration_weeks": 0,  # All levels, no specific duration
+        "order": 0,
+    },
+    {
+        "slug": "restaurant-culture-builder",
+        "title": "Restaurant Culture Builder",
+        "description": "Learn to intentionally shape your restaurant's culture to create an environment where team members are engaged, guests receive exceptional service, and business results follow. This comprehensive 8-week plan provides practical tools for building a thriving culture.",
+        "duration_weeks": 8,
+        "order": 1,
+    },
+    {
+        "slug": "team-development-expert",
+        "title": "Team Development Expert",
+        "description": "Master the skills of coaching, feedback, and talent development to build a high-performing restaurant team. This comprehensive 10-week plan equips you with practical tools to help each team member reach their full potential while driving operational excellence.",
+        "duration_weeks": 10,
+        "order": 2,
+    },
+    {
+        "slug": "strategic-leadership-mastery",
+        "title": "Strategic Leadership Mastery",
+        "description": "Develop strategic thinking, vision-setting, and decision-making capabilities specifically for restaurant leadership. This comprehensive 12-week plan builds practical skills to think beyond day-to-day operations and lead your area with strategic purpose. Includes restaurant-specific examples and scenarios.",
+        "duration_weeks": 12,
+        "order": 3,
+    },
+    {
+        "slug": "communication-influence-excellence",
+        "title": "Communication & Influence Excellence",
+        "description": "Master the art of clear communication and positive influence to inspire teams and drive results. This comprehensive 10-week plan develops both verbal and non-verbal communication skills essential for effective leadership.",
+        "duration_weeks": 10,
+        "order": 4,
+    },
+    {
+        "slug": "operational-excellence-leader",
+        "title": "Operational Excellence Leader",
+        "description": "Drive efficiency, quality, and continuous improvement in restaurant operations. This comprehensive 10-week plan equips you with the tools and mindset to optimize processes and deliver consistent results.",
+        "duration_weeks": 10,
+        "order": 5,
+    },
+    {
+        "slug": "innovation-change-champion",
+        "title": "Innovation & Change Champion",
+        "description": "Lead innovation initiatives and guide teams through change with confidence. This comprehensive 9-week plan develops the skills needed to foster creativity, adapt to change, and drive continuous improvement.",
+        "duration_weeks": 9,
+        "order": 6,
+    },
+    {
+        "slug": "hospitality-leader",
+        "title": "Hospitality Leader",
+        "description": "Excel at creating exceptional customer experiences and building a hospitality-focused culture. This comprehensive 8-week plan develops the skills needed to consistently deliver outstanding service and recover from service failures.",
+        "duration_weeks": 8,
+        "order": 7,
+    },
+    {
+        "slug": "conflict-resolution-problem-solving",
+        "title": "Conflict Resolution & Problem Solving",
+        "description": "Master the skills to resolve conflicts constructively and solve complex problems effectively. This comprehensive 9-week plan equips you with tools to handle difficult conversations and find win-win solutions.",
+        "duration_weeks": 9,
+        "order": 8,
+    },
+    {
+        "slug": "emotional-intelligence-leader",
+        "title": "Emotional Intelligence Leader",
+        "description": "Develop emotional intelligence to better understand yourself and others, build stronger relationships, and lead with empathy. This comprehensive 10-week plan focuses on self-awareness, social skills, and emotional regulation with 17 practical tasks.",
+        "duration_weeks": 10,
+        "order": 9,
+    },
+    {
+        "slug": "situational-leadership-mastery",
+        "title": "Situational Leadership Mastery",
+        "description": "Master the art of adapting your leadership style to match the situation and development level of your team members. This comprehensive 12-week plan teaches you the four leadership styles and when to use each for maximum effectiveness.",
+        "duration_weeks": 12,
+        "order": 10,
+    },
+    {
+        "slug": "complete-ownership-of-area",
+        "title": "Complete Ownership of an Area",
+        "description": "Master the mindset and skills to take complete ownership of your area without waiting for direction. This comprehensive 10-week plan develops proactive leadership, accountability, and the initiative to drive results independently.",
+        "duration_weeks": 10,
+        "order": 11,
+    },
+    {
+        "slug": "resilience-mastery",
+        "title": "Resilience Mastery",
+        "description": "Develop mental toughness, stress management, and the ability to thrive under pressure. This comprehensive 12-week program builds the resilience needed to lead effectively during challenging times and maintain composure when the stakes are high.",
+        "duration_weeks": 12,
+        "order": 12,
+    },
+    {
+        "slug": "work-ethic-excellence",
+        "title": "Work Ethic Excellence",
+        "description": "Build and model exceptional work ethic that inspires your entire team. This principle-based 10-week program focuses on ownership, inspiration, and sustainable excellence rather than checklists. Develop the discipline and leadership-by-example approach that creates a culture of excellence.",
+        "duration_weeks": 10,
+        "order": 13,
+    },
+]
+
+
+def seed_leadership_programs(store):
+    """Create the 14 leadership development programs from LD Growth."""
+    created_modules = 0
+    for prog in LEADERSHIP_PROGRAMS:
+        module, was_created = LeadershipModule.objects.get_or_create(
+            slug=prog["slug"],
+            defaults={
+                "title": prog["title"],
+                "description": prog["description"],
+                "order": prog["order"],
+                "is_active": True,
+            },
+        )
+        if was_created:
+            created_modules += 1
+        
+        # Create a sample activity for each module (placeholder for now).
+        # In a real implementation, you'd add specific activities per program.
+        activity_text = f"Complete the {prog['title']} program"
+        LeadershipActivity.objects.get_or_create(
+            module=module,
+            activity_number=1,
+            defaults={
+                "title": f"{prog['title']} - Activity 1",
+                "content": activity_text,
+                "instructions": "Follow the program guidelines and complete all tasks.",
+                "estimated_duration": prog["duration_weeks"] * 7 * 60 if prog["duration_weeks"] > 0 else 60,
+                "order": 0,
+                "is_active": True,
+            },
+        )
+    
+    print(f"    Leadership programs: +{created_modules} modules created.")
+
+
+# Position tracks for Team Development page
+POSITION_TRACKS = [
+    {"name": "Team Member", "description": "Entry-level position", "order": 0},
+    {"name": "Trainer", "description": "Certified to train new team members", "order": 1},
+    {"name": "Zone Leader", "description": "Leads a specific area during shifts", "order": 2},
+    {"name": "Shift Lead", "description": "Manages entire shifts", "order": 3},
+]
+
+
+def seed_position_tracks(store):
+    """Create the 4 position tracks for career progression."""
+    created = 0
+    for track in POSITION_TRACKS:
+        _, was_created = PositionTrack.objects.get_or_create(
+            store=store, name=track["name"],
+            defaults={
+                "description": track["description"],
+                "order": track["order"],
+            },
+        )
+        if was_created:
+            created += 1
+    print(f"    Position tracks: +{created} created.")
+
+
+# Sample 360 evaluation template
+def seed_360_template(store):
+    """Create a sample 360 evaluation template."""
+    template, was_created = Evaluation360Template.objects.get_or_create(
+        store=store,
+        name="Leadership 360 Assessment",
+        defaults={
+            "description": "Comprehensive 360-degree leadership evaluation covering communication, decision-making, team development, and operational excellence.",
+            "sections_count": 5,
+            "is_active": True,
+        },
+    )
+    if was_created:
+        print("    360 evaluation template: +1 created.")
+    else:
+        print("    360 evaluation template: already exists.")
+
+
 def seed_all_for_store(store):
     """Run every per-store seeder. Idempotent."""
     print(f"  Seeding data for {store}…")
@@ -757,3 +945,7 @@ def seed_all_for_store(store):
     seed_sample_team_members(store)
     seed_training_plans(store)
     seed_quick_links(store)
+    # Phase 7
+    seed_leadership_programs(store)
+    seed_position_tracks(store)
+    seed_360_template(store)

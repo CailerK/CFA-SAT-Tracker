@@ -14,16 +14,22 @@ from .models import (
     EmployeeRecord,
     Equipment,
     EquipmentCategory,
+    Evaluation360,
+    Evaluation360Template,
+    EvaluationEvaluator,
     FOHTaskCompletion,
     FOHTaskTemplate,
     FoodSafetyCompletion,
     FoodSafetyTask,
     KitchenChecklistCompletion,
     KitchenChecklistTask,
+    LeadershipArea,
+    LeadershipNote,
     MaintenanceLog,
     MaintenanceSchedule,
     MealPeriod,
     MenuItem,
+    PositionTrack,
     QuickLink,
     QuickLinkCategory,
     SetupSheet,
@@ -36,6 +42,7 @@ from .models import (
     TemperatureReading,
     TemperatureTarget,
     TimeBlock,
+    TrackProgress,
     TraineeAssignment,
     TrainingActivity,
     TrainingPlan,
@@ -860,3 +867,88 @@ class QuickLinkSerializer(serializers.ModelSerializer):
                   "archived_at", "created_at", "updated_at"]
         read_only_fields = ["id", "category_name", "category_color",
                             "archived_at", "created_at", "updated_at"]
+
+
+# ============================================================================
+# Phase 7: Leadership 360 + Team Development
+# ============================================================================
+
+class Evaluation360TemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Evaluation360Template
+        fields = ["id", "name", "description", "sections_count", "is_active",
+                  "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class EvaluationEvaluatorSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    user_initials = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EvaluationEvaluator
+        fields = ["id", "evaluation", "user", "user_name", "user_initials",
+                  "evaluator_type", "invited_at", "completed_at", "responses"]
+        read_only_fields = ["id", "user_name", "user_initials", "invited_at"]
+
+    def get_user_name(self, obj):
+        u = obj.user
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+    def get_user_initials(self, obj):
+        return obj.user.initials
+
+
+class Evaluation360Serializer(serializers.ModelSerializer):
+    evaluatee_name = serializers.SerializerMethodField()
+    template_name = serializers.CharField(source="template.name", read_only=True)
+    evaluators = EvaluationEvaluatorSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Evaluation360
+        fields = ["id", "evaluatee", "evaluatee_name", "template", "template_name",
+                  "status", "due_date", "progress_percent",
+                  "evaluators", "created_at", "completed_at"]
+        read_only_fields = ["id", "evaluatee_name", "template_name",
+                            "evaluators", "created_at"]
+
+    def get_evaluatee_name(self, obj):
+        u = obj.evaluatee
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+
+class PositionTrackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PositionTrack
+        fields = ["id", "name", "description", "order",
+                  "archived_at", "created_at", "updated_at"]
+        read_only_fields = ["id", "archived_at", "created_at", "updated_at"]
+
+
+class TrackProgressSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    track_name = serializers.CharField(source="track.name", read_only=True)
+
+    class Meta:
+        model = TrackProgress
+        fields = ["id", "user", "user_name", "track", "track_name",
+                  "status", "completed_steps", "current_step", "updated_at"]
+        read_only_fields = ["id", "user_name", "track_name", "updated_at"]
+
+    def get_user_name(self, obj):
+        u = obj.user
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+
+class LeadershipAreaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeadershipArea
+        fields = ["id", "user", "area_key", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+
+class LeadershipNoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeadershipNote
+        fields = ["id", "user", "text", "created_at"]
+        read_only_fields = ["id", "created_at"]
