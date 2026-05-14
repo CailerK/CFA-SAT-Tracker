@@ -35,6 +35,9 @@ const CleaningMaintenance = ({ onBack }) => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskFrequency, setNewTaskFrequency] = useState('daily');
 
   const refresh = useCallback(async () => {
     try {
@@ -108,6 +111,38 @@ const CleaningMaintenance = ({ onBack }) => {
     }
   };
 
+  const handleAddTask = async () => {
+    const name = newTaskName.trim();
+    if (!name) return;
+    try {
+      const created = await cleaningService.create({
+        scope: SCOPE,
+        name,
+        frequency: newTaskFrequency,
+        order: (tasks[newTaskFrequency] || []).length,
+      });
+      const normalized = normalizeRow(created);
+      setTasks(prev => ({
+        ...prev,
+        [newTaskFrequency]: [...(prev[newTaskFrequency] || []), normalized],
+      }));
+      setCounts(prev => ({
+        ...prev,
+        [newTaskFrequency]: {
+          ...prev[newTaskFrequency],
+          total: (prev[newTaskFrequency]?.total || 0) + 1,
+        },
+      }));
+      setNewTaskName('');
+      setShowAddTask(false);
+      setActiveFrequency(newTaskFrequency);
+      setErrorMsg('');
+    } catch (err) {
+      console.error('Add cleaning task failed:', err);
+      setErrorMsg(err.message || 'Could not add task. Manager role required.');
+    }
+  };
+
   const deleteTask = async (taskId) => {
     const prevList = tasks[activeFrequency];
     setTasks(prev => ({
@@ -155,7 +190,7 @@ const CleaningMaintenance = ({ onBack }) => {
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
               </svg>
             </button>
-            <button className="cleaning-add-btn" aria-label="Add task">
+            <button className="cleaning-add-btn" aria-label="Add task" onClick={() => setShowAddTask(true)}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
@@ -226,6 +261,163 @@ const CleaningMaintenance = ({ onBack }) => {
             </div>
           ))}
         </div>
+
+        {/* Add Task Modal */}
+        {showAddTask && (
+          <div
+            onClick={() => setShowAddTask(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: '#fff',
+                borderRadius: '16px',
+                width: '90%',
+                maxWidth: '480px',
+                overflow: 'hidden',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              }}
+            >
+              <div
+                style={{
+                  background: '#E51636',
+                  color: '#fff',
+                  padding: '20px 24px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <h2 style={{ margin: 0, fontSize: '20px' }}>Add Cleaning Task</h2>
+                <button
+                  onClick={() => setShowAddTask(false)}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: 'none',
+                    color: '#fff',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '18px',
+                  }}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <div style={{ padding: '24px' }}>
+                <div style={{ marginBottom: '20px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      marginBottom: '8px',
+                      color: '#374151',
+                    }}
+                  >
+                    Task Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newTaskName}
+                    onChange={(e) => setNewTaskName(e.target.value)}
+                    placeholder="e.g., Wipe down high chairs"
+                    autoFocus
+                    maxLength={200}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '20px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      marginBottom: '8px',
+                      color: '#374151',
+                    }}
+                  >
+                    Frequency
+                  </label>
+                  <select
+                    value={newTaskFrequency}
+                    onChange={(e) => setNewTaskFrequency(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      background: '#fff',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                  </select>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '12px',
+                    justifyContent: 'flex-end',
+                  }}
+                >
+                  <button
+                    onClick={() => setShowAddTask(false)}
+                    style={{
+                      padding: '10px 20px',
+                      background: '#f3f4f6',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddTask}
+                    disabled={!newTaskName.trim()}
+                    style={{
+                      padding: '10px 20px',
+                      background: newTaskName.trim() ? '#E51636' : '#fca5a5',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: newTaskName.trim() ? 'pointer' : 'not-allowed',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    + Create Task
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Progress Footer */}
         <div className="tasks-footer">

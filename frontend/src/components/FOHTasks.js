@@ -168,6 +168,43 @@ const FOHTasks = ({ onBack }) => {
 
       {/* Main Content */}
       <main className="foh-main">
+        {errorMessage && (
+          <div
+            style={{
+              margin: '12px 16px',
+              padding: '12px 16px',
+              background: '#fee2e2',
+              border: '1px solid #fecaca',
+              borderRadius: '8px',
+              color: '#991b1b',
+              fontSize: '14px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>{errorMessage}</span>
+            <button
+              onClick={() => setErrorMessage('')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#991b1b',
+                cursor: 'pointer',
+                fontSize: '18px',
+                padding: '0 4px',
+              }}
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {isLoading && (
+          <div style={{ padding: '24px', color: '#6b7280', textAlign: 'center' }}>
+            Loading tasks…
+          </div>
+        )}
         {/* Shift Tabs */}
         <div className="foh-tabs-wrap">
           <div className="foh-tabs-inner">
