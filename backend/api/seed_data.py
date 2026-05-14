@@ -10,13 +10,18 @@ from datetime import date, timedelta
 
 from .models import (
     CleaningTask,
+    Equipment,
+    EquipmentCategory,
     FOHTaskTemplate,
+    FoodSafetyTask,
     KitchenChecklistTask,
+    MaintenanceSchedule,
     MealPeriod,
     MenuItem,
     SetupSheet,
     SetupSheetTemplate,
     ShiftTag,
+    TemperatureTarget,
     WasteReason,
 )
 
@@ -404,6 +409,181 @@ def seed_waste_reasons(store):
     print(f"    Waste reasons: +{created} created.")
 
 
+# ---------------------------------------------------------------------------
+# Equipment — categories + sample items + a maintenance schedule
+# ---------------------------------------------------------------------------
+
+EQUIPMENT_CATEGORIES = [
+    {"slug": "hvac", "label": "HVAC", "emoji": "❄️", "order": 0},
+    {"slug": "cleaning", "label": "Cleaning", "emoji": "🧽", "order": 1},
+    {"slug": "pos_tech", "label": "POS / Tech", "emoji": "💻", "order": 2},
+    {"slug": "safety", "label": "Safety", "emoji": "🛡️", "order": 3},
+    {"slug": "cooking", "label": "Cooking", "emoji": "🔥", "order": 4},
+    {"slug": "refrigeration", "label": "Refrigeration", "emoji": "🧊", "order": 5},
+    {"slug": "preparation", "label": "Preparation", "emoji": "🔪", "order": 6},
+    {"slug": "beverage", "label": "Beverage", "emoji": "🥤", "order": 7},
+]
+
+EQUIPMENT_BY_CATEGORY = {
+    "cooking": [
+        {"name": "Primary Fryers", "icon": "flame"},
+        {"name": "Secondary Fryers", "icon": "flame"},
+        {"name": "Grills", "icon": "beef"},
+        {"name": "Pressure Fryers", "icon": "flame"},
+    ],
+    "refrigeration": [
+        {"name": "Walk In Cooler", "icon": "snowflake"},
+        {"name": "Walk In Freezer", "icon": "snowflake"},
+        {"name": "Prep Area Cooler", "icon": "snowflake"},
+        {"name": "Ice Machine", "icon": "snowflake"},
+    ],
+    "cleaning": [
+        {"name": "3-Compartment Sink", "icon": "droplet"},
+        {"name": "Dish Machine", "icon": "droplet"},
+        {"name": "Mop Sink", "icon": "droplet"},
+        {"name": "Hand Sinks", "icon": "droplet"},
+    ],
+    "hvac": [
+        {"name": "Main HVAC", "icon": "wind"},
+        {"name": "Hood Vents", "icon": "wind"},
+        {"name": "Make-Up Air Unit", "icon": "wind"},
+        {"name": "Filters", "icon": "wind"},
+    ],
+    "safety": [
+        {"name": "Fire Suppression", "icon": "shield"},
+        {"name": "Fire Extinguishers", "icon": "shield"},
+        {"name": "First Aid Kit", "icon": "shield"},
+        {"name": "Emergency Lights", "icon": "shield"},
+    ],
+    "pos_tech": [
+        {"name": "POS Terminals", "icon": "monitor"},
+        {"name": "Drive Thru Headsets", "icon": "headphones"},
+        {"name": "Receipt Printers", "icon": "monitor"},
+        {"name": "Kitchen Display", "icon": "monitor"},
+    ],
+}
+
+
+def seed_equipment(store):
+    from datetime import date, timedelta
+    cat_created = 0
+    eq_created = 0
+    sched_created = 0
+    for c in EQUIPMENT_CATEGORIES:
+        cat_obj, was_created = EquipmentCategory.objects.get_or_create(
+            store=store, slug=c["slug"],
+            defaults={"label": c["label"], "emoji": c["emoji"], "order": c["order"]},
+        )
+        if was_created:
+            cat_created += 1
+        # Seed equipment in this category, if defined.
+        for item in EQUIPMENT_BY_CATEGORY.get(c["slug"], []):
+            _, was_created = Equipment.objects.get_or_create(
+                store=store, category=cat_obj, name=item["name"],
+                defaults={"icon": item["icon"], "status": "ok"},
+            )
+            if was_created:
+                eq_created += 1
+
+    # Add one sample schedule on Primary Fryers (mirrors KitchenEquipment.js demo data).
+    try:
+        primary = Equipment.objects.get(
+            store=store, name="Primary Fryers",
+            category__slug="cooking",
+        )
+        _, was_created = MaintenanceSchedule.objects.get_or_create(
+            equipment=primary, task_name="Boil out",
+            defaults={
+                "cadence": "weekly",
+                "next_due": date.today() + timedelta(days=3),
+                "urgency_threshold_days": 3,
+            },
+        )
+        if was_created:
+            sched_created += 1
+    except Equipment.DoesNotExist:
+        pass
+
+    print(f"    Equipment: +{cat_created} categories, +{eq_created} items, "
+          f"+{sched_created} schedules.")
+
+
+# ---------------------------------------------------------------------------
+# Food Safety — daypart tasks + temperature targets
+# ---------------------------------------------------------------------------
+
+FOOD_SAFETY_TASKS = {
+    "morning": [
+        "Temp all chicken",
+        "Temp all equipment",
+        "Temp prep table",
+        "Make sure all prep has stickers",
+        "No chemicals on tables",
+        "No drinks on tables (only in the right spot)",
+        "Stickers on front products",
+        "Use first raw in the right spot",
+    ],
+    "lunch": [
+        "Check all temp logs",
+        "Verify cooler temperatures",
+        "Hot hold temp check",
+        "Hand wash audit",
+        "Sanitizer concentration check",
+    ],
+    "dinner": [
+        "Final temp logs",
+        "Walk-in cooler check",
+        "Cooling rack verification",
+        "Sanitizer recharge",
+        "Surface cleaning audit",
+    ],
+}
+
+
+def seed_food_safety_tasks(store):
+    created = 0
+    for daypart, items in FOOD_SAFETY_TASKS.items():
+        for order, text in enumerate(items):
+            _, was_created = FoodSafetyTask.objects.get_or_create(
+                store=store, daypart=daypart, text=text,
+                defaults={"order": order},
+            )
+            if was_created:
+                created += 1
+    print(f"    Food safety tasks: +{created} created.")
+
+
+TEMPERATURE_TARGETS = [
+    # Equipment
+    {"kind": "equipment", "name": "Walk In Cooler", "expected_min": "22", "expected_max": "41"},
+    {"kind": "equipment", "name": "Walk In Freezer", "expected_min": "-20", "expected_max": "0"},
+    {"kind": "equipment", "name": "Prep Area Cooler", "expected_min": "22", "expected_max": "41"},
+    {"kind": "equipment", "name": "Cooking Line", "expected_min": "35", "expected_max": "41"},
+    {"kind": "equipment", "name": "Ice Cream", "expected_min": "35", "expected_max": "41"},
+    # Products
+    {"kind": "product", "name": "Chicken Strips", "expected_min": "35", "expected_max": "41"},
+    {"kind": "product", "name": "Filets", "expected_min": "35", "expected_max": "41"},
+    {"kind": "product", "name": "Nuggets", "expected_min": "35", "expected_max": "41"},
+]
+
+
+def seed_temperature_targets(store):
+    from decimal import Decimal
+    created = 0
+    for order, t in enumerate(TEMPERATURE_TARGETS):
+        _, was_created = TemperatureTarget.objects.get_or_create(
+            store=store, kind=t["kind"], name=t["name"],
+            defaults={
+                "expected_min": Decimal(t["expected_min"]),
+                "expected_max": Decimal(t["expected_max"]),
+                "order": order,
+            },
+        )
+        if was_created:
+            created += 1
+    print(f"    Temperature targets: +{created} created.")
+
+
 def seed_all_for_store(store):
     """Run every per-store seeder. Idempotent."""
     print(f"  Seeding data for {store}…")
@@ -418,3 +598,7 @@ def seed_all_for_store(store):
     seed_kitchen_checklists(store)
     seed_menu_items(store)
     seed_waste_reasons(store)
+    # Phase 5
+    seed_equipment(store)
+    seed_food_safety_tasks(store)
+    seed_temperature_targets(store)

@@ -943,3 +943,255 @@ class WasteEntry(models.Model):
 
     def __str__(self):
         return f"{self.qty}x {self.menu_item.name} ({self.unit})"
+
+
+# =============================================================================
+# Phase 5: Kitchen Equipment
+# =============================================================================
+
+class EquipmentCategory(models.Model):
+    """A category of kitchen equipment, e.g. 'cooking', 'refrigeration'."""
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='equipment_categories'
+    )
+    slug = models.CharField(max_length=30)  # 'hvac', 'cooking', etc.
+    label = models.CharField(max_length=60)
+    emoji = models.CharField(max_length=10, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['store', 'slug'],
+                name='unique_equipment_category_per_store',
+            ),
+        ]
+
+    def __str__(self):
+        return self.label
+
+
+class Equipment(models.Model):
+    """A single piece of kitchen equipment."""
+    STATUS_CHOICES = [
+        ('ok', 'OK'),
+        ('needs_attention', 'Needs Attention'),
+        ('down', 'Down'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='equipment'
+    )
+    category = models.ForeignKey(
+        EquipmentCategory, on_delete=models.CASCADE,
+        related_name='equipment_items',
+    )
+    name = models.CharField(max_length=100)
+    icon = models.CharField(max_length=30, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ok')
+    notes = models.TextField(blank=True)
+    installed_at = models.DateField(null=True, blank=True)
+    warranty_expires = models.DateField(null=True, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['category', 'name']
+        indexes = [models.Index(fields=['store', 'category'])]
+
+    def __str__(self):
+        return self.name
+
+
+class MaintenanceSchedule(models.Model):
+    """A recurring maintenance task for a piece of equipment."""
+    CADENCE_CHOICES = [
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly'),
+        ('quarterly', 'Quarterly'),
+        ('yearly', 'Yearly'),
+    ]
+
+    equipment = models.ForeignKey(
+        Equipment, on_delete=models.CASCADE, related_name='schedules'
+    )
+    task_name = models.CharField(max_length=200)
+    cadence = models.CharField(max_length=20, choices=CADENCE_CHOICES, default='weekly')
+    next_due = models.DateField(null=True, blank=True)
+    last_completed = models.DateField(null=True, blank=True)
+    urgency_threshold_days = models.PositiveIntegerField(
+        default=3,
+        help_text="Days before next_due to flag as 'Soon'. Past due → 'Overdue'.",
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['next_due', 'id']
+
+    @property
+    def urgency(self):
+        """Derived: 'Overdue' | 'Soon' | 'OK' | ''."""
+        from datetime import date
+        if not self.next_due:
+            return ""
+        today = date.today()
+        if self.next_due < today:
+            return "Overdue"
+        if (self.next_due - today).days <= self.urgency_threshold_days:
+            return "Soon"
+        return "OK"
+
+    def __str__(self):
+        return f"{self.task_name} on {self.equipment.name}"
+
+
+class MaintenanceLog(models.Model):
+    """An event log entry for a piece of equipment: history / maint / clean / issue."""
+    KIND_CHOICES = [
+        ('history', 'History'),
+        ('maintenance', 'Maintenance'),
+        ('cleaning', 'Cleaning'),
+        ('issue', 'Issue'),
+    ]
+
+    equipment = models.ForeignKey(
+        Equipment, on_delete=models.CASCADE, related_name='logs'
+    )
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    notes = models.TextField(blank=True)
+    performed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='equipment_logs',
+    )
+    performed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-performed_at', '-id']
+
+
+# =============================================================================
+# Phase 5: Food Safety
+# =============================================================================
+
+class FoodSafetyTask(models.Model):
+    """A recurring food-safety task, grouped by daypart."""
+    DAYPART_CHOICES = [
+        ('morning', 'Morning'),
+        ('lunch', 'Lunch'),
+        ('dinner', 'Dinner'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='food_safety_tasks'
+    )
+    daypart = models.CharField(max_length=20, choices=DAYPART_CHOICES)
+    text = models.CharField(max_length=300)
+    order = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['daypart', 'order', 'id']
+        indexes = [models.Index(fields=['store', 'daypart'])]
+
+
+class FoodSafetyCompletion(models.Model):
+    template = models.ForeignKey(
+        FoodSafetyTask, on_delete=models.CASCADE, related_name='completions'
+    )
+    date = models.DateField()
+    completed_at = models.DateTimeField(auto_now_add=True)
+    completed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='food_safety_completions',
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['template', 'date'],
+                name='unique_food_safety_completion_per_day',
+            ),
+        ]
+
+
+class TemperatureTarget(models.Model):
+    """A named slot you regularly take temperatures for, like 'Walk In Cooler'."""
+    KIND_CHOICES = [
+        ('equipment', 'Equipment'),
+        ('product', 'Product'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='temperature_targets'
+    )
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    name = models.CharField(max_length=100)
+    expected_min = models.DecimalField(
+        max_digits=6, decimal_places=2,
+        help_text="Acceptable lower bound in °F.",
+    )
+    expected_max = models.DecimalField(
+        max_digits=6, decimal_places=2,
+        help_text="Acceptable upper bound in °F.",
+    )
+    order = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['kind', 'order', 'id']
+        indexes = [models.Index(fields=['store', 'kind'])]
+
+    def __str__(self):
+        return f"{self.name} ({self.expected_min}°F - {self.expected_max}°F)"
+
+
+class TemperatureReading(models.Model):
+    """A single temperature reading against a target."""
+    STATUS_CHOICES = [
+        ('good', 'Good'),
+        ('warning', 'Warning'),
+        ('critical', 'Critical'),
+    ]
+
+    target = models.ForeignKey(
+        TemperatureTarget, on_delete=models.CASCADE, related_name='readings'
+    )
+    value = models.DecimalField(max_digits=6, decimal_places=2)
+    unit = models.CharField(max_length=2, default='F')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='good')
+    recorded_at = models.DateTimeField(auto_now_add=True)
+    recorded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='temperature_readings',
+    )
+
+    class Meta:
+        ordering = ['-recorded_at', '-id']
+        indexes = [models.Index(fields=['target', 'recorded_at'])]
+
+    def save(self, *args, **kwargs):
+        # Auto-classify status from expected range on save.
+        try:
+            v = float(self.value)
+            lo = float(self.target.expected_min)
+            hi = float(self.target.expected_max)
+            if v < lo - 5 or v > hi + 5:
+                self.status = 'critical'
+            elif v < lo or v > hi:
+                self.status = 'warning'
+            else:
+                self.status = 'good'
+        except (TypeError, ValueError):
+            pass
+        super().save(*args, **kwargs)

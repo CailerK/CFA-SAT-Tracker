@@ -216,7 +216,32 @@ These rules apply everywhere — flag any place they're violated.
 ---
 
 ## Phase 5 — Equipment & Food Safety
-_(To be added.)_
+
+### Kitchen → Equip (`/kitchen-equipment`)
+
+- [ ] 8 categories load with real counts: HVAC 4, Cleaning 4, POS/Tech 4, Safety 4, Cooking 4, Refrigeration 4, Preparation 0, Beverage 0.
+- [ ] Click any populated category → its equipment cards load below.
+- [ ] **Cooking → Primary Fryers** shows a maintenance schedule pill ("Boil out — weekly — Soon") because that's the seeded sample.
+- [ ] Toolbar "X/Y operational" reflects the real status counts (initially 16/16 = 100%).
+
+#### As `demouser@gmail.com`:
+- [ ] Can browse all categories + see equipment.
+- [ ] Cannot create new equipment / categories (manager-only).
+
+### Kitchen → Safety (`/kitchen-safety`)
+
+- [ ] KPI strip loads with real values: Complete %, Temps `X/Y`, Warning count, Critical count — all derived from your seeded data.
+- [ ] **Daypart tabs** (Morning / Lunch / Dinner) show seeded tasks: 8 morning, 5 lunch, 5 dinner. Click a task → checkmark fills, "You — just now" appears underneath.
+- [ ] **Refresh page** → completed task remains checked. Tomorrow it resets.
+- [ ] **Temperature Log** equipment tab shows 5 seeded targets (Walk In Cooler, Walk In Freezer, Prep Area Cooler, Cooking Line, Ice Cream) with expected ranges and "No reading yet" since none have been logged.
+- [ ] Product tab shows 3 seeded targets (Chicken Strips, Filets, Nuggets).
+
+#### As `demouser@gmail.com`:
+- [ ] Can check off safety tasks.
+- [ ] Cannot create new safety tasks / temperature targets.
+
+#### Known limitation:
+- Manually logging a new temperature reading from the UI isn't wired yet (Phase 5 backend supports it; UI button comes later). For now you can log via Django admin to test the status-classification logic.
 
 ---
 

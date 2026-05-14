@@ -3,6 +3,14 @@ from rest_framework.routers import DefaultRouter
 
 from . import views, views_stores
 from .views_cleaning import CleaningTaskViewSet
+from .views_equipment import (
+    EquipmentCategoryViewSet,
+    EquipmentViewSet,
+    FoodSafetyTaskViewSet,
+    MaintenanceScheduleViewSet,
+    TemperatureReadingViewSet,
+    TemperatureTargetViewSet,
+)
 from .views_foh import FOHTaskTemplateViewSet
 from .views_kitchen import (
     KitchenChecklistViewSet,
@@ -35,6 +43,26 @@ router.register(
 )
 router.register(
     r"kitchen/waste/entries", WasteEntryViewSet, basename="waste-entry"
+)
+# Phase 5: Equipment + Food Safety
+router.register(
+    r"kitchen/equipment/categories",
+    EquipmentCategoryViewSet, basename="equipment-category",
+)
+router.register(
+    r"kitchen/equipment", EquipmentViewSet, basename="equipment"
+)
+router.register(
+    r"kitchen/food-safety/tasks",
+    FoodSafetyTaskViewSet, basename="food-safety-task",
+)
+router.register(
+    r"kitchen/food-safety/temperature-targets",
+    TemperatureTargetViewSet, basename="temp-target",
+)
+router.register(
+    r"kitchen/food-safety/temperature-readings",
+    TemperatureReadingViewSet, basename="temp-reading",
 )
 router.register(
     r"shift-summaries/tags", ShiftTagViewSet, basename="shift-tag"
@@ -77,6 +105,13 @@ urlpatterns = [
         "users/me/preferences/",
         views_stores.user_preferences_me,
         name="user_preferences_me",
+    ),
+
+    # Phase 5: Maintenance schedule completion (standalone action)
+    path(
+        "kitchen/equipment/schedules/<int:pk>/complete/",
+        MaintenanceScheduleViewSet.as_view({"post": "complete"}),
+        name="schedule_complete",
     ),
 
     # Phase 4: Kitchen dashboard + waste KPIs/trend/top-items/goals (function views)

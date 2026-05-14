@@ -10,10 +10,16 @@ from rest_framework import serializers
 from .models import (
     CleaningCompletion,
     CleaningTask,
+    Equipment,
+    EquipmentCategory,
     FOHTaskCompletion,
     FOHTaskTemplate,
+    FoodSafetyCompletion,
+    FoodSafetyTask,
     KitchenChecklistCompletion,
     KitchenChecklistTask,
+    MaintenanceLog,
+    MaintenanceSchedule,
     MealPeriod,
     MenuItem,
     SetupSheet,
@@ -23,6 +29,8 @@ from .models import (
     ShiftTag,
     Store,
     StoreSettings,
+    TemperatureReading,
+    TemperatureTarget,
     TimeBlock,
     User,
     UserPreferences,
@@ -495,3 +503,181 @@ class WasteEntrySerializer(serializers.ModelSerializer):
         if not u:
             return None
         return f"{u.first_name} {u.last_name}".strip() or u.email
+
+
+# ============================================================================
+# Phase 5: Equipment
+# ============================================================================
+
+class MaintenanceScheduleSerializer(serializers.ModelSerializer):
+    urgency = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = MaintenanceSchedule
+        fields = [
+            "id", "equipment", "task_name", "cadence",
+            "next_due", "last_completed", "urgency_threshold_days",
+            "urgency", "archived_at",
+        ]
+        read_only_fields = ["id", "urgency", "archived_at"]
+
+
+class MaintenanceLogSerializer(serializers.ModelSerializer):
+    performed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MaintenanceLog
+        fields = [
+            "id", "equipment", "kind", "notes",
+            "performed_by", "performed_by_name", "performed_at",
+        ]
+        read_only_fields = ["id", "performed_by", "performed_by_name", "performed_at"]
+
+    def get_performed_by_name(self, obj):
+        u = obj.performed_by
+        if not u:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+
+class EquipmentSerializer(serializers.ModelSerializer):
+    """Equipment with its top-of-list maintenance schedule attached."""
+    schedule = serializers.SerializerMethodField()
+    category_slug = serializers.CharField(source="category.slug", read_only=True)
+
+    class Meta:
+        model = Equipment
+        fields = [
+            "id", "name", "icon", "status", "notes",
+            "category", "category_slug",
+            "installed_at", "warranty_expires",
+            "archived_at", "created_at", "updated_at",
+            "schedule",
+        ]
+        read_only_fields = ["id", "category_slug", "schedule", "archived_at",
+                            "created_at", "updated_at"]
+
+    def get_schedule(self, obj):
+        # Surface the next-due schedule for the card UI (matches the
+        # `schedule: {task, cadence, date, urgency}` shape from the frontend).
+        prefetched = getattr(obj, "next_schedule_list", None)
+        if prefetched is not None:
+            sched = prefetched[0] if prefetched else None
+        else:
+            sched = obj.schedules.filter(archived_at__isnull=True).order_by(
+                "next_due"
+            ).first()
+        if not sched:
+            return None
+        return {
+            "id": sched.id,
+            "task": sched.task_name,
+            "cadence": sched.cadence,
+            "date": sched.next_due.strftime("%b %-d") if sched.next_due else None,
+            "urgency": sched.urgency,
+        }
+
+
+class EquipmentCategorySerializer(serializers.ModelSerializer):
+    count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EquipmentCategory
+        fields = ["id", "slug", "label", "emoji", "order", "count",
+                  "archived_at", "created_at", "updated_at"]
+        read_only_fields = ["id", "count", "archived_at", "created_at", "updated_at"]
+
+    def get_count(self, obj):
+        return obj.equipment_items.filter(archived_at__isnull=True).count()
+
+
+# ============================================================================
+# Phase 5: Food Safety
+# ============================================================================
+
+class FoodSafetyCompletionSerializer(serializers.ModelSerializer):
+    completed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FoodSafetyCompletion
+        fields = ["id", "date", "completed_at", "completed_by", "completed_by_name"]
+        read_only_fields = ["id", "completed_at", "completed_by_name"]
+
+    def get_completed_by_name(self, obj):
+        u = obj.completed_by
+        return (f"{u.first_name} {u.last_name}".strip() or u.email) if u else None
+
+
+class FoodSafetyTaskSerializer(serializers.ModelSerializer):
+    today_completion = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FoodSafetyTask
+        fields = ["id", "daypart", "text", "order",
+                  "today_completion", "archived_at",
+                  "created_at", "updated_at"]
+        read_only_fields = ["id", "today_completion", "archived_at",
+                            "created_at", "updated_at"]
+
+    def get_today_completion(self, obj):
+        prefetched = getattr(obj, "today_completion_list", None)
+        if prefetched is not None:
+            comp = prefetched[0] if prefetched else None
+        else:
+            from django.utils import timezone
+            comp = obj.completions.filter(date=timezone.localdate()).first()
+        return FoodSafetyCompletionSerializer(comp).data if comp else None
+
+
+class TemperatureTargetSerializer(serializers.ModelSerializer):
+    last_reading = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TemperatureTarget
+        fields = [
+            "id", "kind", "name",
+            "expected_min", "expected_max",
+            "order", "last_reading",
+            "archived_at", "created_at",
+        ]
+        read_only_fields = ["id", "last_reading", "archived_at", "created_at"]
+
+    def get_last_reading(self, obj):
+        r = obj.readings.order_by("-recorded_at").first()
+        if not r:
+            return None
+        return {
+            "id": r.id,
+            "value": float(r.value),
+            "unit": r.unit,
+            "status": r.status,
+            "recorded_at": r.recorded_at,
+        }
+
+
+class TemperatureReadingSerializer(serializers.ModelSerializer):
+    recorded_by_name = serializers.SerializerMethodField()
+    target_name = serializers.CharField(source="target.name", read_only=True)
+    target_kind = serializers.CharField(source="target.kind", read_only=True)
+    expected_min = serializers.DecimalField(
+        source="target.expected_min", max_digits=6, decimal_places=2, read_only=True
+    )
+    expected_max = serializers.DecimalField(
+        source="target.expected_max", max_digits=6, decimal_places=2, read_only=True
+    )
+
+    class Meta:
+        model = TemperatureReading
+        fields = [
+            "id", "target", "target_name", "target_kind",
+            "expected_min", "expected_max",
+            "value", "unit", "status",
+            "recorded_at", "recorded_by", "recorded_by_name",
+        ]
+        read_only_fields = ["id", "target_name", "target_kind",
+                            "expected_min", "expected_max", "status",
+                            "recorded_at", "recorded_by", "recorded_by_name"]
+
+    def get_recorded_by_name(self, obj):
+        u = obj.recorded_by
+        return (f"{u.first_name} {u.last_name}".strip() or u.email) if u else None

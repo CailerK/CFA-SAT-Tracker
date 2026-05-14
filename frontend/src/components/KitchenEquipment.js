@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import equipmentService from '../services/equipment';
 import './SetupSheetTemplates.css'; // banner
 import './KitchenDashboard.css';     // kitchen nav
 import './KitchenEquipment.css';
@@ -73,6 +74,39 @@ const EquipIcon = ({ type, className }) => {
 
 const KitchenEquipment = ({ onNavigate, user }) => {
   const [activeCategory, setActiveCategory] = useState('cooking');
+  const [categoriesRaw, setCategoriesRaw] = useState([]);
+  const [equipmentRaw, setEquipmentRaw] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load categories once.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await equipmentService.listCategories();
+        if (!cancelled) setCategoriesRaw(res.results || res || []);
+      } catch (err) {
+        console.error('Failed to load equipment categories:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Load equipment for the active category whenever it changes.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await equipmentService.listEquipment({ category: activeCategory });
+        if (!cancelled) setEquipmentRaw(res.results || res || []);
+      } catch (err) {
+        console.error('Failed to load equipment:', err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeCategory]);
 
   const tabs = [
     { id: 'home', label: 'Home', Icon: IconLayoutDashboard },
@@ -97,11 +131,30 @@ const KitchenEquipment = ({ onNavigate, user }) => {
     }
   };
 
-  const equipment = useMemo(() => EQUIPMENT_BY_CATEGORY[activeCategory] || [], [activeCategory]);
+  // Map backend equipment rows to the existing UI shape ({id, name, icon, status, schedule}).
+  const equipment = useMemo(
+    () => equipmentRaw.map((e) => ({
+      id: e.id,
+      name: e.name,
+      icon: e.icon || 'flame',
+      // Backend returns 'ok'|'needs_attention'|'down'; UI displays uppercase 'OK'/'NEEDS ATTENTION'/'DOWN'.
+      status: (e.status || 'ok').replace('_', ' ').toUpperCase(),
+      schedule: e.schedule,  // either null or {id, task, cadence, date, urgency}
+    })),
+    [equipmentRaw]
+  );
 
-  const runningTotal = 24;
-  const runningOf = 24;
-  const runningPct = Math.round((runningTotal / runningOf) * 100);
+  // Categories source-of-truth — fall back to the static CATEGORIES list while loading.
+  const categories = categoriesRaw.length
+    ? categoriesRaw.map((c) => ({
+        id: c.slug, label: c.label, emoji: c.emoji, count: c.count,
+      }))
+    : CATEGORIES;
+
+  // Running totals derived from real data.
+  const runningTotal = equipment.filter((e) => e.status === 'OK').length;
+  const runningOf = equipment.length;
+  const runningPct = runningOf ? Math.round((runningTotal / runningOf) * 100) : 0;
 
   return (
     <div className="sst-page">
@@ -178,7 +231,7 @@ const KitchenEquipment = ({ onNavigate, user }) => {
         {/* Category chips */}
         <div className="ke-cats-wrap">
           <div className="ke-cats">
-            {CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <button
                 key={c.id}
                 type="button"

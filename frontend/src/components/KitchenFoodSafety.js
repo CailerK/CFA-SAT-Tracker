@@ -1,10 +1,101 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './KitchenFoodSafety.css';
+import equipmentService from '../services/equipment';
+
+// Normalize backend FoodSafetyTask to {id, text, completed, user, time}.
+const normalizeTask = (raw) => {
+  const comp = raw.today_completion;
+  let time = '';
+  if (comp?.completed_at) {
+    try {
+      time = new Date(comp.completed_at).toLocaleTimeString('en-US', {
+        hour: 'numeric', minute: '2-digit',
+      });
+    } catch {}
+  }
+  return {
+    id: raw.id,
+    text: raw.text,
+    completed: Boolean(comp),
+    user: comp?.completed_by_name || '',
+    time,
+  };
+};
+
+// Normalize backend TemperatureTarget to the row shape the UI uses.
+const normalizeTempRow = (raw) => {
+  const r = raw.last_reading;
+  let displayTime = 'No reading yet';
+  if (r?.recorded_at) {
+    try {
+      const d = new Date(r.recorded_at);
+      const isToday = d.toLocaleDateString() === new Date().toLocaleDateString();
+      const t = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      displayTime = `${isToday ? 'Today' : d.toLocaleDateString()} at ${t}`;
+    } catch {}
+  }
+  return {
+    id: raw.id,
+    name: raw.name,
+    temp: r ? `${Number(r.value).toFixed(0)}°${r.unit || 'F'}` : '—',
+    range: `${Number(raw.expected_min).toFixed(0)}°F - ${Number(raw.expected_max).toFixed(0)}°F`,
+    time: displayTime,
+    status: r?.status || 'good',
+  };
+};
 
 const KitchenFoodSafety = ({ onNavigate, user }) => {
   const [activeTab, setActiveTab] = useState('safety');
   const [activeTaskTab, setActiveTaskTab] = useState('morning');
   const [activeTempTab, setActiveTempTab] = useState('equipment');
+  const [tasksByDaypart, setTasksByDaypart] = useState({ morning: [], lunch: [], dinner: [] });
+  const [tempsByKind, setTempsByKind] = useState({ equipment: [], product: [] });
+  const [isLoading, setIsLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [morning, lunch, dinner, eqTargets, prodTargets] = await Promise.all([
+        equipmentService.listSafetyTasks({ daypart: 'morning' }),
+        equipmentService.listSafetyTasks({ daypart: 'lunch' }),
+        equipmentService.listSafetyTasks({ daypart: 'dinner' }),
+        equipmentService.listTemperatureTargets({ kind: 'equipment' }),
+        equipmentService.listTemperatureTargets({ kind: 'product' }),
+      ]);
+      setTasksByDaypart({
+        morning: ((morning.results || morning) || []).map(normalizeTask),
+        lunch: ((lunch.results || lunch) || []).map(normalizeTask),
+        dinner: ((dinner.results || dinner) || []).map(normalizeTask),
+      });
+      setTempsByKind({
+        equipment: ((eqTargets.results || eqTargets) || []).map(normalizeTempRow),
+        product: ((prodTargets.results || prodTargets) || []).map(normalizeTempRow),
+      });
+    } catch (err) {
+      console.error('Failed to load food safety:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const toggleSafetyTask = async (taskId, currentlyCompleted) => {
+    setTasksByDaypart((prev) => ({
+      ...prev,
+      [activeTaskTab]: prev[activeTaskTab].map((t) =>
+        t.id === taskId
+          ? { ...t, completed: !currentlyCompleted, user: !currentlyCompleted ? 'You' : '', time: !currentlyCompleted ? 'just now' : '' }
+          : t
+      ),
+    }));
+    try {
+      if (currentlyCompleted) await equipmentService.uncompleteSafetyTask(taskId);
+      else await equipmentService.completeSafetyTask(taskId);
+    } catch (err) {
+      console.error('Safety task toggle failed:', err);
+      refresh();
+    }
+  };
 
   const tabs = [
     { id: 'home', label: 'Home', icon: '🏠' },
@@ -16,47 +107,32 @@ const KitchenFoodSafety = ({ onNavigate, user }) => {
     { id: 'waste', label: 'Waste', icon: '🗑️' }
   ];
 
-  const stats = [
-    { id: 'complete', label: 'COMPLETE', value: '39%', sublabel: 'daily items', icon: '✅', color: '#10b981' },
-    { id: 'temps', label: 'TEMPS', value: '14/17', sublabel: 'for morning', icon: '🌡️', color: '#6b7280' },
-    { id: 'overdue', label: 'OVERDUE', value: '10', sublabel: 'tasks', icon: '⏰', color: '#f59e0b' },
-    { id: 'critical', label: 'CRITICAL', value: '0', sublabel: 'pending', icon: '🔴', color: '#E51636' }
-  ];
+  // KPIs computed from loaded state.
+  const stats = useMemo(() => {
+    const allTasks = [
+      ...tasksByDaypart.morning,
+      ...tasksByDaypart.lunch,
+      ...tasksByDaypart.dinner,
+    ];
+    const allTemps = [...tempsByKind.equipment, ...tempsByKind.product];
+    const totalT = allTasks.length;
+    const doneT = allTasks.filter(t => t.completed).length;
+    const completePct = totalT ? Math.round((doneT / totalT) * 100) : 0;
+    const morningT = tasksByDaypart.morning;
+    const morningDone = morningT.filter(t => t.completed).length;
+    const critical = allTemps.filter(t => t.status === 'critical').length;
+    const warning = allTemps.filter(t => t.status === 'warning').length;
+    return [
+      { id: 'complete', label: 'COMPLETE', value: `${completePct}%`, sublabel: 'daily items', icon: '✅', color: '#10b981' },
+      { id: 'temps', label: 'TEMPS', value: `${morningDone}/${morningT.length}`, sublabel: 'morning tasks', icon: '🌡️', color: '#6b7280' },
+      { id: 'overdue', label: 'WARNING', value: String(warning), sublabel: 'temp warnings', icon: '⚠️', color: '#f59e0b' },
+      { id: 'critical', label: 'CRITICAL', value: String(critical), sublabel: 'temp critical', icon: '🔴', color: '#E51636' },
+    ];
+  }, [tasksByDaypart, tempsByKind]);
 
-  const safetyTasks = {
-    morning: [
-      { id: 1, text: 'Temp all chicken', completed: true, user: 'Robby Hall', time: '9:08 AM' },
-      { id: 2, text: 'Temp all equipment', completed: true, user: 'Robby Hall', time: '9:08 AM' },
-      { id: 3, text: 'Temp prep table', completed: true, user: 'Robby Hall', time: '9:08 AM' },
-      { id: 4, text: 'make sure all prep has stickers', completed: true, user: 'Robby Hall', time: '9:08 AM' },
-      { id: 5, text: 'no chemicals on tables', completed: true, user: 'Robby Hall', time: '9:09 AM' },
-      { id: 6, text: 'no drinks on tables only in the right spot', completed: true, user: 'Robby Hall', time: '9:09 AM' },
-      { id: 7, text: 'Stickers on front products', completed: true, user: 'Robby Hall', time: '9:09 AM' },
-      { id: 8, text: 'Use first raw in the right spot', completed: true, user: 'Robby Hall', time: '9:09 AM' }
-    ],
-    lunch: [
-      { id: 101, text: 'Check all temp logs', completed: false, user: '', time: '' },
-      { id: 102, text: 'Verify cooler temperatures', completed: false, user: '', time: '' }
-    ],
-    dinner: [
-      { id: 201, text: 'Final temp checks', completed: false, user: '', time: '' },
-      { id: 202, text: 'Close out safety log', completed: false, user: '', time: '' }
-    ]
-  };
-
-  const temperatureLog = {
-    equipment: [
-      { id: 1, name: 'Walk In Cooler', temp: '32°F', range: '22°F - 41°F', time: 'Today at 9:08 AM', status: 'good' },
-      { id: 2, name: 'Walk In Freezer', temp: '-4°F', range: '-20°F - 0°F', time: 'Today at 9:08 AM', status: 'warning' },
-      { id: 3, name: 'Prep Area Cooler', temp: '36°F', range: '22°F - 41°F', time: 'Today at 9:08 AM', status: 'good' },
-      { id: 4, name: 'Cooking Line', temp: '35°F', range: '35°F - 41°F', time: 'Today at 9:08 AM', status: 'warning' },
-      { id: 5, name: 'Ice Cream', temp: '40°F', range: '35°F - 41°F', time: 'Today at 9:08 AM', status: 'good' }
-    ],
-    product: [
-      { id: 101, name: 'Chicken Strips', temp: '38°F', range: '35°F - 41°F', time: 'Today at 9:10 AM', status: 'good' },
-      { id: 102, name: 'Filets', temp: '36°F', range: '35°F - 41°F', time: 'Today at 9:10 AM', status: 'good' }
-    ]
-  };
+  // Aliases that match the original variable names used by the render below.
+  const safetyTasks = tasksByDaypart;
+  const temperatureLog = tempsByKind;
 
   const handleTabClick = (tabId) => {
     if (tabId === 'home') {
@@ -177,7 +253,12 @@ const KitchenFoodSafety = ({ onNavigate, user }) => {
           {/* Task List */}
           <div className="task-list">
             {safetyTasks[activeTaskTab].map(task => (
-              <div key={task.id} className={`task-item ${task.completed ? 'completed' : ''}`}>
+              <div
+                key={task.id}
+                className={`task-item ${task.completed ? 'completed' : ''}`}
+                onClick={() => toggleSafetyTask(task.id, task.completed)}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="task-checkbox">
                   {task.completed && (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
