@@ -45,6 +45,15 @@ class FOHTaskTemplateViewSet(StoreScopedViewSet):
     queryset = FOHTaskTemplate.objects.all()
     permission_classes = [IsAuthenticated, ReadAllWriteManager]
 
+    # Completing a task is a normal team-member action — it's the whole point
+    # of the page. Override permissions for those actions so non-managers can
+    # still check things off. Template CRUD + reorder stays manager-gated via
+    # the class-level ReadAllWriteManager.
+    def get_permissions(self):
+        if self.action in {"complete", "uncomplete", "history"}:
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     def get_queryset(self):
         qs = super().get_queryset()
         # Hide archived rows from list/detail by default. (Admins can still
