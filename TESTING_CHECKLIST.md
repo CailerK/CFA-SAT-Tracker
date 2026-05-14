@@ -39,6 +39,76 @@ These rules apply everywhere — flag any place they're violated.
 
 ---
 
+## Dashboard Customize + navigation routing
+
+### Customize Stat Cards modal (Dashboard Insights)
+- [ ] Click "Customize" next to Dashboard Insights → modal opens.
+- [ ] Currently-selected cards have the red ✓ check.
+- [ ] Uncheck 2 of the 4 defaults, check 2 different cards → click **Save Changes** → modal closes → the dashboard's 4 insight cards **swap out** to match your selection.
+- [ ] **Refresh the page** → your custom selection persists (loaded from `/api/users/me/preferences/`).
+- [ ] Click **Reset to Default** → 4 defaults re-selected (FOH Tasks / Kitchen Checklist / Equipment Issues / Documentation). Save → confirm defaults return.
+
+### Customize Quick Actions modal
+- [ ] Click "Customize" next to Quick Actions → modal opens.
+- [ ] Currently-selected actions are highlighted.
+- [ ] Add 2, remove 1 (up to 12 total) → Save → grid below updates immediately.
+- [ ] **Refresh** → custom set persists.
+- [ ] Reset to Default → defaults return.
+
+### Navigation: every Quick Action card opens the right page
+Walk through these one by one — each card on the Quick Actions grid should navigate cleanly (no blank screens, no console errors):
+
+| Card label | Expected page |
+|---|---|
+| Team Overview | `/users` (Team Members) |
+| Evaluations | Team Evaluations |
+| FOH Tasks | FOH Tasks |
+| Cleaning | FOH Cleaning |
+| Setup Sheets | Setup Sheet Templates |
+| Kitchen | Kitchen Dashboard |
+| Training | Team Training |
+| Documentation | Team Documentation |
+| Leadership | Leadership 360 |
+| Analytics | Kitchen Analytics |
+| Waste Tracker | Kitchen Waste |
+| Equipment | Kitchen Equipment |
+| Food Safety | Kitchen Safety |
+| My Training | Team Training |
+| My Evaluations | Team Evaluations |
+| My Profile | Settings _(temporary alias — there's no profile page yet)_ |
+| Playbooks | Leadership |
+| Goals | Leadership 360 |
+| CFAdollars | Dashboard _(no rewards page yet — placeholder)_ |
+| Safe Counting | Dashboard _(no page yet — placeholder)_ |
+| Team Chat | Team Chat |
+| Settings | Settings |
+
+### Navigation: every Insight card opens the right page
+| Insight card | Expected page |
+|---|---|
+| FOH Tasks | FOH Tasks |
+| Kitchen Checklist | Kitchen Checklists |
+| Equipment Issues | Kitchen Equipment |
+| Documentation | Team Documentation |
+| Waste Today | Kitchen Waste |
+| Team Members | Team Members |
+| Evaluations | Team Evaluations |
+| Active Trainees | Team Training |
+| New Hires | Team Members |
+| Completion Rate | Team Training |
+| Training | Team Training |
+| Leadership Plans | Leadership 360 |
+| Team Performance | Team Development |
+| Food Safety Temps | Kitchen Safety |
+| Safety Incidents | Kitchen Safety |
+| Schedule Compliance | Team Members _(no schedules page yet — placeholder)_ |
+| Guest Recovery | Guest Recovery |
+| Prep Tasks | Kitchen Dashboard |
+
+> Any card that lands on the wrong page or a blank screen — note it next to the row.
+
+---
+
 ## Phase 0 — Foundation (Settings, Store, Preferences)
 
 ### `/settings` (Settings page)

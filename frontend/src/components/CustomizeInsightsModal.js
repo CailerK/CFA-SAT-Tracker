@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './CustomizeInsightsModal.css';
 
-const CustomizeInsightsModal = ({ isOpen, onClose, onSave, currentInsights }) => {
-  const [selectedCards, setSelectedCards] = useState([]);
-
-  const availableCards = [
+// Exported so Dashboard.js can render selected cards using the same catalog.
+// Page values must match the route keys in Dashboard.js's `currentPage` switch.
+export const AVAILABLE_INSIGHT_CARDS = [
     {
       id: 'foh-tasks',
       title: 'FOH Tasks',
@@ -21,7 +20,7 @@ const CustomizeInsightsModal = ({ isOpen, onClose, onSave, currentInsights }) =>
       category: 'kitchen',
       icon: '✓',
       iconColor: 'green',
-      page: 'kitchen-checklist'
+      page: 'kitchen-checklists'
     },
     {
       id: 'equipment-issues',
@@ -39,7 +38,7 @@ const CustomizeInsightsModal = ({ isOpen, onClose, onSave, currentInsights }) =>
       category: 'documentation',
       icon: '📄',
       iconColor: 'red',
-      page: 'documentation'
+      page: 'team-documentation'
     },
     {
       id: 'waste-today',
@@ -147,7 +146,7 @@ const CustomizeInsightsModal = ({ isOpen, onClose, onSave, currentInsights }) =>
       category: 'leadership',
       icon: '⏰',
       iconColor: 'blue',
-      page: 'team-schedules'
+      page: 'team-members'
     },
     {
       id: 'guest-recovery',
@@ -156,7 +155,7 @@ const CustomizeInsightsModal = ({ isOpen, onClose, onSave, currentInsights }) =>
       category: 'leadership',
       icon: '🛎',
       iconColor: 'orange',
-      page: 'leadership'
+      page: 'guest-recovery'
     },
     {
       id: 'prep-tasks',
@@ -169,9 +168,20 @@ const CustomizeInsightsModal = ({ isOpen, onClose, onSave, currentInsights }) =>
     }
   ];
 
+// Helpers for downstream consumers (Dashboard.js renders cards via getInsightById).
+export const getInsightById = (id) =>
+  AVAILABLE_INSIGHT_CARDS.find((c) => c.id === id) || null;
+
+const CustomizeInsightsModal = ({ isOpen, onClose, onSave, currentInsights }) => {
+  const [selectedCards, setSelectedCards] = useState([]);
+  const availableCards = AVAILABLE_INSIGHT_CARDS;
+
+  // Accept either an array of ID strings (preferred) or an array of card objects.
   useEffect(() => {
     if (currentInsights) {
-      setSelectedCards(currentInsights.map(insight => insight.id));
+      setSelectedCards(
+        currentInsights.map((c) => (typeof c === 'string' ? c : c?.id)).filter(Boolean)
+      );
     }
   }, [currentInsights]);
 
@@ -183,15 +193,14 @@ const CustomizeInsightsModal = ({ isOpen, onClose, onSave, currentInsights }) =>
     }
   };
 
+  // Save returns the chosen IDs (strings). Parent persists to backend + state.
   const handleSave = () => {
-    const selectedCardData = availableCards.filter(card => 
-      selectedCards.includes(card.id)
-    );
-    onSave(selectedCardData);
+    onSave(selectedCards.slice());
     onClose();
   };
 
   const handleReset = () => {
+    // IDs must match the backend's _default_insight_ids().
     setSelectedCards(['foh-tasks', 'kitchen-checklist', 'equipment-issues', 'documentation']);
   };
 

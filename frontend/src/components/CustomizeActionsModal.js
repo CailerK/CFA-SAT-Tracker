@@ -201,9 +201,12 @@ const CustomizeActionsModal = ({ isOpen, onClose, onSave, currentActions }) => {
     }
   ];
 
+  // Accept either an array of ID strings (preferred) or array of card objects.
   useEffect(() => {
     if (currentActions) {
-      setSelectedActions(currentActions.map(action => action.id));
+      setSelectedActions(
+        currentActions.map((a) => (typeof a === 'string' ? a : a?.id)).filter(Boolean)
+      );
     }
   }, [currentActions]);
 
@@ -215,11 +218,9 @@ const CustomizeActionsModal = ({ isOpen, onClose, onSave, currentActions }) => {
     }
   };
 
+  // Save returns IDs (strings) so the parent can persist via API + filter on render.
   const handleSave = () => {
-    const selectedActionData = availableActions.filter(action => 
-      selectedActions.includes(action.id)
-    );
-    onSave(selectedActionData);
+    onSave(selectedActions.slice());
     onClose();
   };
 

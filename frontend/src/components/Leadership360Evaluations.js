@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import leadershipService from '../services/leadership';
+import './Leadership360Evaluations.css';
 
 // Normalize a backend Evaluation360 to the row shape this UI uses.
 const normalizeEval = (raw) => ({
@@ -18,7 +19,6 @@ const normalizeEval = (raw) => ({
   total: raw.total_evaluators || 0,
   overdue: Boolean(raw.is_overdue),
 });
-import './Leadership360Evaluations.css';
 
 /* ----- Inline Lucide icons ----- */
 const Icon = ({ size = 18, stroke = 2, children }) => (

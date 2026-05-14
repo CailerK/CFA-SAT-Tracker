@@ -81,7 +81,7 @@ const QuickActions = ({ onPageChange, onCustomize, customActions }) => {
       ),
       iconBg: 'blue',
       tags: ['Team Member', 'Trainer'],
-      page: 'training-progress'
+      page: 'team-training'
     },
     {
       id: 'my-evaluations',
@@ -96,7 +96,7 @@ const QuickActions = ({ onPageChange, onCustomize, customActions }) => {
       ),
       iconBg: 'purple',
       tags: ['Team Member', 'Trainer'],
-      page: 'evaluations'
+      page: 'team-evaluations'
     },
     {
       id: 'my-profile',
@@ -110,7 +110,7 @@ const QuickActions = ({ onPageChange, onCustomize, customActions }) => {
       ),
       iconBg: 'blue',
       tags: ['Team Member', 'Trainer'],
-      page: 'profile'
+      page: 'settings'
     },
     {
       id: 'playbooks',
@@ -153,7 +153,7 @@ const QuickActions = ({ onPageChange, onCustomize, customActions }) => {
       ),
       iconBg: 'yellow',
       tags: ['Team Member', 'Trainer'],
-      page: 'cfadollars'
+      page: 'dashboard'
     },
     {
       id: 'safe-counting',
@@ -167,7 +167,7 @@ const QuickActions = ({ onPageChange, onCustomize, customActions }) => {
       ),
       iconBg: 'teal',
       tags: ['Leader', 'Director'],
-      page: 'safe-counting'
+      page: 'dashboard'
     },
     {
       id: 'team-chat',

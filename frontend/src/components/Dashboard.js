@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './Dashboard.css';
 import Sidebar from './Sidebar';
 import QuickActions from './QuickActions';
-import CustomizeInsightsModal from './CustomizeInsightsModal';
+import CustomizeInsightsModal, { AVAILABLE_INSIGHT_CARDS, getInsightById } from './CustomizeInsightsModal';
 import CustomizeActionsModal from './CustomizeActionsModal';
 import NotificationDropdown from './NotificationDropdown';
 import notificationService from '../services/notifications';
@@ -485,79 +485,38 @@ const Dashboard = ({ user, onLogout }) => {
                 </div>
 
                 <div className="insights-grid">
-                  <button
-                    className="insight-card insight-green"
-                    onClick={() => setCurrentPage('foh')}
-                  >
-                    <div className="insight-card-blur" aria-hidden="true"></div>
-                    <div className="insight-card-body">
-                      <div className="insight-icon insight-icon-green">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="m9 11 3 3L22 4"/>
-                          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                        </svg>
-                      </div>
-                      <h3 className="insight-value">0%</h3>
-                      <p className="insight-label">FOH Tasks</p>
-                      <p className="insight-subtitle">0/64 today</p>
-                    </div>
-                  </button>
-
-                  <button
-                    className="insight-card insight-emerald"
-                    onClick={() => setCurrentPage('kitchen-checklists')}
-                  >
-                    <div className="insight-card-blur" aria-hidden="true"></div>
-                    <div className="insight-card-body">
-                      <div className="insight-icon insight-icon-emerald">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="m9 11 3 3L22 4"/>
-                          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                        </svg>
-                      </div>
-                      <h3 className="insight-value">0%</h3>
-                      <p className="insight-label">Kitchen Checklist</p>
-                      <p className="insight-subtitle">0 completed today</p>
-                    </div>
-                  </button>
-
-                  <button
-                    className="insight-card insight-amber"
-                    onClick={() => setCurrentPage('kitchen-equipment')}
-                  >
-                    <div className="insight-card-blur" aria-hidden="true"></div>
-                    <div className="insight-card-body">
-                      <div className="insight-icon insight-icon-amber">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-                        </svg>
-                      </div>
-                      <h3 className="insight-value">0</h3>
-                      <p className="insight-label">Equipment Issues</p>
-                      <p className="insight-subtitle">Need repair</p>
-                    </div>
-                  </button>
-
-                  <button
-                    className="insight-card insight-red"
-                    onClick={() => setCurrentPage('team-documentation')}
-                  >
-                    <div className="insight-card-blur" aria-hidden="true"></div>
-                    <div className="insight-card-body">
-                      <div className="insight-icon insight-icon-red">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
-                          <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
-                          <path d="M10 9H8"/>
-                          <path d="M16 13H8"/>
-                          <path d="M16 17H8"/>
-                        </svg>
-                      </div>
-                      <h3 className="insight-value">0</h3>
-                      <p className="insight-label">Documentation</p>
-                      <p className="insight-subtitle">This week</p>
-                    </div>
-                  </button>
+                  {/* Render the user's selected insight cards from their preferences.
+                      Falls back to the seeded defaults if customInsights is empty. */}
+                  {(() => {
+                    const ids = (customInsights && customInsights.length
+                      ? customInsights
+                      : ['foh-tasks', 'kitchen-checklist', 'equipment-issues', 'documentation']
+                    ).map((c) => (typeof c === 'string' ? c : c?.id)).filter(Boolean);
+                    return ids.map((id) => {
+                      const card = getInsightById(id);
+                      if (!card) return null;
+                      const colorClass = `insight-${card.iconColor || 'green'}`;
+                      const value = insightsValues[id]?.value ?? '—';
+                      const subtitle = insightsValues[id]?.subtitle ?? card.subtitle;
+                      return (
+                        <button
+                          key={id}
+                          className={`insight-card ${colorClass}`}
+                          onClick={() => setCurrentPage(card.page)}
+                        >
+                          <div className="insight-card-blur" aria-hidden="true"></div>
+                          <div className="insight-card-body">
+                            <div className={`insight-icon insight-icon-${card.iconColor || 'green'}`}>
+                              <span style={{ fontSize: 22 }}>{card.icon || '📊'}</span>
+                            </div>
+                            <h3 className="insight-value">{value}</h3>
+                            <p className="insight-label">{card.title}</p>
+                            <p className="insight-subtitle">{subtitle}</p>
+                          </div>
+                        </button>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </div>
@@ -577,9 +536,12 @@ const Dashboard = ({ user, onLogout }) => {
         isOpen={isCustomizeInsightsOpen}
         onClose={() => setIsCustomizeInsightsOpen(false)}
         onSave={async (insights) => {
+          // Modal now returns IDs (strings). Be defensive in case anyone
+          // wires it back to passing objects later.
+          const ids = (insights || []).map((i) => (typeof i === 'string' ? i : i?.id)).filter(Boolean);
           try {
-            await preferencesService.updateInsights(insights);
-            setCustomInsights(insights);
+            await preferencesService.updateInsights(ids);
+            setCustomInsights(ids);
             setIsCustomizeInsightsOpen(false);
           } catch (error) {
             console.error('Failed to save insights:', error);
@@ -595,9 +557,10 @@ const Dashboard = ({ user, onLogout }) => {
         isOpen={isCustomizeActionsOpen}
         onClose={() => setIsCustomizeActionsOpen(false)}
         onSave={async (actions) => {
+          const ids = (actions || []).map((a) => (typeof a === 'string' ? a : a?.id)).filter(Boolean);
           try {
-            await preferencesService.updateQuickActions(actions);
-            setCustomActions(actions);
+            await preferencesService.updateQuickActions(ids);
+            setCustomActions(ids);
             setIsCustomizeActionsOpen(false);
           } catch (error) {
             console.error('Failed to save quick actions:', error);
