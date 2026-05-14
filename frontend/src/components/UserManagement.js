@@ -26,17 +26,17 @@ const UserManagement = ({ currentUser }) => {
     try {
       setIsLoading(true);
       const [usersRes, storesRes, rolesRes] = await Promise.all([
-        api.get('/api/users/'),
-        api.get('/api/users/stores/'),
-        api.get('/api/users/roles/'),
+        api.request('/users/'),
+        api.request('/users/stores/'),
+        api.request('/users/roles/'),
       ]);
-      setUsers(usersRes.data);
-      setStores(storesRes.data);
-      setRoles(rolesRes.data);
+      setUsers(usersRes);
+      setStores(storesRes);
+      setRoles(rolesRes);
       setError(null);
     } catch (err) {
       console.error('Failed to load user management data:', err);
-      setError(err.response?.data?.detail || 'Failed to load users');
+      setError(err.message || 'Failed to load users');
     } finally {
       setIsLoading(false);
     }
@@ -106,10 +106,16 @@ const UserManagement = ({ currentUser }) => {
 
       if (editingUser.id) {
         // Update existing user
-        await api.put(`/api/users/${editingUser.id}/`, payload);
+        await api.request(`/users/${editingUser.id}/`, {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
       } else {
         // Create new user
-        await api.post('/api/users/', payload);
+        await api.request('/users/', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
       }
 
       setShowModal(false);
@@ -117,7 +123,7 @@ const UserManagement = ({ currentUser }) => {
       loadData();
     } catch (err) {
       console.error('Failed to save user:', err);
-      alert(err.response?.data?.detail || 'Failed to save user');
+      alert(err.message || 'Failed to save user');
     }
   };
 
@@ -134,11 +140,11 @@ const UserManagement = ({ currentUser }) => {
 
     if (window.confirm(`Are you sure you want to delete ${user.fullName || user.email}?`)) {
       try {
-        await api.delete(`/api/users/${user.id}/`);
+        await api.request(`/users/${user.id}/`, { method: 'DELETE' });
         loadData();
       } catch (err) {
         console.error('Failed to delete user:', err);
-        alert(err.response?.data?.detail || 'Failed to delete user');
+        alert(err.message || 'Failed to delete user');
       }
     }
   };
@@ -146,12 +152,12 @@ const UserManagement = ({ currentUser }) => {
   const handleResetPassword = async (user) => {
     if (window.confirm(`Reset password for ${user.fullName || user.email}?`)) {
       try {
-        const res = await api.post(`/api/users/${user.id}/reset_password/`);
-        setTempPassword(res.data.temporary_password);
+        const res = await api.request(`/users/${user.id}/reset_password/`, { method: 'POST' });
+        setTempPassword(res.temporary_password);
         setShowPasswordModal(true);
       } catch (err) {
         console.error('Failed to reset password:', err);
-        alert(err.response?.data?.detail || 'Failed to reset password');
+        alert(err.message || 'Failed to reset password');
       }
     }
   };
