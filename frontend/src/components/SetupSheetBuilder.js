@@ -34,16 +34,16 @@ const SetupSheetBuilder = ({ onNavigate, user }) => {
   const [uploadMessage, setUploadMessage] = useState('');
   const fileInputRef = useRef(null);
 
-  // Load templates so the "Load Previous Setup" dropdown reflects reality.
+  // Load saved sheets so the "Load Previous Setup" dropdown reflects reality.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await setupSheetsService.listTemplates();
+        const res = await setupSheetsService.listSheets({ mine: true });
         const rows = res.results || res || [];
         if (!cancelled) setTemplates(rows);
       } catch (err) {
-        console.error('Failed to load templates:', err);
+        console.error('Failed to load saved setups:', err);
       }
     })();
     return () => { cancelled = true; };
@@ -255,9 +255,19 @@ const SetupSheetBuilder = ({ onNavigate, user }) => {
                 <select
                   className="ssb-load-select"
                   value={selectedTemplate}
-                  onChange={(e) => setSelectedTemplate(e.target.value)}
+                  onChange={async (e) => {
+                    const nextId = e.target.value;
+                    setSelectedTemplate(nextId);
+                    if (!nextId) return;
+                    try {
+                      await setupSheetsService.duplicateSheet(nextId);
+                      onNavigate && onNavigate('saved-setups');
+                    } catch (err) {
+                      console.error('Failed to duplicate previous setup:', err);
+                    }
+                  }}
                 >
-                  <option value="">Select a saved template...</option>
+                  <option value="">Select a saved setup...</option>
                   {templates.map((t) => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}

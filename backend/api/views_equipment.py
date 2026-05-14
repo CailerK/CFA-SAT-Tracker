@@ -50,7 +50,7 @@ from .models import (
     TemperatureReading,
     TemperatureTarget,
 )
-from .permissions import ReadAllWriteManager
+from .permissions import ReadAllWriteManager, is_manager_or_above
 from .serializers import (
     EquipmentCategorySerializer,
     EquipmentSerializer,
@@ -200,6 +200,25 @@ class MaintenanceScheduleViewSet(viewsets.ViewSet):
             performed_by=request.user,
         )
         return Response(MaintenanceScheduleSerializer(sched).data)
+
+    def partial_update(self, request, pk=None):
+        if not is_manager_or_above(request.user):
+            raise ValidationError("Manager role required to edit schedules.")
+        sched = self._get(pk, request.user)
+        serializer = MaintenanceScheduleSerializer(
+            sched, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def destroy(self, request, pk=None):
+        if not is_manager_or_above(request.user):
+            raise ValidationError("Manager role required to delete schedules.")
+        sched = self._get(pk, request.user)
+        sched.archived_at = timezone.now()
+        sched.save(update_fields=["archived_at", "updated_at"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ============================================================================

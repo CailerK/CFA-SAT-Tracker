@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './Calendar.css';
 import calendarService from '../services/calendar';
 
@@ -23,33 +23,36 @@ const Calendar = ({ onBack }) => {
   const [viewMode, setViewMode] = useState('month');
   const [EVENTS, setEVENTS] = useState({});
 
+  const loadEvents = useCallback(async () => {
+    const monthStr = `${viewDate.getFullYear()}-${pad(viewDate.getMonth() + 1)}`;
+    const res = await calendarService.list({ month: monthStr });
+    const rows = res.results || res || [];
+    const bucket = {};
+    for (const e of rows) {
+      if (!e.starts_at) continue;
+      const d = new Date(e.starts_at);
+      const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+      (bucket[key] ||= []).push({
+        id: e.id,
+        title: e.title,
+        category: e.category,
+        startsAt: e.starts_at,
+        color: CATEGORY_COLOR[e.category] || '#6b7280',
+      });
+    }
+    setEVENTS(bucket);
+  }, [viewDate]);
+
   // Load events for the current month whenever the view date changes.
   useEffect(() => {
-    let cancelled = false;
-    const monthStr = `${viewDate.getFullYear()}-${pad(viewDate.getMonth() + 1)}`;
     (async () => {
       try {
-        const res = await calendarService.list({ month: monthStr });
-        const rows = res.results || res || [];
-        // Bucket events into a map keyed by 'YYYY-M-D' (matches original shape).
-        const bucket = {};
-        for (const e of rows) {
-          if (!e.starts_at) continue;
-          const d = new Date(e.starts_at);
-          const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-          (bucket[key] ||= []).push({
-            id: e.id,
-            title: e.title,
-            color: CATEGORY_COLOR[e.category] || '#6b7280',
-          });
-        }
-        if (!cancelled) setEVENTS(bucket);
+        await loadEvents();
       } catch (err) {
         console.error('Failed to load calendar:', err);
       }
     })();
-    return () => { cancelled = true; };
-  }, [viewDate]);
+  }, [loadEvents]);
 
   const today = new Date();
   const isToday = (d) =>
@@ -88,6 +91,56 @@ const Calendar = ({ onBack }) => {
   const next = () => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
   const goToday = () => { setViewDate(new Date(today.getFullYear(), today.getMonth(), 1)); };
 
+  const handleAddEvent = async () => {
+    const title = window.prompt('Event title');
+    if (!title?.trim()) return;
+    const date = window.prompt(
+      'Event date (YYYY-MM-DD)',
+      `${viewDate.getFullYear()}-${pad(viewDate.getMonth() + 1)}-${pad(today.getDate())}`
+    );
+    if (!date?.trim()) return;
+    const category = window.prompt(
+      `Category (${Object.keys(CATEGORY_COLOR).join(', ')})`,
+      'store_event'
+    );
+    if (!category?.trim()) return;
+    try {
+      await calendarService.create({
+        title: title.trim(),
+        category: category.trim(),
+        starts_at: `${date.trim()}T12:00:00`,
+        all_day: true,
+      });
+      await loadEvents();
+    } catch (err) {
+      console.error('Failed to create calendar event:', err);
+    }
+  };
+
+  const handleEventClick = async (event) => {
+    const action = window.prompt(`Type "edit" to rename or "delete" to remove "${event.title}".`, 'edit');
+    if (!action) return;
+    if (action.toLowerCase() === 'delete') {
+      const confirmed = window.confirm(`Delete "${event.title}"?`);
+      if (!confirmed) return;
+      try {
+        await calendarService.remove(event.id);
+        await loadEvents();
+      } catch (err) {
+        console.error('Failed to delete calendar event:', err);
+      }
+      return;
+    }
+    const nextTitle = window.prompt('Updated event title', event.title);
+    if (!nextTitle?.trim()) return;
+    try {
+      await calendarService.update(event.id, { title: nextTitle.trim() });
+      await loadEvents();
+    } catch (err) {
+      console.error('Failed to update calendar event:', err);
+    }
+  };
+
   return (
     <div className="cal-page">
       {/* Page header row */}
@@ -117,7 +170,7 @@ const Calendar = ({ onBack }) => {
           <button className="cal-nav-btn" onClick={next}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
           </button>
-          <button className="cal-add-btn">
+          <button className="cal-add-btn" onClick={handleAddEvent}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add Event
           </button>
@@ -144,7 +197,7 @@ const Calendar = ({ onBack }) => {
                 </div>
                 <div className="cal-cell-events">
                   {evts.map(ev => (
-                    <div key={ev.id} className="cal-event" style={{ backgroundColor: ev.color }}>
+                    <div key={ev.id} className="cal-event" style={{ backgroundColor: ev.color }} onClick={() => handleEventClick(ev)}>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.8, flexShrink: 0 }}>
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                       </svg>

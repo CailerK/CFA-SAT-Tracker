@@ -10,6 +10,20 @@ const formatRole = (slug) => {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
+const formatShiftPreference = (value) => {
+  if (!value) return 'Flex';
+  if (typeof value === 'string') {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+  if (Array.isArray(value)) {
+    return value.length ? 'Custom' : 'Flex';
+  }
+  if (typeof value === 'object') {
+    return Object.keys(value).length ? 'Custom' : 'Flex';
+  }
+  return 'Flex';
+};
+
 // Normalize backend user → existing UI shape ({id, name, initials, email,
 // isAdmin, isActive, role, depts, shift, manager}).
 const normalizeMember = (raw) => ({
@@ -17,11 +31,14 @@ const normalizeMember = (raw) => ({
   name: raw.name,
   initials: raw.initials || '??',
   email: raw.email || '',
+  phone: raw.phone || '',
   isAdmin: Boolean(raw.is_admin),
   isActive: Boolean(raw.is_active),
   role: formatRole(raw.role),
+  roleSlug: raw.role || 'team_member',
   depts: (raw.departments || []).map((d) => d.name),
-  shift: raw.shift_preference ? raw.shift_preference[0].toUpperCase() + raw.shift_preference.slice(1) : 'Flex',
+  shift: formatShiftPreference(raw.shift_preference),
+  managerId: raw.manager || '',
   manager: raw.manager_name || null,
 });
 
@@ -44,17 +61,21 @@ const TeamMembers = ({ onBack, onNavigate }) => {
   const [page, setPage] = useState(1);
   const [STATS, setSTATS] = useState({ active: 0, inactive: 0, managers: 0 });
   const [members, setMembers] = useState([]);
+  const [managers, setManagers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load roster + stats on mount and whenever tab/search changes.
   const refresh = useCallback(async () => {
     try {
-      const [list, stats] = await Promise.all([
+      const [list, stats, managerList] = await Promise.all([
         teamService.listMembers({ status: activeTab, q: searchQuery.trim() || undefined }),
         teamService.getStats(),
+        teamService.listMembers({ status: 'managers' }),
       ]);
       const rows = list.results || list || [];
+      const managerRows = managerList.results || managerList || [];
       setMembers(rows.map(normalizeMember));
+      setManagers(managerRows.map(normalizeMember));
       setSTATS(stats);
     } catch (err) {
       console.error('Failed to load team members:', err);
@@ -65,11 +86,13 @@ const TeamMembers = ({ onBack, onNavigate }) => {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const totalCount = activeTab === 'active' ? STATS.active : STATS.inactive;
-  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
-
-  // Server-side filtering already applies; this is just a guard for the local list.
   const filtered = members;
+  const totalCount = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+  const visibleMembers = filtered.slice(
+    (page - 1) * ITEMS_PER_PAGE,
+    page * ITEMS_PER_PAGE
+  );
 
   // Simple page-number strip: 1 ... totalPages with current + neighbors
   const pageNumbers = useMemo(() => {
@@ -86,6 +109,62 @@ const TeamMembers = ({ onBack, onNavigate }) => {
   const handleBack = () => {
     if (onBack) return onBack();
     if (onNavigate) return onNavigate('dashboard');
+  };
+
+  const handleMemberAction = async (member) => {
+    const defaultAction = member.isActive ? 'edit' : 'activate';
+    const action = window.prompt(
+      `Type "edit" or "${member.isActive ? 'deactivate' : 'activate'}" for ${member.name}.`,
+      defaultAction
+    );
+    if (!action) return;
+    const choice = action.trim().toLowerCase();
+
+    try {
+      if (choice === 'deactivate' || choice === 'activate') {
+        await teamService.updateMember(member.id, {
+          is_active: choice === 'activate',
+        });
+        await refresh();
+        return;
+      }
+
+      if (choice !== 'edit') return;
+
+      const role = window.prompt(
+        'Role slug',
+        member.roleSlug
+      );
+      if (role == null) return;
+
+      const managerPrompt = managers
+        .filter((m) => m.id !== member.id)
+        .map((m) => m.name)
+        .join('\n');
+      const managerInput = window.prompt(
+        `Manager name (leave blank for none)\n${managerPrompt}`,
+        member.manager || ''
+      );
+      if (managerInput == null) return;
+
+      const phone = window.prompt('Phone', member.phone || '');
+      if (phone == null) return;
+
+      const nextManager = managers.find(
+        (candidate) =>
+          candidate.id !== member.id
+          && candidate.name.toLowerCase() === managerInput.trim().toLowerCase()
+      );
+
+      await teamService.updateMember(member.id, {
+        role: role.trim().toLowerCase().replace(/\s+/g, '_'),
+        manager: managerInput.trim() ? nextManager?.id || member.managerId || null : null,
+        phone: phone.trim(),
+      });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to update team member:', err);
+    }
   };
 
   return (
@@ -175,13 +254,36 @@ const TeamMembers = ({ onBack, onNavigate }) => {
           </button>
           {managersOpen && (
             <div className="tm-managers-body">
-              <p className="tm-managers-empty">Manager list placeholder — wire to API.</p>
+              {managers.length === 0 ? (
+                <p className="tm-managers-empty">No managers found for this store.</p>
+              ) : (
+                managers.map((manager) => (
+                  <button
+                    key={manager.id}
+                    type="button"
+                    className="tm-manager-link"
+                    onClick={() => handleMemberAction(manager)}
+                    style={{ display: 'block', marginBottom: 8 }}
+                  >
+                    {manager.name} · {manager.role}
+                  </button>
+                ))
+              )}
             </div>
           )}
         </div>
 
         {/* Members table card */}
         <div className="tm-table-card">
+          {isLoading && (
+            <div className="tm-row">
+              <div className="tm-cell-member">
+                <div className="tm-member-text">
+                  <span className="tm-name">Loading team members…</span>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Desktop table head */}
           <div className="tm-table-head">
             <span>Member</span>
@@ -192,7 +294,7 @@ const TeamMembers = ({ onBack, onNavigate }) => {
 
           {/* Desktop rows */}
           <div className="tm-table-desktop">
-            {filtered.map((m, i) => (
+            {visibleMembers.map((m, i) => (
               <div
                 key={m.id}
                 className="tm-row"
@@ -233,7 +335,12 @@ const TeamMembers = ({ onBack, onNavigate }) => {
                 </div>
 
                 <div className="tm-cell-actions">
-                  <button type="button" className="tm-row-action-btn" aria-label={`Actions for ${m.name}`}>
+                  <button
+                    type="button"
+                    className="tm-row-action-btn"
+                    aria-label={`Actions for ${m.name}`}
+                    onClick={() => handleMemberAction(m)}
+                  >
                     <IconMoreVertical className="tm-row-action-icon" />
                   </button>
                 </div>
@@ -243,7 +350,7 @@ const TeamMembers = ({ onBack, onNavigate }) => {
 
           {/* Mobile cards */}
           <div className="tm-table-mobile">
-            {filtered.map((m, i) => (
+            {visibleMembers.map((m, i) => (
               <div
                 key={m.id}
                 className="tm-card"
@@ -260,7 +367,12 @@ const TeamMembers = ({ onBack, onNavigate }) => {
                       <p className="tm-email">{m.email}</p>
                     </div>
                   </div>
-                  <button type="button" className="tm-row-action-btn" aria-label={`Actions for ${m.name}`}>
+                  <button
+                    type="button"
+                    className="tm-row-action-btn"
+                    aria-label={`Actions for ${m.name}`}
+                    onClick={() => handleMemberAction(m)}
+                  >
                     <IconMoreVertical className="tm-row-action-icon" />
                   </button>
                 </div>
@@ -299,7 +411,7 @@ const TeamMembers = ({ onBack, onNavigate }) => {
           {/* Pagination footer */}
           <div className="tm-pagination">
             <p className="tm-pagination-text">
-              Showing <span className="tm-pagination-strong">{(page - 1) * ITEMS_PER_PAGE + 1}</span> to{' '}
+              Showing <span className="tm-pagination-strong">{totalCount ? (page - 1) * ITEMS_PER_PAGE + 1 : 0}</span> to{' '}
               <span className="tm-pagination-strong">
                 {Math.min(page * ITEMS_PER_PAGE, totalCount)}
               </span>{' '}

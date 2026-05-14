@@ -71,7 +71,7 @@ class KitchenChecklistViewSet(StoreScopedViewSet):
     permission_classes = [IsAuthenticated, ReadAllWriteManager]
 
     def get_permissions(self):
-        if self.action in {"complete", "uncomplete"}:
+        if self.action in {"complete", "uncomplete", "history"}:
             return [IsAuthenticated()]
         return super().get_permissions()
 
@@ -108,6 +108,72 @@ class KitchenChecklistViewSet(StoreScopedViewSet):
             template=task, date=_today()
         ).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["get"], url_path="history")
+    def history(self, request):
+        range_arg = request.query_params.get("range", "7d")
+        try:
+            days = int(range_arg.rstrip("d"))
+        except ValueError:
+            days = 7
+        days = min(max(days, 1), 90)
+
+        end = _today()
+        start = end - timedelta(days=days - 1)
+
+        active_templates = list(self.get_queryset())
+        totals_by_shift = {
+            shift: sum(1 for template in active_templates if template.shift == shift)
+            for shift in ("opening", "transition", "closing")
+        }
+        active_by_id = {template.id: template for template in active_templates}
+
+        completions = (
+            KitchenChecklistCompletion.objects.filter(
+                template__store=request.user.store,
+                template__archived_at__isnull=True,
+                date__gte=start,
+                date__lte=end,
+            )
+            .select_related("template")
+        )
+
+        by_date = {}
+        for completion in completions:
+            date_key = completion.date.isoformat()
+            day = by_date.setdefault(date_key, {
+                "date": date_key,
+                "opening": {"done": 0, "total": totals_by_shift.get("opening", 0)},
+                "transition": {"done": 0, "total": totals_by_shift.get("transition", 0)},
+                "closing": {"done": 0, "total": totals_by_shift.get("closing", 0)},
+                "completed_template_ids": set(),
+            })
+            day[completion.template.shift]["done"] += 1
+            day["completed_template_ids"].add(completion.template_id)
+
+        result = []
+        for offset in range(days):
+            date_obj = end - timedelta(days=offset)
+            date_key = date_obj.isoformat()
+            day = by_date.get(date_key) or {
+                "date": date_key,
+                "opening": {"done": 0, "total": totals_by_shift.get("opening", 0)},
+                "transition": {"done": 0, "total": totals_by_shift.get("transition", 0)},
+                "closing": {"done": 0, "total": totals_by_shift.get("closing", 0)},
+                "completed_template_ids": set(),
+            }
+            completed_ids = day.pop("completed_template_ids")
+            day["total"] = {
+                "done": sum(day[shift]["done"] for shift in ("opening", "transition", "closing")),
+                "total": sum(day[shift]["total"] for shift in ("opening", "transition", "closing")),
+            }
+            day["missed"] = [
+                active_by_id[template_id].text
+                for template_id in active_by_id
+                if template_id not in completed_ids
+            ][:10]
+            result.append(day)
+        return Response({"days": result, "range": f"{days}d"})
 
 
 # ============================================================================

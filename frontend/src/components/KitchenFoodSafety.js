@@ -50,7 +50,6 @@ const KitchenFoodSafety = ({ onNavigate, user }) => {
   const [activeTempTab, setActiveTempTab] = useState('equipment');
   const [tasksByDaypart, setTasksByDaypart] = useState({ morning: [], lunch: [], dinner: [] });
   const [tempsByKind, setTempsByKind] = useState({ equipment: [], product: [] });
-  const [isLoading, setIsLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
@@ -72,8 +71,6 @@ const KitchenFoodSafety = ({ onNavigate, user }) => {
       });
     } catch (err) {
       console.error('Failed to load food safety:', err);
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
@@ -154,6 +151,42 @@ const KitchenFoodSafety = ({ onNavigate, user }) => {
     }
   };
 
+  const handleRecordTemp = async () => {
+    const targets = temperatureLog[activeTempTab];
+    if (!targets.length) return;
+    const targetName = window.prompt(
+      `Record a temperature for which ${activeTempTab} item?\n${targets.map((item) => item.name).join('\n')}`
+    );
+    if (!targetName?.trim()) return;
+    const target = targets.find((item) => item.name.toLowerCase() === targetName.trim().toLowerCase());
+    if (!target) return;
+    const value = window.prompt(`Temperature for ${target.name}`);
+    if (value == null || value === '') return;
+    try {
+      await equipmentService.logReading({ target: target.id, value: Number(value), unit: 'F' });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to record temperature:', err);
+    }
+  };
+
+  const handleViewHistory = async () => {
+    try {
+      const readings = await equipmentService.listRecentReadings({ kind: activeTempTab, range: '7d' });
+      const rows = readings.results || readings || [];
+      const preview = rows.slice(0, 10).map((reading) => {
+        const targetName = reading.target_name || 'Unknown';
+        const recordedAt = reading.recorded_at
+          ? new Date(reading.recorded_at).toLocaleString('en-US')
+          : 'Unknown time';
+        return `${targetName}: ${reading.value}${reading.unit || 'F'} at ${recordedAt}`;
+      });
+      window.alert(preview.length ? preview.join('\n') : 'No recent temperature readings.');
+    } catch (err) {
+      console.error('Failed to load temperature history:', err);
+    }
+  };
+
   return (
     <div className="kitchen-safety-page">
       {/* Red Header Banner */}
@@ -182,14 +215,14 @@ const KitchenFoodSafety = ({ onNavigate, user }) => {
 
       {/* Action Buttons */}
       <div className="safety-action-buttons">
-        <button className="safety-btn-history">
+        <button className="safety-btn-history" onClick={handleViewHistory}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10"/>
             <polyline points="12,6 12,12 16,14"/>
           </svg>
           History
         </button>
-        <button className="safety-btn-record">
+        <button className="safety-btn-record" onClick={handleRecordTemp}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
           </svg>

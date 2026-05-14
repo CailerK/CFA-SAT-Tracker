@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import equipmentService from '../services/equipment';
 import './SetupSheetTemplates.css'; // banner
 import './KitchenDashboard.css';     // kitchen nav
@@ -30,7 +30,6 @@ const getGreeting = () => {
 };
 const getCurrentDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-// ===== DEMO DATA (see FAKE_DATA.md) =====
 const CATEGORIES = [
   { id: 'hvac', label: 'hvac', emoji: '📦', count: 4 },
   { id: 'cleaning', label: 'cleaning', emoji: '🧽', count: 4 },
@@ -41,28 +40,6 @@ const CATEGORIES = [
   { id: 'preparation', label: 'preparation', emoji: '🔪', count: 0 },
   { id: 'beverage', label: 'beverage', emoji: '🥤', count: 0 },
 ];
-
-const EQUIPMENT_BY_CATEGORY = {
-  cooking: [
-    {
-      id: 'primary_fryers',
-      name: 'Primary Fryers',
-      icon: 'flame',
-      status: 'OK',
-      schedule: { task: 'boil out', cadence: 'weekly', date: 'Apr 21', urgency: 'Soon' },
-    },
-    { id: 'secondary_fryers', name: 'Secondary Fryers', icon: 'flame', status: 'OK', schedule: null },
-    { id: 'grills', name: 'Grills', icon: 'beef', status: 'OK', schedule: null },
-    { id: 'pressure_fryers', name: 'Pressure Fryers', icon: 'flame', status: 'OK', schedule: null },
-  ],
-  hvac: [],
-  cleaning: [],
-  pos_tech: [],
-  safety: [],
-  refrigeration: [],
-  preparation: [],
-  beverage: [],
-};
 
 const EquipIcon = ({ type, className }) => {
   switch (type) {
@@ -76,37 +53,27 @@ const KitchenEquipment = ({ onNavigate, user }) => {
   const [activeCategory, setActiveCategory] = useState('cooking');
   const [categoriesRaw, setCategoriesRaw] = useState([]);
   const [equipmentRaw, setEquipmentRaw] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Load categories once.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await equipmentService.listCategories();
-        if (!cancelled) setCategoriesRaw(res.results || res || []);
-      } catch (err) {
-        console.error('Failed to load equipment categories:', err);
-      }
-    })();
-    return () => { cancelled = true; };
+  const refreshCategories = useCallback(async () => {
+    try {
+      const res = await equipmentService.listCategories();
+      setCategoriesRaw(res.results || res || []);
+    } catch (err) {
+      console.error('Failed to load equipment categories:', err);
+    }
   }, []);
 
-  // Load equipment for the active category whenever it changes.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await equipmentService.listEquipment({ category: activeCategory });
-        if (!cancelled) setEquipmentRaw(res.results || res || []);
-      } catch (err) {
-        console.error('Failed to load equipment:', err);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+  const refreshEquipment = useCallback(async () => {
+    try {
+      const res = await equipmentService.listEquipment({ category: activeCategory });
+      setEquipmentRaw(res.results || res || []);
+    } catch (err) {
+      console.error('Failed to load equipment:', err);
+    }
   }, [activeCategory]);
+
+  useEffect(() => { refreshCategories(); }, [refreshCategories]);
+  useEffect(() => { refreshEquipment(); }, [refreshEquipment]);
 
   const tabs = [
     { id: 'home', label: 'Home', Icon: IconLayoutDashboard },
@@ -150,11 +117,189 @@ const KitchenEquipment = ({ onNavigate, user }) => {
         id: c.slug, label: c.label, emoji: c.emoji, count: c.count,
       }))
     : CATEGORIES;
+  const activeCategoryRow = categoriesRaw.find((category) => category.slug === activeCategory) || null;
 
   // Running totals derived from real data.
   const runningTotal = equipment.filter((e) => e.status === 'OK').length;
   const runningOf = equipment.length;
   const runningPct = runningOf ? Math.round((runningTotal / runningOf) * 100) : 0;
+  const upcomingCount = equipment.filter((item) => item.schedule).length;
+
+  const handleCompleteSchedule = async (scheduleId) => {
+    try {
+      await equipmentService.completeSchedule(scheduleId);
+      await refreshEquipment();
+    } catch (err) {
+      console.error('Failed to complete maintenance schedule:', err);
+    }
+  };
+
+  const handleLogAction = async (equipment, kind) => {
+    const notes = window.prompt(`Notes for ${equipment.name} (${kind})`, '');
+    if (notes == null) return;
+    try {
+      await equipmentService.addEquipmentLog(equipment.id, { kind, notes });
+      await refreshEquipment();
+    } catch (err) {
+      console.error(`Failed to log ${kind} event:`, err);
+    }
+  };
+
+  const handleViewHistory = async (equipment) => {
+    try {
+      const res = await equipmentService.getEquipmentLogs(equipment.id);
+      const rows = res.results || res || [];
+      const preview = rows.slice(0, 10).map((log) => {
+        const when = log.performed_at ? new Date(log.performed_at).toLocaleString('en-US') : 'Unknown time';
+        return `${log.kind}: ${log.notes || 'No notes'} (${when})`;
+      });
+      window.alert(preview.length ? preview.join('\n') : 'No maintenance history yet.');
+    } catch (err) {
+      console.error('Failed to load maintenance history:', err);
+    }
+  };
+
+  const handleViewUpcomingTasks = () => {
+    const preview = equipment
+      .filter((item) => item.schedule)
+      .slice(0, 10)
+      .map((item) => `${item.name}: ${item.schedule.task} (${item.schedule.cadence}) due ${item.schedule.date}`);
+    window.alert(preview.length ? preview.join('\n') : 'No upcoming maintenance schedules in this category.');
+  };
+
+  const handleAddCategory = async () => {
+    const label = window.prompt('Category label');
+    if (!label?.trim()) return;
+    const slugDefault = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const slug = window.prompt('Category slug', slugDefault);
+    if (!slug?.trim()) return;
+    const emoji = window.prompt('Category emoji', '🔧') || '🔧';
+    try {
+      await equipmentService.createCategory({
+        label: label.trim(),
+        slug: slug.trim().toLowerCase(),
+        emoji: emoji.trim(),
+        order: categoriesRaw.length,
+      });
+      await refreshCategories();
+      setActiveCategory(slug.trim().toLowerCase());
+    } catch (err) {
+      console.error('Failed to create equipment category:', err);
+    }
+  };
+
+  const handleAddEquipment = async () => {
+    if (!activeCategoryRow) return;
+    const name = window.prompt(`Equipment name for ${activeCategoryRow.label}`);
+    if (!name?.trim()) return;
+    const status = window.prompt('Status (ok, needs_attention, down)', 'ok');
+    if (!status?.trim()) return;
+    const icon = window.prompt('Icon key (flame or beef)', 'flame') || 'flame';
+    try {
+      await equipmentService.createEquipment({
+        category: activeCategoryRow.id,
+        name: name.trim(),
+        status: status.trim().toLowerCase(),
+        icon: icon.trim().toLowerCase(),
+      });
+      await Promise.all([refreshCategories(), refreshEquipment()]);
+    } catch (err) {
+      console.error('Failed to create equipment:', err);
+    }
+  };
+
+  const handleManageEquipment = async () => {
+    const action = window.prompt('Type add, edit, or delete equipment', 'add');
+    if (!action) return;
+    const choice = action.trim().toLowerCase();
+    if (choice === 'add') {
+      await handleAddEquipment();
+      return;
+    }
+    if (!equipment.length) return;
+
+    const name = window.prompt(
+      `Which equipment?\n${equipment.map((item) => item.name).join('\n')}`,
+      equipment[0]?.name || ''
+    );
+    if (!name?.trim()) return;
+    const target = equipment.find((item) => item.name.toLowerCase() === name.trim().toLowerCase());
+    if (!target) return;
+
+    try {
+      if (choice === 'delete') {
+        const confirmed = window.confirm(`Delete "${target.name}"?`);
+        if (!confirmed) return;
+        await equipmentService.removeEquipment(target.id);
+        await Promise.all([refreshCategories(), refreshEquipment()]);
+        return;
+      }
+
+      if (choice !== 'edit') return;
+      const nextName = window.prompt('Equipment name', target.name);
+      if (!nextName?.trim()) return;
+      const nextStatus = window.prompt('Status (ok, needs_attention, down)', target.status.toLowerCase().replace(/ /g, '_'));
+      if (!nextStatus?.trim()) return;
+      await equipmentService.updateEquipment(target.id, {
+        name: nextName.trim(),
+        status: nextStatus.trim().toLowerCase(),
+      });
+      await refreshEquipment();
+    } catch (err) {
+      console.error('Failed to manage equipment:', err);
+    }
+  };
+
+  const handleAddSchedule = async (equipmentItem) => {
+    const taskName = window.prompt(`Maintenance task for ${equipmentItem.name}`);
+    if (!taskName?.trim()) return;
+    const cadence = window.prompt('Cadence (daily, weekly, monthly, quarterly, yearly)', 'weekly');
+    if (!cadence?.trim()) return;
+    const nextDue = window.prompt('Next due date (YYYY-MM-DD)');
+    if (!nextDue?.trim()) return;
+    try {
+      await equipmentService.createEquipmentSchedule(equipmentItem.id, {
+        task_name: taskName.trim(),
+        cadence: cadence.trim().toLowerCase(),
+        next_due: nextDue.trim(),
+      });
+      await refreshEquipment();
+    } catch (err) {
+      console.error('Failed to create equipment schedule:', err);
+    }
+  };
+
+  const handleEditSchedule = async (equipmentItem) => {
+    if (!equipmentItem.schedule) return;
+    const taskName = window.prompt('Maintenance task', equipmentItem.schedule.task);
+    if (!taskName?.trim()) return;
+    const cadence = window.prompt('Cadence', equipmentItem.schedule.cadence);
+    if (!cadence?.trim()) return;
+    const nextDue = window.prompt('Next due date (YYYY-MM-DD)', equipmentItem.schedule.next_due || '');
+    if (!nextDue?.trim()) return;
+    try {
+      await equipmentService.updateEquipmentSchedule(equipmentItem.schedule.id, {
+        task_name: taskName.trim(),
+        cadence: cadence.trim().toLowerCase(),
+        next_due: nextDue.trim(),
+      });
+      await refreshEquipment();
+    } catch (err) {
+      console.error('Failed to update equipment schedule:', err);
+    }
+  };
+
+  const handleDeleteSchedule = async (equipmentItem) => {
+    if (!equipmentItem.schedule) return;
+    const confirmed = window.confirm(`Delete the maintenance schedule for ${equipmentItem.name}?`);
+    if (!confirmed) return;
+    try {
+      await equipmentService.deleteEquipmentSchedule(equipmentItem.schedule.id);
+      await refreshEquipment();
+    } catch (err) {
+      console.error('Failed to delete equipment schedule:', err);
+    }
+  };
 
   return (
     <div className="sst-page">
@@ -218,11 +363,11 @@ const KitchenEquipment = ({ onNavigate, user }) => {
             </div>
           </div>
           <div className="ke-toolbar-actions">
-            <button type="button" className="ke-toolbar-btn" aria-label="Upcoming tasks">
+            <button type="button" className="ke-toolbar-btn" aria-label="Upcoming tasks" onClick={handleViewUpcomingTasks}>
               <IconCalendarDays className="ke-toolbar-btn-icon" />
-              <span className="ke-badge">1</span>
+              <span className="ke-badge">{upcomingCount}</span>
             </button>
-            <button type="button" className="ke-toolbar-btn" aria-label="Manage equipment">
+            <button type="button" className="ke-toolbar-btn" aria-label="Manage equipment" onClick={handleManageEquipment}>
               <IconSettings className="ke-toolbar-btn-icon" />
             </button>
           </div>
@@ -243,7 +388,7 @@ const KitchenEquipment = ({ onNavigate, user }) => {
                 <span className="ke-cat-count">{c.count}</span>
               </button>
             ))}
-            <button type="button" className="ke-cat ke-cat-add">
+            <button type="button" className="ke-cat ke-cat-add" onClick={handleAddCategory}>
               <IconPlus className="ke-cat-add-icon" />
               <span>Add</span>
             </button>
@@ -256,6 +401,9 @@ const KitchenEquipment = ({ onNavigate, user }) => {
             <div className="ke-empty">
               <p className="ke-empty-title">No equipment in this category yet</p>
               <p className="ke-empty-sub">Add equipment to start tracking maintenance and cleaning.</p>
+              <button type="button" className="ke-action ke-action-amber" onClick={handleAddEquipment}>
+                <IconPlus className="ke-action-icon" /> <span>Add Equipment</span>
+              </button>
             </div>
           ) : (
             <div className="ke-grid">
@@ -284,31 +432,31 @@ const KitchenEquipment = ({ onNavigate, user }) => {
                           <span className="ke-schedule-urgency">{eq.schedule.urgency}</span>
                         </div>
                         <div className="ke-schedule-actions">
-                          <button className="ke-schedule-mini" type="button" aria-label="Edit">
+                          <button className="ke-schedule-mini" type="button" aria-label="Edit" onClick={() => handleEditSchedule(eq)}>
                             <IconPencil className="ke-schedule-mini-icon" />
                           </button>
-                          <button className="ke-schedule-mini ke-schedule-mini-delete" type="button" aria-label="Delete">
+                          <button className="ke-schedule-mini ke-schedule-mini-delete" type="button" aria-label="Delete" onClick={() => handleDeleteSchedule(eq)}>
                             <IconTrash className="ke-schedule-mini-icon" />
                           </button>
-                          <button className="ke-schedule-done" type="button">Done</button>
+                          <button className="ke-schedule-done" type="button" onClick={() => handleCompleteSchedule(eq.schedule.id)}>Done</button>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <p className="ke-no-schedule">No schedules set up</p>
+                    <button type="button" className="ke-no-schedule" onClick={() => handleAddSchedule(eq)}>Add maintenance schedule</button>
                   )}
 
                   <div className="ke-card-actions">
-                    <button type="button" className="ke-action ke-action-gray" aria-label="View history">
+                    <button type="button" className="ke-action ke-action-gray" aria-label="View history" onClick={() => handleViewHistory(eq)}>
                       <IconHistory className="ke-action-icon" /> <span>History</span>
                     </button>
-                    <button type="button" className="ke-action ke-action-amber" aria-label="Add maintenance">
+                    <button type="button" className="ke-action ke-action-amber" aria-label="Add maintenance" onClick={() => handleLogAction(eq, 'maintenance')}>
                       <IconWrench className="ke-action-icon" /> <span>Maint.</span>
                     </button>
-                    <button type="button" className="ke-action ke-action-blue" aria-label="Add cleaning">
+                    <button type="button" className="ke-action ke-action-blue" aria-label="Add cleaning" onClick={() => handleLogAction(eq, 'cleaning')}>
                       <IconBrush className="ke-action-icon" /> <span>Clean</span>
                     </button>
-                    <button type="button" className="ke-action ke-action-red" aria-label="Report issue">
+                    <button type="button" className="ke-action ke-action-red" aria-label="Report issue" onClick={() => handleLogAction(eq, 'issue')}>
                       <IconAlertCircle className="ke-action-icon" /> <span>Issue</span>
                     </button>
                   </div>

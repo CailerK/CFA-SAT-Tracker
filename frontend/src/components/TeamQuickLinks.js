@@ -46,14 +46,34 @@ const formatToday = () => {
 
 const TeamQuickLinks = ({ user }) => {
   const [links, setLinks] = useState([]);
+  const [categories, setCategories] = useState([]);
+
+  const loadData = async () => {
+    try {
+      const [linksRes, categoriesRes] = await Promise.all([
+        teamService.listQuickLinks(),
+        teamService.listLinkCategories(),
+      ]);
+      const linkRows = linksRes.results || linksRes || [];
+      const categoryRows = categoriesRes.results || categoriesRes || [];
+      setLinks(linkRows);
+      setCategories(categoryRows);
+    } catch (err) {
+      console.error('Failed to load quick links:', err);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await teamService.listQuickLinks();
-        const rows = res.results || res || [];
-        if (!cancelled) setLinks(rows);
+        const [linksRes, categoriesRes] = await Promise.all([
+          teamService.listQuickLinks(),
+          teamService.listLinkCategories(),
+        ]);
+        if (cancelled) return;
+        setLinks(linksRes.results || linksRes || []);
+        setCategories(categoriesRes.results || categoriesRes || []);
       } catch (err) {
         console.error('Failed to load quick links:', err);
       }
@@ -62,6 +82,42 @@ const TeamQuickLinks = ({ user }) => {
   }, []);
 
   const displayName = user?.firstName || user?.name || 'Demo User';
+
+  const handleAddCategory = async () => {
+    const name = window.prompt('Category name');
+    if (!name?.trim()) return;
+    const color = window.prompt('Category color hex', '#E51636') || '#E51636';
+    try {
+      await teamService.createLinkCategory({ name: name.trim(), color: color.trim() || '#E51636' });
+      await loadData();
+    } catch (err) {
+      console.error('Failed to create quick link category:', err);
+    }
+  };
+
+  const handleAddQuickLink = async () => {
+    const label = window.prompt('Quick link label');
+    if (!label?.trim()) return;
+    const url = window.prompt('Quick link URL', 'https://');
+    if (!url?.trim()) return;
+    const icon = window.prompt('Optional icon/emoji', '🔗') || '🔗';
+    const categoryPrompt = categories.length
+      ? `Category name (${categories.map((c) => c.name).join(', ')})`
+      : 'Category name (optional)';
+    const categoryName = window.prompt(categoryPrompt, categories[0]?.name || '') || '';
+    const category = categories.find((c) => c.name.toLowerCase() === categoryName.trim().toLowerCase());
+    try {
+      await teamService.createQuickLink({
+        label: label.trim(),
+        url: url.trim(),
+        icon: icon.trim(),
+        category: category?.id || null,
+      });
+      await loadData();
+    } catch (err) {
+      console.error('Failed to create quick link:', err);
+    }
+  };
 
   return (
     <div className="tql-page">
@@ -87,12 +143,12 @@ const TeamQuickLinks = ({ user }) => {
             </div>
 
             <div className="tql-hero-actions">
-              <button className="tql-btn tql-btn--ghost" type="button">
+              <button className="tql-btn tql-btn--ghost" type="button" onClick={handleAddCategory}>
                 <IconSettings size={16} />
                 <span className="tql-btn-lg">Manage Categories</span>
                 <span className="tql-btn-sm">Categories</span>
               </button>
-              <button className="tql-btn tql-btn--primary" type="button">
+              <button className="tql-btn tql-btn--primary" type="button" onClick={handleAddQuickLink}>
                 <IconPlus size={16} />
                 <span>Add Quick Link</span>
               </button>
@@ -112,7 +168,7 @@ const TeamQuickLinks = ({ user }) => {
             <p className="tql-empty-sub">
               Add your most-used links here for quick access
             </p>
-            <button className="tql-empty-cta" type="button">
+            <button className="tql-empty-cta" type="button" onClick={handleAddQuickLink}>
               <IconPlus size={16} />
               <span>Add Your First Link</span>
             </button>

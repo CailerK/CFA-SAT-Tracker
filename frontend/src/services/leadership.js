@@ -16,6 +16,19 @@ const leadershipService = {
     });
   },
 
+  async updateTemplate(id, patch) {
+    return apiService.request(`/leadership/360/templates/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  async deleteTemplate(id) {
+    return apiService.request(`/leadership/360/templates/${id}/`, {
+      method: "DELETE",
+    });
+  },
+
   async listEvaluations({ status: statusQ, q } = {}) {
     const params = new URLSearchParams();
     if (statusQ && statusQ !== "all") params.set("status", statusQ);
@@ -50,6 +63,26 @@ const leadershipService = {
 
   async listTracks() {
     return apiService.request("/team-development/tracks/");
+  },
+
+  async createTrack(payload) {
+    return apiService.request("/team-development/tracks/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateTrack(id, patch) {
+    return apiService.request(`/team-development/tracks/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  async deleteTrack(id) {
+    return apiService.request(`/team-development/tracks/${id}/`, {
+      method: "DELETE",
+    });
   },
 
   async listProgress({ scope = "all", position } = {}) {

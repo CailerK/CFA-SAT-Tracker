@@ -36,51 +36,6 @@ const getGreeting = () => {
 };
 const getCurrentDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-// ===== Demo data =====
-// DEMO DATA: hardcoded 30-day waste values to reproduce the chart shape from LD Growth.
-// See FAKE_DATA.md.
-const TREND_POINTS = [
-  { label: 'Mar 23', y: 17 },
-  { label: 'Mar 24', y: 25 },
-  { label: 'Mar 25', y: 51 },
-  { label: 'Mar 26', y: 34 },
-  { label: 'Mar 27', y: 20 },
-  { label: 'Mar 28', y: 8 },
-  { label: 'Mar 29', y: 48 },
-  { label: 'Mar 30', y: 15 },
-  { label: 'Mar 31', y: 50 },
-  { label: 'Apr 1', y: 35 },
-  { label: 'Apr 2', y: 19 },
-  { label: 'Apr 3', y: 51 },
-  { label: 'Apr 4', y: 43 },
-  { label: 'Apr 5', y: 28 },
-  { label: 'Apr 6', y: 13 },
-  { label: 'Apr 7', y: 5 },
-  { label: 'Apr 8', y: 12 },
-  { label: 'Apr 9', y: 22 },
-  { label: 'Apr 10', y: 45 },
-  { label: 'Apr 11', y: 29 },
-  { label: 'Apr 12', y: 12 },
-  { label: 'Apr 13', y: 33 },
-  { label: 'Apr 14', y: 9 },
-  { label: 'Apr 15', y: 58 },
-  { label: 'Apr 16', y: 6 },
-  { label: 'Apr 17', y: 28 },
-  { label: 'Apr 18', y: 62 },
-  { label: 'Apr 19', y: 15 },
-  { label: 'Apr 20', y: 13 },
-  { label: 'Apr 21', y: 7 },
-];
-
-// DEMO DATA: see FAKE_DATA.md.
-const TOP_ITEMS = [
-  { name: 'Nuggets',     items: 18, cost: 120.00, pct: 33, color: '#E51636' },
-  { name: 'Mac & Cheese', items: 27, cost: 59.59,  pct: 16, color: '#27251F' },
-  { name: 'Strips',      items: 33, cost: 49.29,  pct: 14, color: '#FDB022' },
-  { name: 'Filet',       items: 23, cost: 32.64,  pct: 9,  color: '#16A34A' },
-  { name: 'Spicy Filet', items: 25, cost: 31.25,  pct: 9,  color: '#2563EB' },
-];
-
 const SUB_TABS = [
   { id: 'overview', emoji: '📊', label: 'Overview' },
   { id: 'byDay', emoji: '📅', label: 'By Day' },
@@ -254,6 +209,25 @@ const KitchenAnalytics = ({ onNavigate, user }) => {
 
   const trendTotal = useMemo(() => trendPoints.reduce((s, p) => s + (p.y || 0), 0), [trendPoints]);
 
+  const handleEditGoals = async () => {
+    const daily = window.prompt('Daily waste goal', String(goalsData.daily || 0));
+    if (daily == null) return;
+    const weekly = window.prompt('Weekly waste goal', String(goalsData.weekly || 0));
+    if (weekly == null) return;
+    const monthly = window.prompt('Monthly waste goal', String(goalsData.monthly || 0));
+    if (monthly == null) return;
+    try {
+      const updated = await kitchenService.updateGoals({
+        daily: Number(daily),
+        weekly: Number(weekly),
+        monthly: Number(monthly),
+      });
+      setGoalsData(updated);
+    } catch (err) {
+      console.error('Failed to update waste goals:', err);
+    }
+  };
+
   return (
     <div className="sst-page">
       <div className="sst-container kd-container">
@@ -331,7 +305,7 @@ const KitchenAnalytics = ({ onNavigate, user }) => {
               </div>
               <h3 className="ka-goals-title">Waste Reduction Goals</h3>
             </div>
-            <button className="ka-goals-edit" type="button" aria-label="Edit goals">
+            <button className="ka-goals-edit" type="button" aria-label="Edit goals" onClick={handleEditGoals}>
               <IconPenLine className="ka-goals-edit-icon" />
             </button>
           </div>

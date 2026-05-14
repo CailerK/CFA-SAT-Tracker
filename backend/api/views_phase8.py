@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .models import (
@@ -20,6 +21,7 @@ from .models import (
     SurveyAnswer,
     SurveyQuestion,
     SurveyResponse,
+    User,
     Vendor,
 )
 from .permissions import IsManagerOrAbove
@@ -194,6 +196,20 @@ class ChatChannelViewSet(StoreScopedViewSet):
             return [IsManagerOrAbove()]
         return super().get_permissions()
 
+    @action(detail=True, methods=['post'], url_path='mark-read')
+    def mark_read(self, request, pk=None):
+        channel = self.get_object()
+        membership, _ = ChatMembership.objects.get_or_create(
+            channel=channel,
+            user=request.user,
+        )
+        membership.last_read_at = timezone.now()
+        membership.save(update_fields=['last_read_at'])
+        return Response({
+            "status": "ok",
+            "last_read_at": membership.last_read_at,
+        })
+
 
 class ChatMessageViewSet(StoreScopedViewSet):
     """
@@ -212,6 +228,8 @@ class ChatMessageViewSet(StoreScopedViewSet):
         return qs.filter(channel_id__in=user_channels)
 
     def perform_create(self, serializer):
+        channel = serializer.validated_data["channel"]
+        ChatMembership.objects.get_or_create(channel=channel, user=self.request.user)
         serializer.save(author=self.request.user)
 
     @action(detail=False, methods=['get'], url_path='channel/(?P<channel_id>[^/.]+)')
@@ -241,6 +259,9 @@ class SurveyViewSet(StoreScopedViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        status_q = self.request.query_params.get('status')
+        if status_q:
+            qs = qs.filter(status=status_q)
         # Non-managers can only see active surveys.
         if not self.request.user.is_manager_or_above:
             qs = qs.filter(status='active')
@@ -252,7 +273,48 @@ class SurveyViewSet(StoreScopedViewSet):
         return super().get_permissions()
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        survey = serializer.save(created_by=self.request.user)
+        questions = self.request.data.get('questions', [])
+        if questions and not isinstance(questions, list):
+            raise ValidationError({"questions": "Expected a list of question objects."})
+        for index, question in enumerate(questions):
+            text = (question.get('text') or '').strip()
+            kind = question.get('kind') or 'text'
+            if not text or kind not in {'text', 'rating', 'multiple_choice', 'yes_no'}:
+                continue
+            SurveyQuestion.objects.create(
+                survey=survey,
+                text=text,
+                kind=kind,
+                options=question.get('options') or [],
+                order=index,
+                required=bool(question.get('required', False)),
+            )
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        surveys = list(self.get_queryset()[:200])
+        visible = len(surveys)
+        active = sum(1 for survey in surveys if survey.status == 'active')
+        responses = sum(survey.responses.count() for survey in surveys)
+        team_size = max(1, User.objects.filter(
+            store=request.user.store,
+            is_active=True,
+        ).count())
+        avg_rate = 0
+        if surveys:
+            avg_rate = round(
+                sum(
+                    min(100, round((survey.responses.count() / team_size) * 100))
+                    for survey in surveys
+                ) / visible
+            )
+        return Response({
+            "visible": visible,
+            "active": active,
+            "responses": responses,
+            "avg_rate": avg_rate,
+        })
 
     @action(detail=True, methods=['post'], url_path='respond')
     def respond(self, request, pk=None):

@@ -96,6 +96,39 @@ const KitchenCleaning = ({ onNavigate, user }) => {
     }
   };
 
+  const handleViewHistory = async () => {
+    try {
+      const res = await cleaningService.getHistory({ scope: 'kitchen' });
+      const rows = res.completions || [];
+      const preview = rows.slice(0, 10).map((entry) => {
+        const when = entry.completed_at
+          ? new Date(entry.completed_at).toLocaleString('en-US')
+          : entry.date;
+        return `${entry.task_name} (${entry.frequency}) - ${entry.completed_by_name || 'Unknown'} - ${when}`;
+      });
+      window.alert(preview.length ? preview.join('\n') : 'No recent kitchen cleaning history yet.');
+    } catch (err) {
+      console.error('Failed to load kitchen cleaning history:', err);
+    }
+  };
+
+  const handleAddTask = async () => {
+    const name = window.prompt('Task name');
+    if (!name?.trim()) return;
+    const frequency = window.prompt('Frequency (daily, weekly, monthly)', activeFrequency) || activeFrequency;
+    try {
+      await cleaningService.create({
+        scope: 'kitchen',
+        name: name.trim(),
+        frequency: frequency.trim().toLowerCase(),
+        order: tasks.length,
+      });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to create kitchen cleaning task:', err);
+    }
+  };
+
   return (
     <div className="sst-page">
       <div className="sst-container kd-container">
@@ -158,8 +191,8 @@ const KitchenCleaning = ({ onNavigate, user }) => {
             </div>
           </div>
           <div className="kcl-header-actions">
-            <button type="button" className="kcl-btn kcl-btn-outline">History</button>
-            <button type="button" className="kcl-btn kcl-btn-primary">
+            <button type="button" className="kcl-btn kcl-btn-outline" onClick={handleViewHistory}>History</button>
+            <button type="button" className="kcl-btn kcl-btn-primary" onClick={handleAddTask}>
               <IconPlus className="kcl-btn-icon" /> Add Task
             </button>
           </div>

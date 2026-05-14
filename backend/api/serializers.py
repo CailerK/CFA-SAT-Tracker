@@ -5,6 +5,8 @@ Convention: snake_case keys in JSON (Django default). Frontend normalizes
 to camelCase at the App.js boundary (see frontend/src/App.js).
 """
 
+from django.utils import timezone
+from django.utils.text import slugify
 from rest_framework import serializers
 
 from .models import (
@@ -728,6 +730,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "task": sched.task_name,
             "cadence": sched.cadence,
             "date": sched.next_due.strftime("%b %-d") if sched.next_due else None,
+            "next_due": sched.next_due.isoformat() if sched.next_due else None,
             "urgency": sched.urgency,
         }
 
@@ -1041,43 +1044,68 @@ class EvaluationEvaluatorSerializer(serializers.ModelSerializer):
 
 class Evaluation360Serializer(serializers.ModelSerializer):
     evaluatee_name = serializers.SerializerMethodField()
+    evaluatee_role = serializers.CharField(source="evaluatee.role", read_only=True)
     template_name = serializers.CharField(source="template.name", read_only=True)
     evaluators = EvaluationEvaluatorSerializer(many=True, read_only=True)
+    total_evaluators = serializers.SerializerMethodField()
+    completed_evaluators = serializers.SerializerMethodField()
+    is_overdue = serializers.SerializerMethodField()
 
     class Meta:
         model = Evaluation360
-        fields = ["id", "evaluatee", "evaluatee_name", "template", "template_name",
+        fields = ["id", "evaluatee", "evaluatee_name", "evaluatee_role", "template", "template_name",
                   "status", "due_date", "progress_percent",
-                  "evaluators", "created_at", "completed_at"]
-        read_only_fields = ["id", "evaluatee_name", "template_name",
-                            "evaluators", "created_at"]
+                  "evaluators", "total_evaluators", "completed_evaluators", "is_overdue",
+                  "created_at", "completed_at"]
+        read_only_fields = ["id", "evaluatee_name", "evaluatee_role", "template_name",
+                            "evaluators", "total_evaluators", "completed_evaluators",
+                            "is_overdue", "created_at"]
 
     def get_evaluatee_name(self, obj):
         u = obj.evaluatee
         return f"{u.first_name} {u.last_name}".strip() or u.email
 
+    def get_total_evaluators(self, obj):
+        return obj.evaluators.count()
+
+    def get_completed_evaluators(self, obj):
+        return obj.evaluators.filter(completed_at__isnull=False).count()
+
+    def get_is_overdue(self, obj):
+        return bool(obj.due_date and obj.status != "completed" and obj.due_date < timezone.localdate())
+
 
 class PositionTrackSerializer(serializers.ModelSerializer):
+    slug = serializers.SerializerMethodField()
+
     class Meta:
         model = PositionTrack
-        fields = ["id", "name", "description", "order",
+        fields = ["id", "name", "slug", "description", "order",
                   "archived_at", "created_at", "updated_at"]
-        read_only_fields = ["id", "archived_at", "created_at", "updated_at"]
+        read_only_fields = ["id", "slug", "archived_at", "created_at", "updated_at"]
+
+    def get_slug(self, obj):
+        return slugify(obj.name or "")
 
 
 class TrackProgressSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
+    user_initials = serializers.CharField(source="user.initials", read_only=True)
     track_name = serializers.CharField(source="track.name", read_only=True)
+    track_slug = serializers.SerializerMethodField()
 
     class Meta:
         model = TrackProgress
-        fields = ["id", "user", "user_name", "track", "track_name",
+        fields = ["id", "user", "user_name", "user_initials", "track", "track_name", "track_slug",
                   "status", "completed_steps", "current_step", "updated_at"]
-        read_only_fields = ["id", "user_name", "track_name", "updated_at"]
+        read_only_fields = ["id", "user_name", "user_initials", "track_name", "track_slug", "updated_at"]
 
     def get_user_name(self, obj):
         u = obj.user
         return f"{u.first_name} {u.last_name}".strip() or u.email
+
+    def get_track_slug(self, obj):
+        return slugify(obj.track.name or "")
 
 
 class LeadershipAreaSerializer(serializers.ModelSerializer):
@@ -1158,19 +1186,50 @@ class VendorSerializer(serializers.ModelSerializer):
 class ChatChannelSerializer(serializers.ModelSerializer):
     unread_count = serializers.SerializerMethodField()
     member_count = serializers.SerializerMethodField()
+    last_message_preview = serializers.SerializerMethodField()
+    last_message_at = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatChannel
         fields = ["id", "name", "slug", "is_default", "unread_count", "member_count",
+                  "last_message_preview", "last_message_at",
                   "created_at"]
-        read_only_fields = ["id", "unread_count", "member_count", "created_at"]
+        read_only_fields = ["id", "unread_count", "member_count",
+                            "last_message_preview", "last_message_at", "created_at"]
 
     def get_unread_count(self, obj):
-        # Placeholder: would calculate unread messages for current user
-        return 0
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return 0
+        membership = obj.memberships.filter(user=user).first()
+        if not membership:
+            return 0
+        qs = obj.messages.exclude(author=user)
+        if membership.last_read_at:
+            qs = qs.filter(created_at__gt=membership.last_read_at)
+        return qs.count()
 
     def get_member_count(self, obj):
         return obj.memberships.count()
+
+    def _last_message(self, obj):
+        cached = getattr(obj, "_last_message_cache", None)
+        if cached is not None:
+            return cached
+        obj._last_message_cache = obj.messages.order_by("-created_at").first()
+        return obj._last_message_cache
+
+    def get_last_message_preview(self, obj):
+        last = self._last_message(obj)
+        if not last or not last.body:
+            return ""
+        body = " ".join(last.body.split())
+        return f"{body[:77]}..." if len(body) > 80 else body
+
+    def get_last_message_at(self, obj):
+        last = self._last_message(obj)
+        return last.created_at if last else None
 
 
 class ChatMembershipSerializer(serializers.ModelSerializer):

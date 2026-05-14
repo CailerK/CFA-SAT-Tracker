@@ -153,7 +153,9 @@ const QuickActions = ({ onPageChange, onCustomize, customActions }) => {
       ),
       iconBg: 'yellow',
       tags: ['Team Member', 'Trainer'],
-      page: 'dashboard'
+      // Sentinel route — Dashboard.js intercepts this and shows a
+      // "not implemented yet" alert instead of navigating.
+      page: '__not_implemented__:CFAdollars'
     },
     {
       id: 'safe-counting',
@@ -167,7 +169,7 @@ const QuickActions = ({ onPageChange, onCustomize, customActions }) => {
       ),
       iconBg: 'teal',
       tags: ['Leader', 'Director'],
-      page: 'dashboard'
+      page: '__not_implemented__:Safe Counting'
     },
     {
       id: 'team-chat',

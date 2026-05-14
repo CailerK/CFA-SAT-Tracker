@@ -29,7 +29,7 @@ const guestRecoveryService = {
   async assign(id, userId) {
     return apiService.request(`/guest-complaints/${id}/assign/`, {
       method: "POST",
-      body: JSON.stringify({ user_id: userId }),
+      body: JSON.stringify({ assigned_to: userId }),
     });
   },
 

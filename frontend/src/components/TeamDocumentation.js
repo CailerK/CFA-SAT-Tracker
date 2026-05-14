@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import teamService from '../services/team';
 import './SetupSheetTemplates.css'; // shared red hero banner
 import './TeamDocumentation.css';
@@ -17,56 +17,6 @@ const getGreeting = () => {
 };
 const getCurrentDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-// ===== DEMO DATA (see FAKE_DATA.md) =====
-// riskLevel drives the card's left border + avatar gradient:
-//   'high'     → red border-l + red avatar (3+ Disc / active PIP)
-//   'mid'      → amber border-l + amber→orange avatar (has Admin-only or Verbal)
-//   'standard' → no left border, CFA-red avatar
-const EMPLOYEES = [
-  { id: 1,  name: 'Emily Harrison',   initials: 'EH', role: 'Team Member', riskLevel: 'mid',
-    counts: { disc: 0, pip: 0, admin: 1 },
-    latest: { title: 'Doctor Note',    date: 'Apr 19', status: 'Documented', kind: 'admin',
-              text: 'Emily has been released and has no restrictions at work.' } },
-  { id: 2,  name: 'Colton Holder',    initials: 'CH', role: 'Team Member', riskLevel: 'mid',
-    counts: { disc: 2, pip: 0, admin: 3 },
-    latest: { title: 'Call Out',       date: 'Apr 16', status: 'Documented', kind: 'admin',
-              text: 'Colton says he has Covid told him he needs to send me his doctors note.' } },
-  { id: 3,  name: 'Hayden Green',     initials: 'HG', role: 'Team Member', riskLevel: 'standard',
-    counts: { disc: 1, pip: 0, admin: 0 },
-    latest: { title: 'Written Warning',date: 'Apr 15', status: 'Pending',    kind: 'warning',
-              text: 'Hayden was late for 5:45 on Wednesday 04/15, and I told her to try to be on time the next day. She was 10 minutes late on Thursday 04/16.' } },
-  { id: 4,  name: 'Miguel Hernandez', initials: 'MH', role: 'Team Member', riskLevel: 'mid',
-    counts: { disc: 2, pip: 0, admin: 0 },
-    latest: { title: 'Verbal Warning', date: 'Apr 14', status: 'Pending',    kind: 'warning',
-              text: 'On 4/14 Miguel left without finishing cleaning lemonades. He said he had to leave at 9:00pm, then sat in the back on his phone until 9:30.' } },
-  { id: 5,  name: 'Carlee Banks',     initials: 'CB', role: 'Team Member', riskLevel: 'standard',
-    counts: { disc: 0, pip: 0, admin: 2 },
-    latest: { title: 'Other',          date: 'Apr 7',  status: 'Documented', kind: 'admin',
-              text: '2 weeks notice.' } },
-  { id: 6,  name: 'Robby Hall',       initials: 'RH', role: 'Leader',       riskLevel: 'standard',
-    counts: { disc: 0, pip: 0, admin: 3 },
-    latest: { title: 'Call Out',       date: 'Apr 7',  status: 'Documented', kind: 'admin',
-              text: 'Left work because he was sick; I am waiting on a doctors note.' } },
-  { id: 7,  name: 'Addisyn Thomas',   initials: 'AT', role: 'Team Member', riskLevel: 'high',
-    counts: { disc: 3, pip: 1, admin: 0 },
-    latest: { title: 'Final Warning',  date: 'Apr 3',  status: 'Pending',    kind: 'warning',
-              text: 'Addison was recently observed calling Stacy rude names under her breath, and a team member overheard these comments.' } },
-  { id: 8,  name: 'Destinee Moore',   initials: 'DM', role: 'Team Member', riskLevel: 'mid',
-    counts: { disc: 5, pip: 0, admin: 3 },
-    latest: { title: 'Written Warning',date: 'Apr 3',  status: 'Pending',    kind: 'warning',
-              text: 'Called out again on Saturday.' } },
-  { id: 9,  name: 'Caitlyn Trammell', initials: 'CT', role: 'Leader',       riskLevel: 'standard',
-    counts: { disc: 1, pip: 0, admin: 0 },
-    latest: { title: 'Verbal Warning', date: 'Apr 3',  status: 'Pending',    kind: 'warning',
-              text: 'Called out.' } },
-  { id: 10, name: 'Landon Jarvis',    initials: 'LJ', role: 'Team Member', riskLevel: 'standard',
-    counts: { disc: 0, pip: 0, admin: 1 },
-    latest: { title: 'Doctor Note',    date: 'Apr 1',  status: 'Documented', kind: 'admin',
-              text: 'Letter explaining bathroom breaks.' } },
-];
-
-const STATS = { total: 52, disciplinary: 21, admin: 30, employeesWithDocs: 31 };
-
 const FILTERS = [
   { id: 'all',          label: 'All' },
   { id: 'disciplinary', label: 'Disciplinary' },
@@ -79,7 +29,6 @@ const TeamDocumentation = ({ onNavigate, user }) => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [employees, setEmployees] = useState([]);
   const [stats, setStats] = useState({ total: 0, disciplinary: 0, admin: 0, employeesWithDocs: 0 });
-  const [isLoading, setIsLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
@@ -98,8 +47,6 @@ const TeamDocumentation = ({ onNavigate, user }) => {
       });
     } catch (err) {
       console.error('Failed to load team documentation:', err);
-    } finally {
-      setIsLoading(false);
     }
   }, [activeFilter, searchQuery]);
 
@@ -109,6 +56,19 @@ const TeamDocumentation = ({ onNavigate, user }) => {
   const filtered = employees;
   // Provide an alias so the existing STATS references below still work.
   const STATS = stats;
+
+  const handleDeleteLatest = async (employee) => {
+    const latestId = employee?.latest?.id;
+    if (!latestId) return;
+    const confirmed = window.confirm(`Delete the latest documentation record for ${employee.name}?`);
+    if (!confirmed) return;
+    try {
+      await teamService.deleteRecord(latestId);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to delete documentation record:', err);
+    }
+  };
 
   return (
     <div className="sst-page">
@@ -237,6 +197,7 @@ const TeamDocumentation = ({ onNavigate, user }) => {
                   className="td-delete-btn"
                   title="Delete latest documentation record"
                   aria-label={`Delete latest documentation for ${e.name}`}
+                  onClick={() => handleDeleteLatest(e)}
                 >
                   <IconTrash className="td-delete-icon" />
                 </button>

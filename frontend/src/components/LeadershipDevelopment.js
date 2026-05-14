@@ -162,8 +162,42 @@ const LeadershipDevelopment = ({ user, onNavigate }) => {
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
           </svg>
-          <input type="text" placeholder="Jot a quick note..." />
+          <input
+            type="text"
+            placeholder="Jot a quick note..."
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                saveNote();
+              }
+            }}
+          />
+          <button type="button" className="btn-see-all" onClick={saveNote}>
+            Save
+          </button>
         </div>
+        {notes.length > 0 && (
+          <div style={{ marginTop: 16, display: 'grid', gap: 10 }}>
+            {notes.slice(0, 5).map((note) => (
+              <div
+                key={note.id}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  background: '#fff',
+                  border: '1px solid #f1f5f9',
+                  color: '#334155',
+                  fontSize: 14,
+                  lineHeight: 1.5,
+                }}
+              >
+                {note.text}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

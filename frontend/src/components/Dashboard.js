@@ -64,7 +64,17 @@ const Dashboard = ({ user, onLogout }) => {
 
   // Wrap setCurrentPage so it also updates the URL hash. This way a refresh
   // lands on the same page instead of bouncing back to the dashboard.
+  //
+  // Sentinel: if the page string starts with '__not_implemented__:', show
+  // a quick alert instead of routing. The portion after the colon is the
+  // feature name used in the message.
   const setCurrentPage = useCallback((page) => {
+    if (typeof page === 'string' && page.startsWith('__not_implemented__')) {
+      const featureName = page.split(':')[1] || 'This feature';
+      // eslint-disable-next-line no-alert
+      alert(`${featureName} isn't implemented yet — coming soon.`);
+      return;
+    }
     setCurrentPageRaw(page);
     const targetHash = page === 'dashboard' ? '' : `#/${page}`;
     if (window.location.hash !== targetHash) {
@@ -413,7 +423,7 @@ const Dashboard = ({ user, onLogout }) => {
         ) : currentPage === 'team-evaluations' ? (
           <TeamEvaluations 
             user={user}
-            onBack={() => setCurrentPage('dashboard')}
+            onNavigate={(page) => setCurrentPage(page)}
           />
         ) : currentPage === 'team-surveys' ? (
           <TeamSurveys 

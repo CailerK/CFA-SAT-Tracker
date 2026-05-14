@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './SetupSheetTemplates.css';
 import setupSheetsService from '../services/setupSheets';
 
@@ -93,31 +93,27 @@ const getCurrentDate = () => {
 const SetupSheetTemplates = ({ onBack, onNavigate }) => {
   const [activeTab, setActiveTab] = useState('templates');
   const [templates, setTemplates] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await setupSheetsService.listTemplates();
+      const rows = res.results || res || [];
+      setTemplates(rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        description: r.description || '',
+        updatedAt: formatDate(r.updated_at),
+        timeBlocks: r.time_blocks_count || 0,
+      })));
+    } catch (err) {
+      console.error('Failed to load setup templates:', err);
+    }
+  }, []);
 
   // Load templates from the backend on mount.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await setupSheetsService.listTemplates();
-        const rows = res.results || res || [];
-        if (!cancelled) {
-          setTemplates(rows.map((r) => ({
-            id: r.id,
-            name: r.name,
-            updatedAt: formatDate(r.updated_at),
-            timeBlocks: r.time_blocks_count || 0,
-          })));
-        }
-      } catch (err) {
-        console.error('Failed to load setup templates:', err);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    refresh();
+  }, [refresh]);
 
   const tabs = [
     { id: 'templates', label: 'Templates', Icon: IconLayoutDashboard },
@@ -127,12 +123,42 @@ const SetupSheetTemplates = ({ onBack, onNavigate }) => {
     { id: 'history', label: 'History', Icon: IconHistory },
   ];
 
-  const handleCreateTemplate = () => {
-    if (onNavigate) onNavigate('setup-sheet-builder');
+  const handleCreateTemplate = async () => {
+    const name = window.prompt('Template name');
+    if (!name?.trim()) return;
+    const description = window.prompt('Template description', '') || '';
+    try {
+      await setupSheetsService.createTemplate({ name: name.trim(), description });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to create setup template:', err);
+    }
   };
 
-  const handleEditTemplate = (template) => {
-    if (onNavigate) onNavigate('edit-template', template);
+  const handleEditTemplate = async (template) => {
+    const name = window.prompt('Rename template', template.name);
+    if (!name?.trim()) return;
+    const description = window.prompt('Description', template.description || '') || '';
+    try {
+      await setupSheetsService.updateTemplate(template.id, {
+        name: name.trim(),
+        description,
+      });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to update setup template:', err);
+    }
+  };
+
+  const handleDeleteTemplate = async (template) => {
+    const confirmed = window.confirm(`Delete template "${template.name}"?`);
+    if (!confirmed) return;
+    try {
+      await setupSheetsService.deleteTemplate(template.id);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to delete setup template:', err);
+    }
   };
 
   const handleTabClick = (tabId) => {
@@ -220,7 +246,10 @@ const SetupSheetTemplates = ({ onBack, onNavigate }) => {
                   <button
                     className="sst-card-menu"
                     type="button"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteTemplate(template);
+                    }}
                     aria-label="Template options"
                   >
                     <IconMoreVertical className="sst-card-menu-icon" />

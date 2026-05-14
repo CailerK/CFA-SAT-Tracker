@@ -31,45 +31,6 @@ const normalizeVendor = (raw) => ({
 
 const CATEGORIES = ['All', 'Food & Beverage', 'Supplies', 'Equipment', 'Cleaning', 'Uniforms', 'Marketing', 'Other'];
 
-const SAMPLE_VENDORS = [
-  {
-    id: 1, name: 'McLane Company', category: 'Food & Beverage',
-    contact: 'David Torres', phone: '(210) 555-0142', email: 'dtorres@mclane.com',
-    website: 'mclane.com', accountNumber: 'MC-48821', notes: 'Primary food distributor. Deliveries Tuesday & Friday.',
-    tags: ['Primary', 'Weekly Delivery']
-  },
-  {
-    id: 2, name: 'Ecolab', category: 'Cleaning',
-    contact: 'Sandra Kim', phone: '(210) 555-0387', email: 'skim@ecolab.com',
-    website: 'ecolab.com', accountNumber: 'ECO-7723', notes: 'Sanitizer and cleaning chemical supplier.',
-    tags: ['Auto-Ship']
-  },
-  {
-    id: 3, name: 'Cintas', category: 'Uniforms',
-    contact: 'Mike Patel', phone: '(210) 555-0561', email: 'mpatel@cintas.com',
-    website: 'cintas.com', accountNumber: 'CIN-3310', notes: 'Uniform supplier and laundry service. Monthly billing.',
-    tags: ['Monthly Billing']
-  },
-  {
-    id: 4, name: 'Hobart Service', category: 'Equipment',
-    contact: 'Rachel Moore', phone: '(210) 555-0299', email: 'rmoore@hobartservice.com',
-    website: 'hobartservice.com', accountNumber: 'HB-9912', notes: 'Equipment maintenance and repair.',
-    tags: ['On-Call']
-  },
-  {
-    id: 5, name: 'Sysco Corporation', category: 'Food & Beverage',
-    contact: 'James Fletcher', phone: '(210) 555-0478', email: 'jfletcher@sysco.com',
-    website: 'sysco.com', accountNumber: 'SYS-22104', notes: 'Secondary food supplier for specialty items.',
-    tags: ['Backup Supplier']
-  },
-  {
-    id: 6, name: 'Veritiv', category: 'Supplies',
-    contact: 'Anna Brooks', phone: '(210) 555-0631', email: 'abrooks@veritiv.com',
-    website: 'veritiv.com', accountNumber: 'VRT-5544', notes: 'Packaging, bags, and paper goods.',
-    tags: ['Monthly Order']
-  },
-];
-
 const CATEGORY_COLORS = {
   'Food & Beverage': { bg: '#d1fae5', text: '#065f46' },
   'Supplies':        { bg: '#dbeafe', text: '#1e40af' },
@@ -89,6 +50,8 @@ const Vendors = ({ onBack }) => {
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [form, setForm]                     = useState(initForm);
   const [vendors, setVendors] = useState([]);
+  const [detailForm, setDetailForm] = useState(initForm);
+  const [isSaving, setIsSaving] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -105,6 +68,23 @@ const Vendors = ({ onBack }) => {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  useEffect(() => {
+    if (!selectedVendor) {
+      setDetailForm(initForm);
+      return;
+    }
+    setDetailForm({
+      name: selectedVendor.name || '',
+      category: selectedVendor.category || '',
+      contact: selectedVendor.contact || '',
+      phone: selectedVendor.phone || '',
+      email: selectedVendor.email || '',
+      website: selectedVendor.website || '',
+      accountNumber: selectedVendor.accountNumber || '',
+      notes: selectedVendor.notes || '',
+    });
+  }, [selectedVendor]);
+
   // Backend already filters.
   const filtered = vendors;
 
@@ -115,6 +95,7 @@ const Vendors = ({ onBack }) => {
   const handleSubmitVendor = async () => {
     if (!form.name.trim() || !form.category) return;
     try {
+      setIsSaving(true);
       await vendorsService.create({
         name: form.name.trim(),
         category: CATEGORY_TO_API[form.category] || 'other',
@@ -128,9 +109,50 @@ const Vendors = ({ onBack }) => {
       });
       setForm(initForm);
       setShowAddModal(false);
-      refresh();
+      await refresh();
     } catch (err) {
       console.error('Create vendor failed:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveVendor = async () => {
+    if (!selectedVendor || !detailForm.name.trim() || !detailForm.category) return;
+    try {
+      setIsSaving(true);
+      await vendorsService.update(selectedVendor.id, {
+        name: detailForm.name.trim(),
+        category: CATEGORY_TO_API[detailForm.category] || 'other',
+        contact_name: detailForm.contact || '',
+        phone: detailForm.phone || '',
+        email: detailForm.email || '',
+        website: detailForm.website || '',
+        account_number: detailForm.accountNumber || '',
+        notes: detailForm.notes || '',
+      });
+      setSelectedVendor(null);
+      await refresh();
+    } catch (err) {
+      console.error('Update vendor failed:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteVendor = async () => {
+    if (!selectedVendor) return;
+    const confirmed = window.confirm(`Delete ${selectedVendor.name}?`);
+    if (!confirmed) return;
+    try {
+      setIsSaving(true);
+      await vendorsService.remove(selectedVendor.id);
+      setSelectedVendor(null);
+      await refresh();
+    } catch (err) {
+      console.error('Delete vendor failed:', err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -170,7 +192,7 @@ const Vendors = ({ onBack }) => {
         {/* ── Stats ── */}
         <div className="vnd-stats-row">
           <div className="vnd-stat">
-            <div className="vnd-stat-num">{SAMPLE_VENDORS.length}</div>
+            <div className="vnd-stat-num">{countFor('All')}</div>
             <div className="vnd-stat-lbl">Total Vendors</div>
           </div>
           {['Food & Beverage', 'Equipment', 'Supplies', 'Cleaning'].map(cat => (
@@ -322,7 +344,9 @@ const Vendors = ({ onBack }) => {
             </div>
             <div className="vnd-modal-footer">
               <button className="vnd-btn-cancel" onClick={() => { setShowAddModal(false); setForm(initForm); }}>Cancel</button>
-              <button className="vnd-btn-submit" onClick={() => { setShowAddModal(false); setForm(initForm); }}>Add Vendor</button>
+              <button className="vnd-btn-submit" onClick={handleSubmitVendor} disabled={isSaving}>
+                {isSaving ? 'Saving...' : 'Add Vendor'}
+              </button>
             </div>
           </div>
         </div>
@@ -351,25 +375,41 @@ const Vendors = ({ onBack }) => {
             </div>
             <div className="vnd-modal-body">
               <div className="vnd-detail-grid">
-                {[
-                  { label: 'Contact', value: selectedVendor.contact },
-                  { label: 'Phone',   value: selectedVendor.phone },
-                  { label: 'Email',   value: selectedVendor.email },
-                  { label: 'Website', value: selectedVendor.website },
-                  { label: 'Account #', value: selectedVendor.accountNumber },
-                ].filter(r => r.value).map(row => (
-                  <div key={row.label} className="vnd-detail-row-modal">
-                    <span className="vnd-detail-label">{row.label}</span>
-                    <span className="vnd-detail-value">{row.value}</span>
-                  </div>
-                ))}
-              </div>
-              {selectedVendor.notes && (
-                <div className="vnd-form-group" style={{ marginTop: 16 }}>
-                  <label>Notes</label>
-                  <p className="vnd-detail-notes">{selectedVendor.notes}</p>
+                <div className="vnd-form-group">
+                  <label>Vendor Name</label>
+                  <input className="vnd-input" value={detailForm.name} onChange={(e) => setDetailForm({ ...detailForm, name: e.target.value })} />
                 </div>
-              )}
+                <div className="vnd-form-group">
+                  <label>Category</label>
+                  <select className="vnd-input" value={detailForm.category} onChange={(e) => setDetailForm({ ...detailForm, category: e.target.value })}>
+                    {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="vnd-form-group">
+                  <label>Contact</label>
+                  <input className="vnd-input" value={detailForm.contact} onChange={(e) => setDetailForm({ ...detailForm, contact: e.target.value })} />
+                </div>
+                <div className="vnd-form-group">
+                  <label>Phone</label>
+                  <input className="vnd-input" value={detailForm.phone} onChange={(e) => setDetailForm({ ...detailForm, phone: e.target.value })} />
+                </div>
+                <div className="vnd-form-group">
+                  <label>Email</label>
+                  <input className="vnd-input" value={detailForm.email} onChange={(e) => setDetailForm({ ...detailForm, email: e.target.value })} />
+                </div>
+                <div className="vnd-form-group">
+                  <label>Website</label>
+                  <input className="vnd-input" value={detailForm.website} onChange={(e) => setDetailForm({ ...detailForm, website: e.target.value })} />
+                </div>
+                <div className="vnd-form-group">
+                  <label>Account #</label>
+                  <input className="vnd-input" value={detailForm.accountNumber} onChange={(e) => setDetailForm({ ...detailForm, accountNumber: e.target.value })} />
+                </div>
+              </div>
+              <div className="vnd-form-group" style={{ marginTop: 16 }}>
+                <label>Notes</label>
+                <textarea className="vnd-textarea" rows={3} value={detailForm.notes} onChange={(e) => setDetailForm({ ...detailForm, notes: e.target.value })} />
+              </div>
               {selectedVendor.tags?.length > 0 && (
                 <div className="vnd-tags" style={{ marginTop: 12 }}>
                   {selectedVendor.tags.map(tag => <span key={tag} className="vnd-tag">{tag}</span>)}
@@ -377,8 +417,10 @@ const Vendors = ({ onBack }) => {
               )}
             </div>
             <div className="vnd-modal-footer">
-              <button className="vnd-btn-cancel" onClick={() => setSelectedVendor(null)}>Close</button>
-              <button className="vnd-btn-submit">Edit Vendor</button>
+              <button className="vnd-btn-cancel" onClick={handleDeleteVendor}>Delete Vendor</button>
+              <button className="vnd-btn-submit" onClick={handleSaveVendor} disabled={isSaving}>
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
             </div>
           </div>
         </div>

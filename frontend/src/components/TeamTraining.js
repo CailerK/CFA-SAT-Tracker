@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import teamService from '../services/team';
 import './TeamTraining.css';
 
@@ -32,7 +32,6 @@ const Icon = ({ d, size = 18, stroke = 2, children, viewBox = '0 0 24 24' }) => 
   </svg>
 );
 
-const IconBookOpen = (p) => (<Icon {...p}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></Icon>);
 const IconClipboardList = (p) => (<Icon {...p}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></Icon>);
 const IconUsers = (p) => (<Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>);
 const IconFileCheck = (p) => (<Icon {...p}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m9 15 2 2 4-4"/></Icon>);
@@ -41,7 +40,6 @@ const IconTrendUp = (p) => (<Icon {...p}><polyline points="22 7 13.5 15.5 8.5 10
 const IconSearchPlus = (p) => (<Icon {...p}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/></Icon>);
 const IconChartBar = (p) => (<Icon {...p}><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></Icon>);
 const IconClock = (p) => (<Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>);
-const IconSearch = (p) => (<Icon {...p}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></Icon>);
 const IconPlus = (p) => (<Icon {...p}><path d="M5 12h14"/><path d="M12 5v14"/></Icon>);
 const IconClipboardCheck = (p) => (<Icon {...p}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></Icon>);
 const IconTrash2 = (p) => (<Icon {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></Icon>);
@@ -57,30 +55,7 @@ const TABS = [
   { id: 'community', label: 'Community', short: 'Community', Icon: IconGlobe },
 ];
 
-const DEPARTMENTS = [
-  { name: 'Front of House', progress: 81, color: 'rgb(229, 22, 54)' },
-  { name: 'Drive Thru', progress: 100, color: 'rgb(0, 79, 113)' },
-  { name: 'Kitchen', progress: 16, color: 'rgb(217, 119, 6)' },
-  { name: 'Management', progress: 90, color: 'rgb(5, 150, 105)' },
-];
-
-const TRAINEES = [
-  { id: 1,  name: 'Benji McDonald',    initials: 'BM', role: 'Team Member', dept: 'Front Counter', plan: 'Foundations FOH', progress: 0,   status: 'In Progress' },
-  { id: 2,  name: 'Joshua Ortiz',      initials: 'JO', role: 'Team Member', dept: 'Front Counter', plan: 'Foundations FOH', progress: 44,  status: 'In Progress' },
-  { id: 3,  name: 'Samara Robles',     initials: 'SR', role: 'Team Member', dept: 'Kitchen',       plan: 'Foundations BOH', progress: 16,  status: 'In Progress' },
-  { id: 4,  name: 'Carter Witte',      initials: 'CW', role: 'Team Member', dept: 'Drive Thru',    plan: 'Foundations FOH', progress: 72,  status: 'In Progress' },
-  { id: 5,  name: 'Peyton Barbier',    initials: 'PB', role: 'Team Member', dept: 'Front Counter', plan: 'Foundations FOH', progress: 55,  status: 'In Progress' },
-  { id: 6,  name: 'Kevin Santos',      initials: 'KS', role: 'Team Member', dept: 'Kitchen',       plan: 'Foundations BOH', progress: 28,  status: 'In Progress' },
-  { id: 7,  name: 'Madison Ensley',    initials: 'ME', role: 'Team Member', dept: 'Drive Thru',    plan: 'Foundations FOH', progress: 90,  status: 'In Progress' },
-  { id: 8,  name: 'Carson Duncan',     initials: 'CD', role: 'Team Member', dept: 'Front Counter', plan: 'Foundations FOH', progress: 12,  status: 'In Progress' },
-  { id: 9,  name: 'Chase Gribble',     initials: 'CG', role: 'Team Member', dept: 'Kitchen',       plan: 'Foundations BOH', progress: 39,  status: 'In Progress' },
-  { id: 10, name: 'Emma Liberatore',   initials: 'EL', role: 'Team Member', dept: 'Front Counter', plan: 'Foundations FOH', progress: 65,  status: 'In Progress' },
-];
-
-const TOTAL_TRAINEES = 25;
-const PAGE_SIZE = 10;
-
-const TeamTraining = ({ user, onBack }) => {
+const TeamTraining = ({ user }) => {
   const [activeTab, setActiveTab] = useState('progress');
   const [deptView, setDeptView] = useState('department');
   const [statusTab, setStatusTab] = useState('active');
@@ -92,6 +67,8 @@ const TeamTraining = ({ user, onBack }) => {
   });
   const [departments, setDepartments] = useState([]);
   const [totalTrainees, setTotalTrainees] = useState(0);
+  const [plans, setPlans] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
 
   const refresh = useCallback(async () => {
     try {
@@ -117,6 +94,24 @@ const TeamTraining = ({ user, onBack }) => {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [plansRes, membersRes] = await Promise.all([
+          teamService.listPlans(),
+          teamService.listMembers({ status: 'active' }),
+        ]);
+        if (cancelled) return;
+        setPlans(plansRes.results || plansRes || []);
+        setTeamMembers(membersRes.results || membersRes || []);
+      } catch (err) {
+        console.error('Failed to load training reference data:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // The backend already filters; expose the local list under the original name.
   const filtered = trainees;
 
@@ -126,6 +121,43 @@ const TeamTraining = ({ user, onBack }) => {
   const pageEnd = Math.min(page * PAGE_SIZE_LOCAL, totalTrainees);
 
   const displayName = user?.firstName || user?.name || 'Demo User';
+
+  const handleAssignTraining = async () => {
+    if (!teamMembers.length || !plans.length) return;
+    const memberInput = window.prompt(
+      `Assign training to which team member?\n${teamMembers.map((m) => m.name || m.email).join('\n')}`
+    );
+    if (!memberInput?.trim()) return;
+    const planInput = window.prompt(
+      `Assign which training plan?\n${plans.map((p) => p.name).join('\n')}`
+    );
+    if (!planInput?.trim()) return;
+
+    const member = teamMembers.find((m) =>
+      (m.name || '').toLowerCase() === memberInput.trim().toLowerCase()
+      || (m.email || '').toLowerCase() === memberInput.trim().toLowerCase()
+    );
+    const plan = plans.find((p) => p.name.toLowerCase() === planInput.trim().toLowerCase());
+    if (!member || !plan) return;
+
+    try {
+      await teamService.assignTraining({ user: member.id, plan: plan.id });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to assign training:', err);
+    }
+  };
+
+  const handleDeleteTrainee = async (trainee) => {
+    const confirmed = window.confirm(`Remove ${trainee.name} from this training plan?`);
+    if (!confirmed) return;
+    try {
+      await teamService.deleteTrainee(trainee.id);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to delete trainee assignment:', err);
+    }
+  };
 
   return (
     <div className="tt-page">
@@ -276,7 +308,7 @@ const TeamTraining = ({ user, onBack }) => {
                 onClick={() => setStatusTab('completed')}
               >Completed</button>
             </div>
-            <button className="tt-btn-assign" type="button">
+            <button className="tt-btn-assign" type="button" onClick={handleAssignTraining}>
               <IconPlus size={16} />
               <span>Assign Training</span>
             </button>
@@ -289,7 +321,7 @@ const TeamTraining = ({ user, onBack }) => {
         <div className="tt-list-head">
           <div>
             <h3 className="tt-list-title">Team Progress</h3>
-            <p className="tt-list-sub">{TOTAL_TRAINEES} active trainees</p>
+            <p className="tt-list-sub">{totalTrainees} active trainees</p>
           </div>
           <span className="tt-list-head-icon"><IconUsers size={20} /></span>
         </div>
@@ -304,13 +336,16 @@ const TeamTraining = ({ user, onBack }) => {
                     <div className="tt-trainee-meta">
                       <span className="tt-badge tt-badge--progress">
                         <IconClockSm size={12} />
-                        In Progress
+                        {t.status}
                       </span>
                       <button
                         type="button"
                         className="tt-icon-btn"
                         aria-label={`Delete training progress for ${t.name}`}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTrainee(t);
+                        }}
                       >
                         <IconTrash2 size={14} />
                       </button>
@@ -343,7 +378,7 @@ const TeamTraining = ({ user, onBack }) => {
       {/* Pagination */}
       <section className="tt-paginator">
         <p className="tt-paginator-count">
-          Showing {pageStart} to {pageEnd} of {TOTAL_TRAINEES}
+          Showing {pageStart} to {pageEnd} of {totalTrainees}
         </p>
         <div className="tt-paginator-ctrls">
           <button

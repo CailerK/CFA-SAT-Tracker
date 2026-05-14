@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import './SetupSheetTemplates.css'; // reuse banner + tab styles
 import './SavedSetups.css';
 import setupSheetsService from '../services/setupSheets';
+import teamService from '../services/team';
 
 // "2026-05-13T17:30Z" → "Updated 12 minutes ago" — quick relative-time helper.
 const relativeTime = (iso) => {
@@ -141,32 +142,57 @@ const SavedSetups = ({ onNavigate, user }) => {
   const [activeTab] = useState('saved');
   const [searchQuery, setSearchQuery] = useState('');
   const [savedSetups, setSavedSetups] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [teamMembers, setTeamMembers] = useState([]);
+
+  const refresh = async () => {
+    try {
+      const res = await setupSheetsService.listSheets();
+      const rows = res.results || res || [];
+      setSavedSetups(rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        weekRange: r.week_range || '',
+        isShared: Boolean(r.is_shared),
+        owner: r.owner_name || '',
+        employees: r.employees_count || 0,
+        areas: r.areas_count || 0,
+        hours: Number(r.hours || 0),
+        updatedAt: relativeTime(r.updated_at),
+      })));
+    } catch (err) {
+      console.error('Failed to load saved setups:', err);
+    }
+  };
 
   // Load from backend on mount.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await setupSheetsService.listSheets();
-        const rows = res.results || res || [];
-        if (!cancelled) {
-          setSavedSetups(rows.map((r) => ({
-            id: r.id,
-            name: r.name,
-            weekRange: r.week_range || '',
-            isShared: Boolean(r.is_shared),
-            owner: r.owner_name || '',
-            employees: r.employees_count || 0,
-            areas: r.areas_count || 0,
-            hours: Number(r.hours || 0),
-            updatedAt: relativeTime(r.updated_at),
-          })));
-        }
+        const [sheetsRes, membersRes] = await Promise.all([
+          setupSheetsService.listSheets(),
+          teamService.listMembers({ status: 'active' }),
+        ]);
+        if (cancelled) return;
+        const rows = sheetsRes.results || sheetsRes || [];
+        setSavedSetups(rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          weekRange: r.week_range || '',
+          isShared: Boolean(r.is_shared),
+          owner: r.owner_name || '',
+          employees: r.employees_count || 0,
+          areas: r.areas_count || 0,
+          hours: Number(r.hours || 0),
+          updatedAt: relativeTime(r.updated_at),
+        })));
+        const memberRows = membersRes.results || membersRes || [];
+        setTeamMembers(memberRows.map((member) => ({
+          id: member.id,
+          name: member.name || member.email,
+        })));
       } catch (err) {
-        console.error('Failed to load saved setups:', err);
-      } finally {
-        if (!cancelled) setIsLoading(false);
+        console.error('Failed to load saved setup reference data:', err);
       }
     })();
     return () => { cancelled = true; };
@@ -192,6 +218,54 @@ const SavedSetups = ({ onNavigate, user }) => {
     if (!q) return savedSetups;
     return savedSetups.filter((s) => s.name.toLowerCase().includes(q));
   }, [savedSetups, searchQuery]);
+
+  const handleDuplicateSetup = async (setup) => {
+    try {
+      await setupSheetsService.duplicateSheet(setup.id);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to duplicate setup sheet:', err);
+    }
+  };
+
+  const handleDeleteSetup = async (setup) => {
+    const confirmed = window.confirm(`Delete "${setup.name}"?`);
+    if (!confirmed) return;
+    try {
+      await setupSheetsService.deleteSheet(setup.id);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to delete setup sheet:', err);
+    }
+  };
+
+  const handleShareSetup = async (setup) => {
+    if (!teamMembers.length) return;
+    const person = window.prompt(`Share "${setup.name}" with which team member?\n${teamMembers.map((member) => member.name).join('\n')}`);
+    if (!person?.trim()) return;
+    const member = teamMembers.find((item) => item.name.toLowerCase() === person.trim().toLowerCase());
+    if (!member) return;
+    try {
+      await setupSheetsService.shareSheet(setup.id, { user_id: member.id, permission: 'view' });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to share setup sheet:', err);
+    }
+  };
+
+  const handleCardAction = async (setup) => {
+    const action = window.prompt('Type duplicate, share, or delete', 'duplicate');
+    if (!action) return;
+    if (action.toLowerCase() === 'share') {
+      await handleShareSetup(setup);
+      return;
+    }
+    if (action.toLowerCase() === 'delete') {
+      await handleDeleteSetup(setup);
+      return;
+    }
+    await handleDuplicateSetup(setup);
+  };
 
   return (
     <div className="sst-page">
@@ -273,7 +347,7 @@ const SavedSetups = ({ onNavigate, user }) => {
               className="ss-card"
               role="button"
               tabIndex={0}
-              onClick={() => onNavigate && onNavigate('setup-detail', setup)}
+              onClick={() => handleDuplicateSetup(setup)}
             >
               {/* Red gradient header */}
               <div className="ss-card-header">
@@ -298,7 +372,10 @@ const SavedSetups = ({ onNavigate, user }) => {
                   className="ss-card-menu"
                   type="button"
                   aria-label="Setup options"
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCardAction(setup);
+                  }}
                 >
                   <IconMoreVertical className="ss-card-menu-icon" />
                 </button>

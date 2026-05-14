@@ -61,6 +61,35 @@ const TeamSurveys = ({ onNavigate }) => {
 
   const handleBackHome = () => onNavigate && onNavigate('dashboard');
 
+  const handleCreateSurvey = async (mode) => {
+    const title = window.prompt(mode === 'advanced' ? 'Advanced survey title' : 'Quick survey title');
+    if (!title?.trim()) return;
+    const questionText = window.prompt('First survey question');
+    if (!questionText?.trim()) return;
+    const closesAt = window.prompt('Close date (YYYY-MM-DD)', new Date().toISOString().slice(0, 10));
+    if (!closesAt?.trim()) return;
+    try {
+      await surveysService.create({
+        title: title.trim(),
+        status: 'active',
+        opens_at: new Date().toISOString(),
+        closes_at: `${closesAt.trim()}T23:59:00`,
+        is_anonymous: true,
+        questions: [
+          {
+            text: questionText.trim(),
+            kind: mode === 'advanced' ? 'rating' : 'text',
+            required: true,
+            options: [],
+          },
+        ],
+      });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to create survey:', err);
+    }
+  };
+
   return (
     <div className="tsy-page">
       <div className="tsy-container">
@@ -116,11 +145,11 @@ const TeamSurveys = ({ onNavigate }) => {
               </p>
             </div>
             <div className="tsy-main-actions">
-              <button type="button" className="tsy-view-btn primary">
+              <button type="button" className="tsy-view-btn primary" onClick={() => handleCreateSurvey('quick')}>
                 <IconPlus className="tsy-btn-icon" />
                 <span>Quick Survey</span>
               </button>
-              <button type="button" className="tsy-view-btn outline">
+              <button type="button" className="tsy-view-btn outline" onClick={() => handleCreateSurvey('advanced')}>
                 <IconSettings className="tsy-btn-icon" />
                 <span>Advanced Survey</span>
               </button>
@@ -196,11 +225,42 @@ const TeamSurveys = ({ onNavigate }) => {
             </header>
 
             <div className="tsy-manage-body">
-              <div className="tsy-empty">
-                <IconClipboardList className="tsy-empty-icon" />
-                <h3 className="tsy-empty-title">No surveys found</h3>
-                <p className="tsy-empty-text">Create a survey to start collecting team feedback.</p>
-              </div>
+              {surveys.length === 0 ? (
+                <div className="tsy-empty">
+                  <IconClipboardList className="tsy-empty-icon" />
+                  <h3 className="tsy-empty-title">No surveys found</h3>
+                  <p className="tsy-empty-text">Create a survey to start collecting team feedback.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {surveys.map((survey) => (
+                    <div
+                      key={survey.id}
+                      style={{
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 16,
+                        padding: '16px 18px',
+                        background: '#fff',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: 16, color: '#111827' }}>{survey.title}</h4>
+                          <p style={{ margin: '6px 0 0', fontSize: 13, color: '#6b7280' }}>
+                            {survey.questions?.length || 0} question{survey.questions?.length === 1 ? '' : 's'} · {survey.response_count || 0} responses
+                          </p>
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600, textTransform: 'capitalize', color: '#E51636' }}>
+                          {survey.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <p style={{ margin: '12px 0 0', fontSize: 13, color: '#4b5563' }}>
+                        Opens: {survey.opens_at ? new Date(survey.opens_at).toLocaleDateString('en-US') : 'Not scheduled'} · Closes: {survey.closes_at ? new Date(survey.closes_at).toLocaleDateString('en-US') : 'Not scheduled'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         </div>

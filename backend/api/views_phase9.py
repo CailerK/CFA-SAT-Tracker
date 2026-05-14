@@ -180,8 +180,8 @@ def dashboard_insights_values(request):
         elif insight_id == "shifts_logged":
             count = ShiftSummary.objects.filter(
                 store=store,
-                date__gte=week_start,
-                date__lte=today
+                shift_date__gte=week_start,
+                shift_date__lte=today
             ).count()
             values[insight_id] = {
                 "value": count,
@@ -269,8 +269,8 @@ def weekly_digest(request):
         "week_end": week_end.isoformat(),
         "shifts_logged": ShiftSummary.objects.filter(
             store=store,
-            date__gte=week_start,
-            date__lte=week_end
+            shift_date__gte=week_start,
+            shift_date__lte=week_end
         ).count(),
         "foh_tasks_completed": FOHTaskCompletion.objects.filter(
             template__store=store,

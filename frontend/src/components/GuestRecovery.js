@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './GuestRecovery.css';
 import guestRecoveryService from '../services/guestRecovery';
+import teamService from '../services/team';
 
 // Backend status slugs → UI labels.
 const STATUS_FROM_API = {
@@ -47,6 +48,7 @@ const normalizeComplaint = (raw) => {
     description: raw.description || '',
     status: STATUS_FROM_API[raw.status] || 'Open',
     resolution: raw.resolution || '',
+    assignedToId: raw.assigned_to || '',
     assignedTo: raw.assigned_to_name || null,
   };
 };
@@ -54,36 +56,47 @@ const normalizeComplaint = (raw) => {
 const CATEGORIES = ['Order Error', 'Service Issue', 'Food Quality', 'Wait Time', 'Cleanliness', 'Staff Behavior', 'App/Rewards', 'Other'];
 const STATUSES = ['All', 'Open', 'In Progress', 'Resolved'];
 
-const SAMPLE_COMPLAINTS = [
-  { id: 1, name: 'James Henderson', phone: '(210) 555-0182', date: 'May 13, 2024', time: '11:42 AM', category: 'Order Error', description: 'Wrong sandwich received – asked for no pickles, got extra.', status: 'Resolved', resolution: 'Offered free combo on next visit.', assignedTo: 'Ruby Boswell' },
-  { id: 2, name: 'Patricia Nguyen', phone: '(210) 555-0341', date: 'May 13, 2024', time: '1:05 PM', category: 'Wait Time', description: 'Drive-thru wait exceeded 15 minutes during lunch rush.', status: 'In Progress', resolution: '', assignedTo: 'Maria Samano' },
-  { id: 3, name: 'Carlos Rivera', phone: '(210) 555-0290', date: 'May 12, 2024', time: '3:22 PM', category: 'Food Quality', description: 'Nuggets were cold and appeared to have been sitting.', status: 'Open', resolution: '', assignedTo: null },
-  { id: 4, name: 'Angela Simmons', phone: '(210) 555-0114', date: 'May 12, 2024', time: '6:48 PM', category: 'Staff Behavior', description: 'Team member was dismissive at register.', status: 'Open', resolution: '', assignedTo: null },
-  { id: 5, name: 'Brian Kowalski', phone: '(210) 555-0477', date: 'May 11, 2024', time: '9:14 AM', category: 'Cleanliness', description: 'Restroom was unclean during morning visit.', status: 'Resolved', resolution: 'Apologized and issued $5 gift card.', assignedTo: 'Hannah Pess' },
-];
-
 const STATUS_COLORS = {
   'Open':        { bg: '#fee2e2', text: '#b91c1c' },
   'In Progress': { bg: '#fef3c7', text: '#b45309' },
   'Resolved':    { bg: '#d1fae5', text: '#065f46' },
 };
 
+const EMPTY_FORM = { name: '', phone: '', category: '', description: '', assignedTo: '' };
+
 const GuestRecovery = ({ onBack }) => {
   const [activeStatus, setActiveStatus] = useState('All');
   const [showLogModal, setShowLogModal] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [form, setForm] = useState({ name: '', phone: '', category: '', description: '', assignedTo: '' });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [complaints, setComplaints] = useState([]);
+  const [stats, setStats] = useState({ total: 0, open: 0, in_progress: 0, resolved: 0 });
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [detailStatus, setDetailStatus] = useState('Open');
+  const [detailAssignedToId, setDetailAssignedToId] = useState('');
+  const [detailResolution, setDetailResolution] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
-      const res = await guestRecoveryService.list({
-        status: activeStatus !== 'All' ? STATUS_TO_API[activeStatus] : undefined,
-        q: searchQuery.trim() || undefined,
-      });
+      const [res, statsRes] = await Promise.all([
+        guestRecoveryService.list({
+          status: activeStatus !== 'All' ? STATUS_TO_API[activeStatus] : undefined,
+          q: searchQuery.trim() || undefined,
+        }),
+        guestRecoveryService.stats().catch(() => null),
+      ]);
       const rows = res.results || res || [];
       setComplaints(rows.map(normalizeComplaint));
+      if (statsRes) {
+        setStats({
+          total: statsRes.total || 0,
+          open: statsRes.open || 0,
+          in_progress: statsRes.in_progress || 0,
+          resolved: statsRes.resolved || 0,
+        });
+      }
     } catch (err) {
       console.error('Failed to load guest complaints:', err);
     }
@@ -91,20 +104,47 @@ const GuestRecovery = ({ onBack }) => {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await teamService.listMembers({ status: 'active' });
+        const rows = res.results || res || [];
+        if (!cancelled) {
+          setTeamMembers(rows.map((member) => ({
+            id: member.id,
+            name: member.name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email,
+          })));
+        }
+      } catch (err) {
+        console.error('Failed to load team members for guest recovery:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedComplaint) return;
+    setDetailStatus(selectedComplaint.status || 'Open');
+    setDetailAssignedToId(selectedComplaint.assignedToId || '');
+    setDetailResolution(selectedComplaint.resolution || '');
+  }, [selectedComplaint]);
+
   // Backend already filters; pass-through.
   const filtered = complaints;
 
   const counts = {
-    All: complaints.length,
-    Open: complaints.filter(c => c.status === 'Open').length,
-    'In Progress': complaints.filter(c => c.status === 'In Progress').length,
-    Resolved: complaints.filter(c => c.status === 'Resolved').length,
+    All: stats.total || complaints.length,
+    Open: stats.open || complaints.filter(c => c.status === 'Open').length,
+    'In Progress': stats.in_progress || complaints.filter(c => c.status === 'In Progress').length,
+    Resolved: stats.resolved || complaints.filter(c => c.status === 'Resolved').length,
   };
 
   // Hook up the Log Complaint modal submit.
   const handleSubmitLog = async () => {
     if (!form.name.trim() || !form.description.trim()) return;
     try {
+      setIsSubmitting(true);
       await guestRecoveryService.create({
         guest_name: form.name.trim(),
         guest_phone: form.phone.trim(),
@@ -112,11 +152,45 @@ const GuestRecovery = ({ onBack }) => {
         description: form.description.trim(),
         occurred_at: new Date().toISOString(),
       });
-      setForm({ name: '', phone: '', category: '', description: '', assignedTo: '' });
+      setForm(EMPTY_FORM);
       setShowLogModal(false);
-      refresh();
+      await refresh();
     } catch (err) {
       console.error('Create complaint failed:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveComplaint = async () => {
+    if (!selectedComplaint) return;
+    const statusSlug = STATUS_TO_API[detailStatus] || 'open';
+    try {
+      setIsSubmitting(true);
+
+      if (detailAssignedToId !== selectedComplaint.assignedToId) {
+        if (detailAssignedToId) {
+          await guestRecoveryService.assign(selectedComplaint.id, detailAssignedToId);
+        } else {
+          await guestRecoveryService.update(selectedComplaint.id, { assigned_to: null });
+        }
+      }
+
+      if (detailStatus === 'Resolved') {
+        await guestRecoveryService.resolve(selectedComplaint.id, detailResolution.trim());
+      } else {
+        await guestRecoveryService.update(selectedComplaint.id, {
+          status: statusSlug,
+          resolution: detailResolution.trim(),
+        });
+      }
+
+      setSelectedComplaint(null);
+      await refresh();
+    } catch (err) {
+      console.error('Save complaint failed:', err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -276,7 +350,9 @@ const GuestRecovery = ({ onBack }) => {
             </div>
             <div className="gr-modal-footer">
               <button className="gr-btn-cancel" onClick={() => setShowLogModal(false)}>Cancel</button>
-              <button className="gr-btn-submit" onClick={() => setShowLogModal(false)}>Log Complaint</button>
+              <button className="gr-btn-submit" onClick={handleSubmitLog} disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : 'Log Complaint'}
+              </button>
             </div>
           </div>
         </div>
@@ -302,30 +378,53 @@ const GuestRecovery = ({ onBack }) => {
               </div>
               <div className="gr-detail-row">
                 <span className="gr-detail-label">Status</span>
-                <span className="gr-status-badge" style={{ background: STATUS_COLORS[selectedComplaint.status].bg, color: STATUS_COLORS[selectedComplaint.status].text }}>{selectedComplaint.status}</span>
+                <select
+                  className="gr-input"
+                  value={detailStatus}
+                  onChange={(e) => setDetailStatus(e.target.value)}
+                >
+                  {STATUSES.filter((s) => s !== 'All').map((statusValue) => (
+                    <option key={statusValue} value={statusValue}>{statusValue}</option>
+                  ))}
+                </select>
               </div>
               <div className="gr-detail-row">
                 <span className="gr-detail-label">Phone</span>
                 <span>{selectedComplaint.phone}</span>
               </div>
-              {selectedComplaint.assignedTo && (
-                <div className="gr-detail-row">
-                  <span className="gr-detail-label">Assigned To</span>
-                  <span>{selectedComplaint.assignedTo}</span>
-                </div>
-              )}
+              <div className="gr-form-group" style={{ marginTop: 16 }}>
+                <label>Assign To</label>
+                <select
+                  className="gr-input"
+                  value={detailAssignedToId}
+                  onChange={(e) => setDetailAssignedToId(e.target.value)}
+                >
+                  <option value="">Unassigned</option>
+                  {teamMembers.map((member) => (
+                    <option key={member.id} value={member.id}>{member.name}</option>
+                  ))}
+                </select>
+              </div>
               <div className="gr-form-group" style={{ marginTop: 16 }}>
                 <label>Description</label>
                 <p className="gr-detail-desc">{selectedComplaint.description}</p>
               </div>
               <div className="gr-form-group">
                 <label>Resolution Notes</label>
-                <textarea className="gr-textarea" rows={3} defaultValue={selectedComplaint.resolution} placeholder="Describe how this was resolved..." />
+                <textarea
+                  className="gr-textarea"
+                  rows={3}
+                  value={detailResolution}
+                  onChange={(e) => setDetailResolution(e.target.value)}
+                  placeholder="Describe how this was resolved..."
+                />
               </div>
             </div>
             <div className="gr-modal-footer">
               <button className="gr-btn-cancel" onClick={() => setSelectedComplaint(null)}>Close</button>
-              <button className="gr-btn-submit" onClick={() => setSelectedComplaint(null)}>Save Changes</button>
+              <button className="gr-btn-submit" onClick={handleSaveComplaint} disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : 'Save Changes'}
+              </button>
             </div>
           </div>
         </div>

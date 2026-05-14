@@ -24,65 +24,10 @@ const getGreeting = () => {
 };
 const getCurrentDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-// ===== DEMO DATA (see FAKE_DATA.md) =====
 const MEAL_PERIODS = [
   { id: 'breakfast', label: 'Breakfast', emoji: '🌅' },
   { id: 'lunch',     label: 'Lunch',     emoji: '☀️' },
   { id: 'dinner',    label: 'Dinner',    emoji: '🌙' },
-];
-
-const MENU_ITEMS_BY_PERIOD = {
-  breakfast: [
-    { id: 'cfa-biscuit',  name: 'CFA Chicken Biscuit', emoji: '🍗', price: 0.83 },
-    { id: 'egg-whites',   name: 'Egg Whites',          emoji: '🥚', price: 0.19 },
-    { id: 'bf-spicy',     name: 'Spicy Filet',         emoji: '🍗', price: 1.25 },
-    { id: 'bf-filet',     name: 'Filet',               emoji: '🍗', price: 1.02 },
-  ],
-  lunch: [
-    { id: 'spicy-filet',   name: 'Spicy Filet',    emoji: '🍗', price: 1.25 },
-    { id: 'filet',         name: 'Filet',          emoji: '🍗', price: 1.02 },
-    { id: 'grilled-filet', name: 'Grilled Filet',  emoji: '🔥', price: 1.12 },
-    { id: 'nuggets',       name: 'Nuggets',        emoji: '🍗', price: 0.15 },
-    { id: 'grl-nuggets',   name: 'Grilled Nuggets', emoji: '🔥', price: 0.17 },
-    { id: 'strips',        name: 'Strips',         emoji: '🍗', price: 0.53 },
-    { id: 'mac-cheese',    name: 'Mac & Cheese',   emoji: '🧀', price: 1.01 },
-    { id: 'white-bun',     name: 'White Bun',      emoji: '🍞', price: 0.16 },
-    { id: 'multi-bun',     name: 'Multigrain Bun', emoji: '🥖', price: 0.33 },
-    { id: 'gf-bun',        name: 'Gluten Free Bun', emoji: '🍞', price: 0.85 },
-    { id: 'sandwich',      name: 'sandwich',       emoji: '🍽️', price: 1.00 },
-  ],
-  dinner: [
-    { id: 'd-filet',    name: 'Filet',       emoji: '🍗', price: 1.02 },
-    { id: 'd-spicy',    name: 'Spicy Filet', emoji: '🍗', price: 1.25 },
-    { id: 'd-nuggets',  name: 'Nuggets',     emoji: '🍗', price: 0.15 },
-    { id: 'd-strips',   name: 'Strips',      emoji: '🍗', price: 0.53 },
-  ],
-};
-
-const WASTE_REASONS = [
-  { id: 'overproduction', emoji: '📈', label: 'Overproduction' },
-  { id: 'quality',        emoji: '❌', label: 'Quality Issues' },
-  { id: 'expired',        emoji: '⏰', label: 'Expired' },
-  { id: 'dropped',        emoji: '💧', label: 'Dropped' },
-];
-
-const TODAY_ENTRIES = [
-  { id: 1,  name: 'Filet',                qty: 1, unit: 'pieces',   price: 1.02, time: '12:15 PM' },
-  { id: 2,  name: 'Strips',               qty: 1, unit: 'pieces',   price: 0.53, time: '12:11 PM' },
-  { id: 3,  name: 'Strips',               qty: 1, unit: 'pieces',   price: 0.53, time: '12:11 PM' },
-  { id: 4,  name: 'Strips',               qty: 1, unit: 'pieces',   price: 0.53, time: '12:11 PM' },
-  { id: 5,  name: 'Strips',               qty: 1, unit: 'pieces',   price: 0.53, time: '12:00 PM' },
-  { id: 6,  name: 'Strips',               qty: 1, unit: 'pieces',   price: 0.53, time: '12:00 PM' },
-  { id: 7,  name: 'Strips',               qty: 1, unit: 'pieces',   price: 0.53, time: '12:00 PM' },
-  { id: 8,  name: 'Strips',               qty: 1, unit: 'pieces',   price: 0.53, time: '12:00 PM' },
-  { id: 9,  name: 'Filet',                qty: 1, unit: 'pieces',   price: 1.02, time: '11:01 AM' },
-  { id: 10, name: 'CFA Chicken Biscuit',  qty: 1, unit: 'pieces',   price: 0.83, time: '9:41 AM'  },
-  { id: 11, name: 'CFA Chicken Biscuit',  qty: 1, unit: 'pieces',   price: 0.83, time: '9:41 AM'  },
-  { id: 12, name: 'Egg Whites',           qty: 1, unit: 'portions', price: 0.19, time: '9:41 AM'  },
-  { id: 13, name: 'Spicy Filet',          qty: 1, unit: 'pieces',   price: 1.25, time: '9:41 AM'  },
-  { id: 14, name: 'Filet',                qty: 1, unit: 'pieces',   price: 1.02, time: '9:40 AM'  },
-  { id: 15, name: 'Filet',                qty: 1, unit: 'pieces',   price: 1.02, time: '9:40 AM'  },
-  { id: 16, name: 'Filet',                qty: 1, unit: 'pieces',   price: 1.02, time: '9:40 AM'  },
 ];
 
 // Format a backend ISO datetime as "9:40 AM" for the entries list.
@@ -116,8 +61,8 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
 
   // Server-loaded catalogs.
   const [menuItemsRaw, setMenuItemsRaw] = useState([]); // [{id, name, emoji, unit_price, meal_period_slug}]
+  const [mealPeriodsRaw, setMealPeriodsRaw] = useState([]);
   const [reasonsRaw, setReasonsRaw] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   // Load menu items for the active meal whenever it changes.
   useEffect(() => {
@@ -148,15 +93,18 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
     let cancelled = false;
     (async () => {
       try {
-        const reasons = await kitchenService.listReasons();
+        const [reasons, meals] = await Promise.all([
+          kitchenService.listReasons(),
+          kitchenService.listMealPeriods(),
+        ]);
         if (!cancelled) {
           setReasonsRaw(reasons.results || reasons || []);
+          setMealPeriodsRaw(meals.results || meals || []);
         }
       } catch (err) {
         console.error('Failed to load waste reasons:', err);
       } finally {
         await refreshEntries();
-        if (!cancelled) setIsLoading(false);
       }
     })();
     return () => { cancelled = true; };
@@ -237,18 +185,35 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
     }
   };
 
-  // "Custom Entry" form — for items that don't appear in the catalog yet.
-  // For now we can't POST a custom entry without a menu_item FK, so we treat
-  // this as a local-only add. (Future: allow creating ad-hoc menu items.)
+  // "Custom Entry" creates a real menu item for the current meal, then logs
+  // a waste entry against it so the record survives refreshes.
   const canAddCustom = customName.trim() && customQty && customPrice;
-  const handleAddCustom = () => {
+  const handleAddCustom = async () => {
     if (!canAddCustom) return;
-    const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    setEntries((prev) => [
-      { id: `tmp-${Date.now()}`, name: customName.trim(), qty: Number(customQty), unit: 'pieces', price: Number(customPrice), time: now },
-      ...prev,
-    ]);
-    setCustomName(''); setCustomQty(''); setCustomPrice('');
+    try {
+      const mealPeriod = mealPeriodsRaw.find((item) => item.slug === activeMeal);
+      if (!mealPeriod) return;
+      const createdItem = await kitchenService.createMenuItem({
+        meal_period: mealPeriod.id,
+        name: customName.trim(),
+        emoji: '📝',
+        unit_price: Number(customPrice),
+      });
+      await kitchenService.logEntry({
+        menu_item: createdItem.id,
+        qty: Number(customQty),
+        unit: 'pieces',
+        reason: selectedReason || null,
+      });
+      setCustomName('');
+      setCustomQty('');
+      setCustomPrice('');
+      await refreshEntries();
+      const res = await kitchenService.listMenuItems({ meal: activeMeal });
+      setMenuItemsRaw(res.results || res || []);
+    } catch (err) {
+      console.error('Failed to create custom waste entry:', err);
+    }
   };
 
   return (

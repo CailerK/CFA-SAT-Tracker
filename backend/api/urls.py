@@ -239,6 +239,14 @@ urlpatterns = [
         MaintenanceScheduleViewSet.as_view({"post": "complete"}),
         name="schedule_complete",
     ),
+    path(
+        "kitchen/equipment/schedules/<int:pk>/",
+        MaintenanceScheduleViewSet.as_view({
+            "patch": "partial_update",
+            "delete": "destroy",
+        }),
+        name="schedule_detail",
+    ),
 
     # Phase 6: Team stats + per-employee documentation
     path("team/stats/", team_stats, name="team_stats"),

@@ -54,6 +54,7 @@ const TeamChat = ({ onBack, user }) => {
         time: formatTime(m.created_at),
         isOwn: user && m.author === user.id,
       })));
+      await chatService.markRead(selectedChat);
     } catch (err) {
       console.error('Failed to load chat messages:', err);
     }
@@ -74,7 +75,7 @@ const TeamChat = ({ onBack, user }) => {
     setMessageText('');
     try {
       await chatService.sendMessage({ channel: selectedChat, body });
-      loadMessages();
+      await loadMessages();
     } catch (err) {
       console.error('Send message failed:', err);
       setMessageText(body); // restore on failure

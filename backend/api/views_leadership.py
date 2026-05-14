@@ -8,6 +8,7 @@ from django.db import models
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .models import (
@@ -63,12 +64,35 @@ class Evaluation360ViewSet(StoreScopedViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        # Filter: show evaluations where the user is either the evaluatee
-        # or one of the evaluators.
         user = self.request.user
+        if user.is_manager_or_above:
+            return qs
         return qs.filter(
             models.Q(evaluatee=user) | models.Q(evaluators__user=user)
         ).distinct()
+
+    def perform_create(self, serializer):
+        evaluation = serializer.save()
+        evaluators = self.request.data.get("evaluators", [])
+        if not isinstance(evaluators, list):
+            raise ValidationError({"evaluators": "Expected a list of evaluators."})
+
+        created_count = 0
+        for entry in evaluators:
+            user_id = entry.get("user")
+            evaluator_type = entry.get("evaluator_type")
+            if not user_id or evaluator_type not in {"peer", "manager", "direct_report"}:
+                continue
+            EvaluationEvaluator.objects.get_or_create(
+                evaluation=evaluation,
+                user_id=user_id,
+                defaults={"evaluator_type": evaluator_type},
+            )
+            created_count += 1
+
+        if created_count:
+            evaluation.progress_percent = 0
+            evaluation.save(update_fields=["progress_percent"])
 
     @action(detail=True, methods=['post'], url_path='respond')
     def respond(self, request, pk=None):
@@ -123,6 +147,7 @@ class Evaluation360ViewSet(StoreScopedViewSet):
             "total": qs.count(),
             "in_progress": qs.filter(status='in_progress').count(),
             "completed": qs.filter(status='completed').count(),
+            "reviewed": qs.filter(status='completed').count(),
         })
 
 
@@ -139,6 +164,13 @@ class PositionTrackViewSet(StoreScopedViewSet):
             return [IsManagerOrAbove()]
         return super().get_permissions()
 
+    def get_queryset(self):
+        return super().get_queryset().filter(archived_at__isnull=True).order_by("order", "id")
+
+    def perform_destroy(self, instance):
+        instance.archived_at = timezone.now()
+        instance.save(update_fields=["archived_at", "updated_at"])
+
 
 class TrackProgressViewSet(StoreScopedViewSet):
     """
@@ -149,10 +181,37 @@ class TrackProgressViewSet(StoreScopedViewSet):
     serializer_class = TrackProgressSerializer
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = super().get_queryset().select_related('user', 'track').filter(
+            track__archived_at__isnull=True
+        )
+        user = self.request.user
+        scope = self.request.query_params.get("scope", "all")
+        position = self.request.query_params.get("position")
+
         # Non-managers can only see their own progress.
-        if not self.request.user.is_manager_or_above:
-            qs = qs.filter(user=self.request.user)
+        if not user.is_manager_or_above:
+            qs = qs.filter(user=user)
+        elif scope == "my-team":
+            qs = qs.filter(user__manager=user)
+
+        if position:
+            variants = {
+                position,
+                position.replace("-", " "),
+                position.replace("-", "_"),
+            }
+            clause = models.Q()
+            for variant in variants:
+                clause |= models.Q(track__name__iexact=variant)
+            qs = qs.filter(clause)
+
+        if self.request.query_params.get("q"):
+            q = self.request.query_params["q"]
+            qs = qs.filter(
+                models.Q(user__first_name__icontains=q)
+                | models.Q(user__last_name__icontains=q)
+                | models.Q(track__name__icontains=q)
+            )
         return qs
 
     def get_permissions(self):

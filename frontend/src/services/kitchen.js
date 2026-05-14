@@ -49,6 +49,12 @@ const kitchenService = {
     });
   },
 
+  async getChecklistHistory({ range = "7d" } = {}) {
+    return apiService.request(
+      `/kitchen/checklists/history/?range=${encodeURIComponent(range)}`
+    );
+  },
+
   async createChecklistTask({ shift, text, order = 0 }) {
     return apiService.request("/kitchen/checklists/", {
       method: "POST",
@@ -71,6 +77,13 @@ const kitchenService = {
   async listMenuItems({ meal } = {}) {
     const qs = meal ? `?meal=${encodeURIComponent(meal)}` : "";
     return apiService.request(`/kitchen/waste/menu-items/${qs}`);
+  },
+
+  async createMenuItem(payload) {
+    return apiService.request("/kitchen/waste/menu-items/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   async listReasons() {

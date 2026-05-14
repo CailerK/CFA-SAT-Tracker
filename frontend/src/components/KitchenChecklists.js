@@ -117,6 +117,58 @@ const KitchenChecklists = ({ onNavigate, user }) => {
     }
   };
 
+  const handleViewHistory = async () => {
+    try {
+      const res = await kitchenService.getChecklistHistory({ range: '7d' });
+      const rows = res.days || [];
+      const preview = rows.slice(0, 7).map((day) => {
+        const date = new Date(day.date).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        });
+        return `${date}: ${day.total?.done || 0}/${day.total?.total || 0}`;
+      });
+      window.alert(preview.length ? preview.join('\n') : 'No checklist history yet.');
+    } catch (err) {
+      console.error('Failed to load kitchen checklist history:', err);
+    }
+  };
+
+  const handleAddTask = async () => {
+    const text = window.prompt(`New ${activeShift} checklist task`);
+    if (!text?.trim()) return;
+    try {
+      await kitchenService.createChecklistTask({
+        shift: activeShift,
+        text: text.trim(),
+        order: activeTasks.length,
+      });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to create kitchen checklist task:', err);
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!activeTasks.length) return;
+    const taskName = window.prompt(
+      `Delete which ${activeShift} task?\n${activeTasks.map((task) => task.text).join('\n')}`
+    );
+    if (!taskName?.trim()) return;
+    const target = activeTasks.find(
+      (task) => task.text.toLowerCase() === taskName.trim().toLowerCase()
+    );
+    if (!target) return;
+    const confirmed = window.confirm(`Delete "${target.text}"?`);
+    if (!confirmed) return;
+    try {
+      await kitchenService.deleteChecklistTask(target.id);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to delete kitchen checklist task:', err);
+    }
+  };
+
   const toggleTask = async (taskId) => {
     const target = shiftState[activeShift].find((t) => t.id === taskId);
     if (!target) return;
@@ -137,7 +189,7 @@ const KitchenChecklists = ({ onNavigate, user }) => {
     }
   };
 
-  const activeTasks = shiftState[activeShift] || [];
+  const activeTasks = useMemo(() => shiftState[activeShift] || [], [shiftState, activeShift]);
   const completedCount = useMemo(() => activeTasks.filter((t) => t.completed).length, [activeTasks]);
   const totalCount = activeTasks.length;
   const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
@@ -204,13 +256,13 @@ const KitchenChecklists = ({ onNavigate, user }) => {
         <header className="kch-header">
           <h2 className="kch-header-title">Kitchen Tasks</h2>
           <div className="kch-header-actions">
-            <button type="button" className="kch-header-btn" aria-label="View history">
+            <button type="button" className="kch-header-btn" aria-label="View history" onClick={handleViewHistory}>
               <IconHistory className="kch-header-btn-icon" />
             </button>
-            <button type="button" className="kch-header-btn" aria-label="Manage positions">
+            <button type="button" className="kch-header-btn" aria-label="Delete task" onClick={handleDeleteTask}>
               <IconUsers className="kch-header-btn-icon" />
             </button>
-            <button type="button" className="kch-header-btn kch-header-btn-primary" aria-label="Edit tasks">
+            <button type="button" className="kch-header-btn kch-header-btn-primary" aria-label="Add task" onClick={handleAddTask}>
               <IconPlus className="kch-header-btn-icon" />
             </button>
           </div>
@@ -253,23 +305,29 @@ const KitchenChecklists = ({ onNavigate, user }) => {
           </div>
 
           <div className="kch-task-list">
-            {activeTasks.map((task) => (
-              <div key={task.id} className="kch-task-row">
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={task.completed}
-                  aria-label={`${task.text} - ${task.completed ? 'Mark incomplete' : 'Mark as complete'}`}
-                  className={`kch-checkbox ${task.completed ? 'checked' : ''}`}
-                  onClick={() => toggleTask(task.id)}
-                >
-                  {task.completed && <IconCheck className="kch-checkbox-icon" />}
-                </button>
-                <div className="kch-task-text-wrap">
-                  <span className={`kch-task-text ${task.completed ? 'completed' : ''}`}>{task.text}</span>
-                </div>
+            {isLoading ? (
+              <div className="kch-task-row">
+                <span className="kch-task-text">Loading kitchen tasks…</span>
               </div>
-            ))}
+            ) : (
+              activeTasks.map((task) => (
+                <div key={task.id} className="kch-task-row">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={task.completed}
+                    aria-label={`${task.text} - ${task.completed ? 'Mark incomplete' : 'Mark as complete'}`}
+                    className={`kch-checkbox ${task.completed ? 'checked' : ''}`}
+                    onClick={() => toggleTask(task.id)}
+                  >
+                    {task.completed && <IconCheck className="kch-checkbox-icon" />}
+                  </button>
+                  <div className="kch-task-text-wrap">
+                    <span className={`kch-task-text ${task.completed ? 'completed' : ''}`}>{task.text}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           <div className="kch-list-footer">

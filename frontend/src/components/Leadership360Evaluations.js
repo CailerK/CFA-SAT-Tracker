@@ -45,33 +45,10 @@ const IconCalendar = (p) => (<Icon {...p}><rect width="18" height="18" x="3" y="
 const IconAlertCircle = (p) => (<Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></Icon>);
 const IconChevronRight = (p) => (<Icon {...p}><path d="m9 18 6-6-6-6"/></Icon>);
 
-const STATS = [
-  { key: 'total',      label: 'Total Reviews', value: 1, tone: 'slate',    Icon: IconClipboardList },
-  { key: 'in-progress',label: 'In Progress',   value: 1, tone: 'blue',     Icon: IconClock },
-  { key: 'completed',  label: 'Completed',     value: 0, tone: 'emerald',  Icon: IconCheckCircle },
-  { key: 'reviewed',   label: 'Reviewed',      value: 0, tone: 'purple',   Icon: IconEye },
-];
-
 const FILTERS = [
   { id: 'all',         label: 'All' },
-  { id: 'in-progress', label: 'In Progress' },
+  { id: 'in_progress', label: 'In Progress' },
   { id: 'completed',   label: 'Completed' },
-];
-
-const EVALUATIONS = [
-  {
-    id: 1,
-    name: 'Anthony Pope',
-    role: 'Director',
-    template: 'Leadership 360 - Directors',
-    status: 'in-progress',
-    statusLabel: 'In Progress',
-    dueDate: 'Mar 2, 2026',
-    progress: 50,
-    completed: 1,
-    total: 2,
-    overdue: true,
-  },
 ];
 
 const TONE = {
@@ -84,23 +61,27 @@ const TONE = {
 const formatToday = () =>
   new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-const Leadership360Evaluations = ({ user }) => {
+const Leadership360Evaluations = ({ user, onNavigate }) => {
   const [activeTab, setActiveTab] = useState('evaluations');
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [evaluations, setEvaluations] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [stats, setStats] = useState({ total: 0, in_progress: 0, completed: 0, reviewed: 0 });
 
   const displayName = user?.firstName || user?.name || 'Demo User';
 
   const refresh = useCallback(async () => {
     try {
-      const [list, statsData] = await Promise.all([
+      const [list, statsData, templatesData] = await Promise.all([
         leadershipService.listEvaluations({ status: filter, q: query.trim() || undefined }),
         leadershipService.getEvaluationStats(),
+        leadershipService.listTemplates(),
       ]);
       const rows = list.results || list || [];
+      const templateRows = templatesData.results || templatesData || [];
       setEvaluations(rows.map(normalizeEval));
+      setTemplates(templateRows);
       setStats(statsData);
     } catch (err) {
       console.error('Failed to load 360 evaluations:', err);
@@ -119,6 +100,56 @@ const Leadership360Evaluations = ({ user }) => {
     { key: 'completed',  label: 'Completed',     value: stats.completed || 0,   tone: 'emerald', Icon: IconCheckCircle },
     { key: 'reviewed',   label: 'Reviewed',      value: stats.reviewed || 0,    tone: 'purple',  Icon: IconEye },
   ]), [stats]);
+
+  const handleCreateTemplate = async () => {
+    const name = window.prompt('Template name');
+    if (!name?.trim()) return;
+    const description = window.prompt('Template description', '') || '';
+    const sectionsCount = window.prompt('Sections count', '1');
+    if (sectionsCount == null) return;
+    try {
+      await leadershipService.createTemplate({
+        name: name.trim(),
+        description,
+        sections_count: Number(sectionsCount) || 0,
+        is_active: true,
+      });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to create 360 template:', err);
+    }
+  };
+
+  const handleTemplateAction = async (template) => {
+    const action = window.prompt(`Type "edit" or "delete" for "${template.name}"`, 'edit');
+    if (!action) return;
+    const choice = action.trim().toLowerCase();
+
+    try {
+      if (choice === 'delete') {
+        const confirmed = window.confirm(`Delete "${template.name}"?`);
+        if (!confirmed) return;
+        await leadershipService.deleteTemplate(template.id);
+        await refresh();
+        return;
+      }
+
+      if (choice !== 'edit') return;
+      const name = window.prompt('Template name', template.name);
+      if (!name?.trim()) return;
+      const description = window.prompt('Template description', template.description || '') || '';
+      const sectionsCount = window.prompt('Sections count', String(template.sections_count || 0));
+      if (sectionsCount == null) return;
+      await leadershipService.updateTemplate(template.id, {
+        name: name.trim(),
+        description,
+        sections_count: Number(sectionsCount) || 0,
+      });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to update 360 template:', err);
+    }
+  };
 
   return (
     <div className="l360-page">
@@ -205,7 +236,7 @@ const Leadership360Evaluations = ({ user }) => {
               ))}
             </div>
 
-            <button className="l360-cta" type="button">
+            <button className="l360-cta" type="button" onClick={() => onNavigate && onNavigate('new-360-evaluation')}>
               <IconPlus size={16} />
               <span>New 360° Review</span>
             </button>
@@ -272,13 +303,64 @@ const Leadership360Evaluations = ({ user }) => {
       )}
 
       {activeTab === 'templates' && (
-        <section className="l360-list">
-          <div className="l360-empty">
-            <div className="l360-empty-icon"><IconFileStack size={28} /></div>
-            <h3>No templates yet</h3>
-            <p>Create your first 360° evaluation template to get started.</p>
-          </div>
-        </section>
+        <>
+          <section className="l360-toolbar">
+            <div />
+            <button className="l360-cta" type="button" onClick={handleCreateTemplate}>
+              <IconPlus size={16} />
+              <span>New Template</span>
+            </button>
+          </section>
+
+          <section className="l360-list">
+            {templates.length === 0 ? (
+              <div className="l360-empty">
+                <div className="l360-empty-icon"><IconFileStack size={28} /></div>
+                <h3>No templates yet</h3>
+                <p>Create your first 360° evaluation template to get started.</p>
+              </div>
+            ) : (
+              templates.map((template) => (
+                <article
+                  key={template.id}
+                  className="l360-card"
+                  onClick={() => handleTemplateAction(template)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <span className="l360-card-stripe stripe-completed" />
+                  <div className="l360-card-body">
+                    <div className="l360-card-left">
+                      <div className="l360-card-meta">
+                        <span className="l360-badge badge-completed">
+                          <IconFileStack size={12} />
+                          Template
+                        </span>
+                      </div>
+                      <h3 className="l360-card-name">{template.name}</h3>
+                      <p className="l360-card-role">
+                        {template.description || 'No description yet'}
+                      </p>
+                    </div>
+
+                    <div className="l360-card-right">
+                      <div className="l360-progress-head">
+                        <span>Sections</span>
+                        <span className="l360-progress-pct">{template.sections_count || 0}</span>
+                      </div>
+                      <div className="l360-progress-foot">
+                        <span>{template.is_active ? 'Active' : 'Inactive'}</span>
+                      </div>
+                    </div>
+
+                    <span className="l360-chevron" aria-hidden>
+                      <IconChevronRight size={18} />
+                    </span>
+                  </div>
+                </article>
+              ))
+            )}
+          </section>
+        </>
       )}
     </div>
   );

@@ -1,15 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import leadershipService from '../services/leadership';
+import teamService from '../services/team';
 import './New360Evaluation.css';
 
-const New360Evaluation = ({ onBack, onNavigate }) => {
+const getDefaultStartDate = () => new Date().toISOString().slice(0, 10);
+
+const getDefaultDueDate = () => {
+  const date = new Date();
+  date.setDate(date.getDate() + 7);
+  return date.toISOString().slice(0, 10);
+};
+
+const New360Evaluation = ({ onBack }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedLeader, setSelectedLeader] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [startDate, setStartDate] = useState('April 20th, 2026');
-  const [dueDate, setDueDate] = useState('April 27th, 2026');
+  const [startDate, setStartDate] = useState(getDefaultStartDate());
+  const [dueDate, setDueDate] = useState(getDefaultDueDate());
   const [evaluators, setEvaluators] = useState([]);
   const [templates, setTemplates] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [selectedEvaluatorUserId, setSelectedEvaluatorUserId] = useState('');
+  const [selectedEvaluatorType, setSelectedEvaluatorType] = useState('peer');
   const [saveStatus, setSaveStatus] = useState(null);
 
   // Load real templates from the backend on mount. Falls back to the
@@ -32,6 +44,21 @@ const New360Evaluation = ({ onBack, onNavigate }) => {
         console.error('Failed to load 360 templates:', err);
       }
     })();
+    (async () => {
+      try {
+        const res = await teamService.listMembers({ status: 'active' });
+        const rows = res.results || res || [];
+        if (!cancelled) {
+          setTeamMembers(rows.map((member) => ({
+            id: member.id,
+            name: member.name || member.email,
+            role: member.role || 'team_member',
+          })));
+        }
+      } catch (err) {
+        console.error('Failed to load team members for 360 evaluation:', err);
+      }
+    })();
     return () => { cancelled = true; };
   }, []);
 
@@ -43,10 +70,10 @@ const New360Evaluation = ({ onBack, onNavigate }) => {
         evaluatee: selectedLeader,
         template: selectedTemplate,
         due_date: dueDate,
-        evaluators: evaluators.map((e) => ({ user_id: e.userId || null, type: e.type.toLowerCase().replace(' ', '_') })),
+        evaluators: evaluators.map((e) => ({ user: e.userId, evaluator_type: e.type })),
       });
       setSaveStatus('saved');
-      setTimeout(() => onNavigate && onNavigate('leadership-360'), 800);
+      setTimeout(() => onBack && onBack(), 800);
     } catch (err) {
       console.error('Create evaluation failed:', err);
       setSaveStatus('error');
@@ -72,9 +99,26 @@ const New360Evaluation = ({ onBack, onNavigate }) => {
   };
 
   const addEvaluator = () => {
-    if (evaluators.length < 10) {
-      setEvaluators([...evaluators, { id: Date.now(), type: 'Peer' }]);
-    }
+    if (!selectedEvaluatorUserId || evaluators.length >= 10) return;
+    const existing = evaluators.some((e) => String(e.userId) === String(selectedEvaluatorUserId));
+    if (existing) return;
+    const member = teamMembers.find((item) => String(item.id) === String(selectedEvaluatorUserId));
+    if (!member) return;
+    setEvaluators([
+      ...evaluators,
+      {
+        id: Date.now(),
+        userId: member.id,
+        name: member.name,
+        type: selectedEvaluatorType,
+      },
+    ]);
+    setSelectedEvaluatorUserId('');
+    setSelectedEvaluatorType('peer');
+  };
+
+  const removeEvaluator = (id) => {
+    setEvaluators((current) => current.filter((item) => item.id !== id));
   };
 
   return (
@@ -123,9 +167,9 @@ const New360Evaluation = ({ onBack, onNavigate }) => {
                   onChange={(e) => setSelectedLeader(e.target.value)}
                 >
                   <option value="">Select a leader</option>
-                  <option value="anthony">Anthony Pope</option>
-                  <option value="sarah">Sarah Johnson</option>
-                  <option value="michael">Michael Chen</option>
+                  {teamMembers.map((member) => (
+                    <option key={member.id} value={member.id}>{member.name}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -172,7 +216,7 @@ const New360Evaluation = ({ onBack, onNavigate }) => {
                 <div className="form-group">
                   <label>Start Date</label>
                   <input 
-                    type="text" 
+                    type="date" 
                     className="form-input"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
@@ -181,14 +225,14 @@ const New360Evaluation = ({ onBack, onNavigate }) => {
                 <div className="form-group">
                   <label>Due Date</label>
                   <input 
-                    type="text" 
+                    type="date" 
                     className="form-input"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
                   />
                 </div>
               </div>
-              <p className="date-note">Evaluation period: Apr 20 - Apr 27, 2026 (7 days)</p>
+              <p className="date-note">Evaluation period: {startDate} to {dueDate}</p>
             </div>
           )}
 
@@ -199,18 +243,33 @@ const New360Evaluation = ({ onBack, onNavigate }) => {
               <p className="step-description">Add at least 2 evaluators (recommended 6) to provide feedback on the leader's performance</p>
               
               <div className="evaluators-summary">
-                <span className="eval-count">0 evaluators selected</span>
-                <span className="eval-needed">Add at least 2 more evaluators</span>
+                <span className="eval-count">{evaluators.length} evaluators selected</span>
+                <span className="eval-needed">
+                  {evaluators.length >= 2 ? 'Ready to create the review' : `Add at least ${2 - evaluators.length} more evaluator${2 - evaluators.length === 1 ? '' : 's'}`}
+                </span>
               </div>
 
               <div className="add-evaluator-row">
-                <select className="form-select eval-select">
-                  <option>Select an evaluator</option>
+                <select
+                  className="form-select eval-select"
+                  value={selectedEvaluatorUserId}
+                  onChange={(e) => setSelectedEvaluatorUserId(e.target.value)}
+                >
+                  <option value="">Select an evaluator</option>
+                  {teamMembers
+                    .filter((member) => String(member.id) !== String(selectedLeader))
+                    .map((member) => (
+                      <option key={member.id} value={member.id}>{member.name}</option>
+                    ))}
                 </select>
-                <select className="form-select type-select">
-                  <option>Peer</option>
-                  <option>Manager</option>
-                  <option>Direct Report</option>
+                <select
+                  className="form-select type-select"
+                  value={selectedEvaluatorType}
+                  onChange={(e) => setSelectedEvaluatorType(e.target.value)}
+                >
+                  <option value="peer">Peer</option>
+                  <option value="manager">Manager</option>
+                  <option value="direct_report">Direct Report</option>
                 </select>
               </div>
               <button className="btn-add-evaluator" onClick={addEvaluator}>
@@ -223,6 +282,20 @@ const New360Evaluation = ({ onBack, onNavigate }) => {
                 </svg>
                 Add Evaluator
               </button>
+
+              {evaluators.length > 0 && (
+                <div className="templates-list" style={{ marginTop: 16 }}>
+                  {evaluators.map((evaluator) => (
+                    <div key={evaluator.id} className="template-card selected">
+                      <div className="template-info">
+                        <h4>{evaluator.name}</h4>
+                        <p>{evaluator.type.replace('_', ' ')}</p>
+                      </div>
+                      <button className="template-check" onClick={() => removeEvaluator(evaluator.id)}>x</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -244,8 +317,8 @@ const New360Evaluation = ({ onBack, onNavigate }) => {
               </svg>
             </button>
           ) : (
-            <button className="btn-create-eval" disabled={evaluators.length < 2}>
-              Create Evaluation & Send Invitations
+            <button className="btn-create-eval" disabled={evaluators.length < 2 || saveStatus === 'saving'} onClick={handleSubmit}>
+              {saveStatus === 'saving' ? 'Creating Evaluation...' : 'Create Evaluation & Send Invitations'}
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M6 9l6 6 6-6"/>
               </svg>

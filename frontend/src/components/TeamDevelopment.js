@@ -43,21 +43,28 @@ const TeamDevelopment = ({ user }) => {
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState('my-team');
   const [members, setMembers] = useState([]);
+  const [tracks, setTracks] = useState([]);
 
   const refresh = useCallback(async () => {
     try {
-      const res = await leadershipService.listProgress({
-        scope,
-        position: active !== 'all' ? active : undefined,
-      });
-      const rows = res.results || res || [];
-      // Each row has { user_name, user_initials, track_name, status, current_step, completed_steps }
+      const [progressRes, tracksRes] = await Promise.all([
+        leadershipService.listProgress({
+          scope,
+          position: active !== 'all' ? active : undefined,
+        }),
+        leadershipService.listTracks(),
+      ]);
+      const rows = progressRes.results || progressRes || [];
+      const trackRows = tracksRes.results || tracksRes || [];
+      setTracks(trackRows);
       setMembers(rows.map((r) => ({
         id: r.id,
         name: r.user_name || 'Unknown',
         initials: r.user_initials || '??',
         position: r.track_slug || 'team-member',
+        positionLabel: r.track_name || 'Team Member',
         status: r.status,
+        statusLabel: (r.status || 'not_started').replace(/_/g, ' '),
         currentStep: r.current_step || 0,
         completedSteps: r.completed_steps || 0,
       })));
@@ -84,6 +91,58 @@ const TeamDevelopment = ({ user }) => {
 
   const displayName = user?.firstName || user?.name || 'Demo User';
 
+  const handleEditTracks = async () => {
+    const action = window.prompt('Type create, rename, or delete', 'create');
+    if (!action) return;
+    const choice = action.trim().toLowerCase();
+
+    try {
+      if (choice === 'create') {
+        const name = window.prompt('Track name');
+        if (!name?.trim()) return;
+        const description = window.prompt('Track description', '') || '';
+        await leadershipService.createTrack({
+          name: name.trim(),
+          description,
+          order: tracks.length,
+        });
+        await refresh();
+        return;
+      }
+
+      const suggested = tracks.find((track) => track.slug === active)?.name || tracks[0]?.name || '';
+      const trackName = window.prompt(
+        `Which track?\n${tracks.map((track) => track.name).join('\n')}`,
+        suggested
+      );
+      if (!trackName?.trim()) return;
+      const target = tracks.find(
+        (track) => track.name.toLowerCase() === trackName.trim().toLowerCase()
+      );
+      if (!target) return;
+
+      if (choice === 'delete') {
+        const confirmed = window.confirm(`Delete "${target.name}"?`);
+        if (!confirmed) return;
+        await leadershipService.deleteTrack(target.id);
+        await refresh();
+        return;
+      }
+
+      if (choice !== 'rename') return;
+      const name = window.prompt('Updated track name', target.name);
+      if (!name?.trim()) return;
+      const description = window.prompt('Updated description', target.description || '') || '';
+      await leadershipService.updateTrack(target.id, {
+        name: name.trim(),
+        description,
+      });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to manage development tracks:', err);
+    }
+  };
+
   return (
     <div className="tdev-page">
       {/* Hero */}
@@ -106,7 +165,7 @@ const TeamDevelopment = ({ user }) => {
                 <p>Empowering your team&rsquo;s growth journey</p>
               </div>
             </div>
-            <button className="tdev-hero-btn" type="button">
+            <button className="tdev-hero-btn" type="button" onClick={handleEditTracks}>
               <IconEdit size={16} />
               <span>Edit Tracks</span>
             </button>
@@ -203,6 +262,7 @@ const TeamDevelopment = ({ user }) => {
                 <div className="tdev-member-body">
                   <h4>{m.name}</h4>
                   <p>{m.positionLabel}</p>
+                  <p>{m.statusLabel} · {m.completedSteps} complete</p>
                 </div>
               </div>
             ))}
