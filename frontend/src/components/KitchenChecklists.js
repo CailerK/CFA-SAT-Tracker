@@ -3,6 +3,8 @@ import kitchenService from '../services/kitchen';
 import './SetupSheetTemplates.css'; // banner
 import './KitchenDashboard.css';     // kitchen nav
 import './KitchenChecklists.css';
+import useCentralDayRefresh from '../hooks/useCentralDayRefresh';
+import { isManagerOrAbove } from '../utils/access';
 
 // ===== Icons =====
 const IconLayoutDashboard = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>);
@@ -24,6 +26,10 @@ const getGreeting = () => {
   return 'Good evening';
 };
 const getCurrentDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+const parseDateOnly = (iso) => {
+  const [year, month, day] = `${iso}`.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
 
 // ===== DEMO DATA (see FAKE_DATA.md) =====
 const TRANSITION_TASKS = [
@@ -76,6 +82,7 @@ const KitchenChecklists = ({ onNavigate, user }) => {
     opening: [], transition: [], closing: [],
   });
   const [isLoading, setIsLoading] = useState(true);
+  const canManageTasks = isManagerOrAbove(user);
 
   const refresh = useCallback(async () => {
     try {
@@ -93,6 +100,7 @@ const KitchenChecklists = ({ onNavigate, user }) => {
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+  useCentralDayRefresh(refresh);
 
   const tabs = [
     { id: 'home', label: 'Home', Icon: IconLayoutDashboard },
@@ -122,7 +130,7 @@ const KitchenChecklists = ({ onNavigate, user }) => {
       const res = await kitchenService.getChecklistHistory({ range: '7d' });
       const rows = res.days || [];
       const preview = rows.slice(0, 7).map((day) => {
-        const date = new Date(day.date).toLocaleDateString('en-US', {
+        const date = parseDateOnly(day.date).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
         });
@@ -135,6 +143,7 @@ const KitchenChecklists = ({ onNavigate, user }) => {
   };
 
   const handleAddTask = async () => {
+    if (!canManageTasks) return;
     const text = window.prompt(`New ${activeShift} checklist task`);
     if (!text?.trim()) return;
     try {
@@ -150,6 +159,7 @@ const KitchenChecklists = ({ onNavigate, user }) => {
   };
 
   const handleDeleteTask = async () => {
+    if (!canManageTasks) return;
     if (!activeTasks.length) return;
     const taskName = window.prompt(
       `Delete which ${activeShift} task?\n${activeTasks.map((task) => task.text).join('\n')}`
@@ -259,12 +269,16 @@ const KitchenChecklists = ({ onNavigate, user }) => {
             <button type="button" className="kch-header-btn" aria-label="View history" onClick={handleViewHistory}>
               <IconHistory className="kch-header-btn-icon" />
             </button>
-            <button type="button" className="kch-header-btn" aria-label="Delete task" onClick={handleDeleteTask}>
-              <IconUsers className="kch-header-btn-icon" />
-            </button>
-            <button type="button" className="kch-header-btn kch-header-btn-primary" aria-label="Add task" onClick={handleAddTask}>
-              <IconPlus className="kch-header-btn-icon" />
-            </button>
+            {canManageTasks && (
+              <button type="button" className="kch-header-btn" aria-label="Delete task" onClick={handleDeleteTask}>
+                <IconUsers className="kch-header-btn-icon" />
+              </button>
+            )}
+            {canManageTasks && (
+              <button type="button" className="kch-header-btn kch-header-btn-primary" aria-label="Add task" onClick={handleAddTask}>
+                <IconPlus className="kch-header-btn-icon" />
+              </button>
+            )}
           </div>
         </header>
 

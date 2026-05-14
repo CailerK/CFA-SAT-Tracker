@@ -15,8 +15,13 @@ const DATE_RANGES = [
   { id: '30d', label: '30d' },
 ];
 
+const parseDateOnly = (iso) => {
+  const [year, month, day] = `${iso}`.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 const formatDate = (iso) => {
-  const date = new Date(iso);
+  const date = parseDateOnly(iso);
   return {
     shortDay: date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
     day: date.getDate(),
@@ -26,6 +31,27 @@ const formatDate = (iso) => {
       year: 'numeric',
     }),
   };
+};
+
+const formatCompletedTime = (iso) => {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const normalizeTaskEntry = (task) => (
+  typeof task === 'string'
+    ? { text: task, shift: 'unknown' }
+    : task
+);
+
+const getShiftLabel = (shift) => {
+  if (shift === 'opening') return 'Opening';
+  if (shift === 'transition') return 'Transition';
+  if (shift === 'closing') return 'Closing';
+  return 'Task';
 };
 
 const TaskHistory = ({ onBack }) => {
@@ -77,8 +103,8 @@ const TaskHistory = ({ onBack }) => {
 
   const dateRangeLabel = useMemo(() => {
     if (!historyData.length) return dateRange;
-    const newest = new Date(historyData[0].date);
-    const oldest = new Date(historyData[historyData.length - 1].date);
+    const newest = parseDateOnly(historyData[0].date);
+    const oldest = parseDateOnly(historyData[historyData.length - 1].date);
     const label = (date) => date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -181,11 +207,21 @@ const TaskHistory = ({ onBack }) => {
         <div className="history-empty-state">
           <p>Loading task history…</p>
         </div>
+      ) : historyData.length === 0 ? (
+        <div className="history-empty-state">
+          <p>No task history recorded yet.</p>
+        </div>
       ) : (
         <div className="history-list">
           {historyData.map((day) => {
             const display = activeTab === 'all' ? day.total : day[activeTab];
             const formatted = formatDate(day.date);
+            const completedTasks = (day.completed || [])
+              .map(normalizeTaskEntry)
+              .filter((task) => activeTab === 'all' || task.shift === activeTab);
+            const missedTasks = (day.missed || [])
+              .map(normalizeTaskEntry)
+              .filter((task) => activeTab === 'all' || task.shift === activeTab);
             return (
               <div key={day.date} className="history-day-card">
                 <div className="day-card-header">
@@ -205,25 +241,73 @@ const TaskHistory = ({ onBack }) => {
                 </div>
 
                 <div className="day-tasks">
-                  {(day.missed || []).length === 0 ? (
-                    <div className="day-task-item">
-                      <span className="day-task-text">No missed tasks recorded.</span>
+                  <div className="day-task-section">
+                    <div className="day-task-section-header">
+                      <span>Completed</span>
+                      <span>{completedTasks.length}</span>
                     </div>
-                  ) : (
-                    day.missed.map((task, index) => (
-                      <div key={`${day.date}-${index}`} className="day-task-item missed">
-                        <label className="day-task-checkbox">
-                          <input type="checkbox" checked={false} readOnly />
-                          <span className="day-checkmark" />
-                        </label>
-                        <span className="day-task-text">{task}</span>
-                        <span className="day-task-status">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                          </svg>
-                        </span>
+                    {completedTasks.length === 0 ? (
+                      <div className="day-task-item">
+                        <span className="day-task-text">No completed tasks recorded.</span>
                       </div>
-                    ))
+                    ) : (
+                      completedTasks.map((task, index) => (
+                        <div key={`${day.date}-done-${index}`} className="day-task-item">
+                          <label className="day-task-checkbox">
+                            <input type="checkbox" checked readOnly />
+                            <span className="day-checkmark" />
+                          </label>
+                          <div className="day-task-text-block">
+                            <span className="day-task-text">{task.text}</span>
+                            <div className="day-task-meta">
+                              {activeTab === 'all' && (
+                                <span className={`day-task-pill ${task.shift || 'unknown'}`}>
+                                  {getShiftLabel(task.shift)}
+                                </span>
+                              )}
+                              {task.completed_by_name && (
+                                <span>{task.completed_by_name}</span>
+                              )}
+                              {task.completed_at && (
+                                <span>{formatCompletedTime(task.completed_at)}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {missedTasks.length > 0 && (
+                    <div className="day-task-section day-task-section-muted">
+                      <div className="day-task-section-header">
+                        <span>Missed</span>
+                        <span>{missedTasks.length}</span>
+                      </div>
+                      {missedTasks.map((task, index) => (
+                        <div key={`${day.date}-missed-${index}`} className="day-task-item missed">
+                          <label className="day-task-checkbox">
+                            <input type="checkbox" checked={false} readOnly />
+                            <span className="day-checkmark" />
+                          </label>
+                          <div className="day-task-text-block">
+                            <span className="day-task-text">{task.text}</span>
+                            {activeTab === 'all' && (
+                              <div className="day-task-meta">
+                                <span className={`day-task-pill ${task.shift || 'unknown'}`}>
+                                  {getShiftLabel(task.shift)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <span className="day-task-status">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                            </svg>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

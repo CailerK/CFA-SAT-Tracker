@@ -336,9 +336,15 @@ const Dashboard = ({ user, onLogout }) => {
         )}
 
         {currentPage === 'foh' ? (
-          <FOHTasks onBack={() => setCurrentPage('dashboard')} />
+          <FOHTasks
+            user={user}
+            onBack={() => setCurrentPage('dashboard')}
+          />
         ) : currentPage === 'foh-cleaning' ? (
-          <CleaningMaintenance onBack={() => setCurrentPage('dashboard')} />
+          <CleaningMaintenance
+            user={user}
+            onBack={() => setCurrentPage('dashboard')}
+          />
         ) : currentPage === 'weekly-digest' ? (
           <WeeklyDigest onBack={() => setCurrentPage('dashboard')} />
         ) : currentPage === 'team-chat' ? (

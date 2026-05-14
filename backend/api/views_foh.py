@@ -17,7 +17,7 @@ Mutations:
 
 from datetime import timedelta
 
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -36,6 +36,14 @@ from .viewsets import StoreScopedViewSet
 
 def _today():
     return timezone.localdate()
+
+
+def _local_date(value):
+    if value is None:
+        return None
+    if timezone.is_naive(value):
+        return value.date()
+    return timezone.localtime(value).date()
 
 
 class FOHTaskTemplateViewSet(StoreScopedViewSet):
@@ -142,7 +150,7 @@ class FOHTaskTemplateViewSet(StoreScopedViewSet):
         """Per-day rollup grouped by shift.
 
         Query: ?range=7d|14d|30d  (default 7d)
-        Response: [{date, opening: {done, total}, transition: {…}, closing: {…}, total: {…}, missed: [text]}]
+        Response: [{date, opening: {done, total}, transition: {…}, closing: {…}, total: {…}, completed: [...], missed: [...]}]
         """
         range_arg = request.query_params.get("range", "7d")
         try:
@@ -154,59 +162,86 @@ class FOHTaskTemplateViewSet(StoreScopedViewSet):
         end = _today()
         start = end - timedelta(days=days - 1)
 
-        # Per-shift totals across active templates.
-        totals_by_shift = dict(
-            self.get_queryset()
-            .values_list("shift")
-            .annotate(c=Count("id"))
-        )
-
         # Completions over the date range.
         completions = (
             FOHTaskCompletion.objects.filter(
                 template__store=request.user.store,
-                template__archived_at__isnull=True,
                 date__gte=start, date__lte=end,
             )
-            .select_related("template")
+            .select_related("template", "completed_by")
+            .order_by("-date", "template__shift", "template__order", "template_id")
         )
 
-        # Bucket by date+shift.
+        all_templates = list(
+            FOHTaskTemplate.objects.filter(store=request.user.store).order_by(
+                "shift", "order", "id"
+            )
+        )
+
         by_date = {}
         for c in completions:
             d = c.date.isoformat()
             day = by_date.setdefault(d, {
                 "date": d,
-                "opening": {"done": 0, "total": totals_by_shift.get("opening", 0)},
-                "transition": {"done": 0, "total": totals_by_shift.get("transition", 0)},
-                "closing": {"done": 0, "total": totals_by_shift.get("closing", 0)},
+                "opening": {"done": 0, "total": 0},
+                "transition": {"done": 0, "total": 0},
+                "closing": {"done": 0, "total": 0},
+                "completed": [],
                 "completed_template_ids": set(),
             })
             shift = c.template.shift
             if shift in day:
                 day[shift]["done"] += 1
             day["completed_template_ids"].add(c.template_id)
+            day["completed"].append({
+                "id": c.template_id,
+                "text": c.template.text,
+                "shift": c.template.shift,
+                "completed_at": c.completed_at,
+                "completed_by_name": (
+                    f"{c.completed_by.first_name} {c.completed_by.last_name}".strip()
+                    if c.completed_by else None
+                ) or (c.completed_by.email if c.completed_by else None),
+            })
 
-        # Compute missed task names for each day.
-        active_templates = list(self.get_queryset())
-        active_by_id = {t.id: t for t in active_templates}
         result = []
         for offset in range(days):
             d_obj = end - timedelta(days=offset)
             d = d_obj.isoformat()
             day = by_date.get(d) or {
                 "date": d,
-                "opening": {"done": 0, "total": totals_by_shift.get("opening", 0)},
-                "transition": {"done": 0, "total": totals_by_shift.get("transition", 0)},
-                "closing": {"done": 0, "total": totals_by_shift.get("closing", 0)},
+                "opening": {"done": 0, "total": 0},
+                "transition": {"done": 0, "total": 0},
+                "closing": {"done": 0, "total": 0},
+                "completed": [],
                 "completed_template_ids": set(),
             }
-            completed_ids = day.pop("completed_template_ids")
+
+            active_templates = [
+                template for template in all_templates
+                if _local_date(template.created_at) <= d_obj
+                and (
+                    template.archived_at is None
+                    or _local_date(template.archived_at) >= d_obj
+                )
+            ]
+            totals_by_shift = {"opening": 0, "transition": 0, "closing": 0}
+            for template in active_templates:
+                totals_by_shift[template.shift] += 1
+
+            completed_ids = day.pop("completed_template_ids", set())
+            for shift in ("opening", "transition", "closing"):
+                day[shift]["total"] = totals_by_shift[shift]
+
             missed = [
-                active_by_id[t_id].text
-                for t_id in active_by_id
-                if t_id not in completed_ids
-            ][:10]  # cap missed list per day
+                {
+                    "id": template.id,
+                    "text": template.text,
+                    "shift": template.shift,
+                }
+                for template in active_templates
+                if template.id not in completed_ids
+            ]
             total_done = sum(day[s]["done"] for s in ("opening", "transition", "closing"))
             total_total = sum(day[s]["total"] for s in ("opening", "transition", "closing"))
             day["total"] = {"done": total_done, "total": total_total}

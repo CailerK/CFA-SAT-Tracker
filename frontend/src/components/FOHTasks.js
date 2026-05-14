@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './FOHTasks.css';
 import TaskHistory from './TaskHistory';
 import fohService from '../services/foh';
+import useCentralDayRefresh from '../hooks/useCentralDayRefresh';
+import { isManagerOrAbove } from '../utils/access';
 
 // Normalize backend task to {id, text, completed}. The backend returns
 // `today_completion` as either null (not done today) or an object (done) —
@@ -15,7 +17,24 @@ const normalizeTask = (raw) => ({
   completedBy: raw.today_completion?.completed_by_name || null,
 });
 
-const FOHTasks = ({ onBack }) => {
+const withSequentialOrder = (list) => (
+  list.map((task, index) => ({ ...task, order: index }))
+);
+
+const reorderTaskList = (list, sourceId, targetId) => {
+  const sourceIndex = list.findIndex((task) => task.id === sourceId);
+  const targetIndex = list.findIndex((task) => task.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+    return list;
+  }
+
+  const next = [...list];
+  const [moved] = next.splice(sourceIndex, 1);
+  next.splice(targetIndex, 0, moved);
+  return withSequentialOrder(next);
+};
+
+const FOHTasks = ({ user }) => {
   const [activeTab, setActiveTab] = useState('opening');
   const [tasks, setTasks] = useState({ opening: [], transition: [], closing: [] });
   const [isLoading, setIsLoading] = useState(true);
@@ -25,15 +44,24 @@ const FOHTasks = ({ onBack }) => {
   const [showHistory, setShowHistory] = useState(false);
   const [requireInitials, setRequireInitials] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState(null);
+  const tasksRef = useRef(tasks);
+  const dragStateRef = useRef(null);
+  const canManageTasks = isManagerOrAbove(user);
+
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   // Load tasks from the backend on mount.
   const refreshTasks = useCallback(async () => {
     try {
       const grouped = await fohService.listTasksGroupedByShift();
       setTasks({
-        opening: (grouped.opening || []).map(normalizeTask),
-        transition: (grouped.transition || []).map(normalizeTask),
-        closing: (grouped.closing || []).map(normalizeTask),
+        opening: withSequentialOrder((grouped.opening || []).map(normalizeTask)),
+        transition: withSequentialOrder((grouped.transition || []).map(normalizeTask)),
+        closing: withSequentialOrder((grouped.closing || []).map(normalizeTask)),
       });
       setErrorMessage('');
     } catch (err) {
@@ -48,9 +76,7 @@ const FOHTasks = ({ onBack }) => {
     refreshTasks();
   }, [refreshTasks]);
 
-  if (showHistory) {
-    return <TaskHistory onBack={() => setShowHistory(false)} />;
-  }
+  useCentralDayRefresh(refreshTasks);
 
   const tabConfig = {
     opening: { label: 'Opening', total: tasks.opening.length, icon: '🌅' },
@@ -98,6 +124,7 @@ const FOHTasks = ({ onBack }) => {
   };
 
   const handleAddTask = async () => {
+    if (!canManageTasks) return;
     const text = newTaskName.trim();
     if (!text) return;
     try {
@@ -108,7 +135,7 @@ const FOHTasks = ({ onBack }) => {
       });
       setTasks(prev => ({
         ...prev,
-        [activeTab]: [...prev[activeTab], normalizeTask(created)],
+        [activeTab]: withSequentialOrder([...prev[activeTab], normalizeTask(created)]),
       }));
       setNewTaskName('');
       setShowAddTask(false);
@@ -119,11 +146,12 @@ const FOHTasks = ({ onBack }) => {
   };
 
   const deleteTask = async (taskId) => {
+    if (!canManageTasks) return;
     // Optimistic remove. (Backend soft-archives.)
     const prevList = tasks[activeTab];
     setTasks(prev => ({
       ...prev,
-      [activeTab]: prev[activeTab].filter(t => t.id !== taskId),
+      [activeTab]: withSequentialOrder(prev[activeTab].filter(t => t.id !== taskId)),
     }));
     try {
       await fohService.deleteTask(taskId);
@@ -133,6 +161,120 @@ const FOHTasks = ({ onBack }) => {
       setTasks(prev => ({ ...prev, [activeTab]: prevList }));
     }
   };
+
+  const persistTaskOrder = useCallback(async (shift, nextList, fallbackList) => {
+    try {
+      await fohService.reorderTasks(
+        nextList.map((task, index) => ({
+          id: task.id,
+          order: index,
+        }))
+      );
+      setTasks(prev => ({
+        ...prev,
+        [shift]: withSequentialOrder(nextList),
+      }));
+      setErrorMessage('');
+    } catch (err) {
+      console.error('Task reorder failed:', err);
+      setErrorMessage(err.message || 'Could not save the new task order.');
+      setTasks(prev => ({
+        ...prev,
+        [shift]: withSequentialOrder(fallbackList),
+      }));
+    }
+  }, []);
+
+  const handleGripPointerDown = (event, taskId) => {
+    if (!canManageTasks) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragStateRef.current = {
+      shift: activeTab,
+      taskId,
+      originalList: tasksRef.current[activeTab].map((task) => ({ ...task })),
+      hasMoved: false,
+    };
+    setDraggedTaskId(taskId);
+    setDragOverTaskId(taskId);
+  };
+
+  const moveTaskByDelta = async (taskId, delta) => {
+    if (!canManageTasks) return;
+    const currentList = tasksRef.current[activeTab];
+    const currentIndex = currentList.findIndex((task) => task.id === taskId);
+    const targetIndex = currentIndex + delta;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= currentList.length) {
+      return;
+    }
+
+    const targetId = currentList[targetIndex].id;
+    const nextList = reorderTaskList(currentList, taskId, targetId);
+    if (nextList === currentList) return;
+
+    setTasks(prev => ({ ...prev, [activeTab]: nextList }));
+    await persistTaskOrder(activeTab, nextList, currentList);
+  };
+
+  useEffect(() => {
+    if (!draggedTaskId) return undefined;
+
+    document.body.style.userSelect = 'none';
+
+    const handlePointerMove = (event) => {
+      const dragState = dragStateRef.current;
+      if (!dragState || dragState.shift !== activeTab) return;
+
+      const element = document.elementFromPoint(event.clientX, event.clientY);
+      const row = element?.closest?.('[data-foh-task-id]');
+      if (!row) return;
+
+      const targetId = Number(row.getAttribute('data-foh-task-id'));
+      if (!targetId) return;
+
+      setDragOverTaskId(targetId);
+      if (targetId === dragState.taskId) return;
+
+      setTasks((prev) => {
+        const nextList = reorderTaskList(prev[dragState.shift], dragState.taskId, targetId);
+        const changed = nextList.some((task, index) => task.id !== prev[dragState.shift][index]?.id);
+        if (changed) {
+          dragState.hasMoved = true;
+        }
+        return changed
+          ? { ...prev, [dragState.shift]: nextList }
+          : prev;
+      });
+    };
+
+    const finishDrag = () => {
+      const dragState = dragStateRef.current;
+      const currentList = dragState ? tasksRef.current[dragState.shift] : null;
+
+      setDraggedTaskId(null);
+      setDragOverTaskId(null);
+      dragStateRef.current = null;
+      document.body.style.userSelect = '';
+
+      if (!dragState || !dragState.hasMoved || !currentList) return;
+      void persistTaskOrder(dragState.shift, currentList, dragState.originalList);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', finishDrag);
+    window.addEventListener('pointercancel', finishDrag);
+
+    return () => {
+      document.body.style.userSelect = '';
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', finishDrag);
+      window.removeEventListener('pointercancel', finishDrag);
+    };
+  }, [activeTab, draggedTaskId, persistTaskOrder]);
+
+  if (showHistory) {
+    return <TaskHistory onBack={() => setShowHistory(false)} />;
+  }
 
   return (
     <div className="foh-page">
@@ -156,12 +298,14 @@ const FOHTasks = ({ onBack }) => {
                 <path d="M12 7v5l4 2"/>
               </svg>
             </button>
-            <button className="foh-icon-btn foh-icon-btn-primary" onClick={() => setShowAddTask(true)} aria-label="Add task">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14"/>
-                <path d="M12 5v14"/>
-              </svg>
-            </button>
+            {canManageTasks && (
+              <button className="foh-icon-btn foh-icon-btn-primary" onClick={() => setShowAddTask(true)} aria-label="Add task">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14"/>
+                  <path d="M12 5v14"/>
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -243,22 +387,36 @@ const FOHTasks = ({ onBack }) => {
             {tasks[activeTab].map((task) => (
               <div
                 key={task.id}
-                className={`foh-task-row ${task.completed ? 'completed' : ''}`}
+                data-foh-task-id={task.id}
+                className={`foh-task-row ${task.completed ? 'completed' : ''} ${draggedTaskId === task.id ? 'is-dragging' : ''} ${dragOverTaskId === task.id && draggedTaskId !== task.id ? 'is-drag-target' : ''}`}
               >
-                <button
-                  className="foh-grip"
-                  aria-label="Drag to reorder task"
-                  tabIndex={0}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="9" cy="12" r="1"/>
-                    <circle cx="9" cy="5" r="1"/>
-                    <circle cx="9" cy="19" r="1"/>
-                    <circle cx="15" cy="12" r="1"/>
-                    <circle cx="15" cy="5" r="1"/>
-                    <circle cx="15" cy="19" r="1"/>
-                  </svg>
-                </button>
+                {canManageTasks && (
+                  <button
+                    type="button"
+                    className="foh-grip"
+                    aria-label={`Reorder task: ${task.text}`}
+                    onPointerDown={(event) => handleGripPointerDown(event, task.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        void moveTaskByDelta(task.id, -1);
+                      }
+                      if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        void moveTaskByDelta(task.id, 1);
+                      }
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="9" cy="12" r="1"/>
+                      <circle cx="9" cy="5" r="1"/>
+                      <circle cx="9" cy="19" r="1"/>
+                      <circle cx="15" cy="12" r="1"/>
+                      <circle cx="15" cy="5" r="1"/>
+                      <circle cx="15" cy="19" r="1"/>
+                    </svg>
+                  </button>
+                )}
                 <button
                   type="button"
                   className={`foh-checkbox ${task.completed ? 'checked' : ''}`}
@@ -276,19 +434,21 @@ const FOHTasks = ({ onBack }) => {
                 <div className="foh-task-text-wrap">
                   <span className="foh-task-text">{task.text}</span>
                 </div>
-                <button
-                  className="foh-delete-btn"
-                  onClick={() => deleteTask(task.id)}
-                  aria-label={`Delete task: ${task.text}`}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 6h18"/>
-                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-                    <line x1="10" x2="10" y1="11" y2="17"/>
-                    <line x1="14" x2="14" y1="11" y2="17"/>
-                  </svg>
-                </button>
+                {canManageTasks && (
+                  <button
+                    className="foh-delete-btn"
+                    onClick={() => deleteTask(task.id)}
+                    aria-label={`Delete task: ${task.text}`}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18"/>
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                      <line x1="10" x2="10" y1="11" y2="17"/>
+                      <line x1="14" x2="14" y1="11" y2="17"/>
+                    </svg>
+                  </button>
+                )}
               </div>
             ))}
           </div>

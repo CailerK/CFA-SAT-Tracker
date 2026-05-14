@@ -3,6 +3,8 @@ import './SetupSheetTemplates.css'; // banner
 import './KitchenDashboard.css';     // kitchen nav
 import './KitchenCleaning.css';
 import cleaningService from '../services/cleaning';
+import useCentralDayRefresh from '../hooks/useCentralDayRefresh';
+import { isManagerOrAbove } from '../utils/access';
 
 // ===== Icons =====
 const IconLayoutDashboard = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>);
@@ -32,6 +34,7 @@ const KitchenCleaning = ({ onNavigate, user }) => {
   const [activeFrequency, setActiveFrequency] = useState('daily');
   const [tasksByFreq, setTasksByFreq] = useState({ daily: [], weekly: [], monthly: [] });
   const [isLoading, setIsLoading] = useState(true);
+  const canManageTasks = isManagerOrAbove(user);
 
   const refresh = useCallback(async () => {
     try {
@@ -49,6 +52,7 @@ const KitchenCleaning = ({ onNavigate, user }) => {
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+  useCentralDayRefresh(refresh);
 
   const tasks = tasksByFreq[activeFrequency] || [];
   const doneToday = tasks.filter(t => t.today_completion).length;
@@ -113,6 +117,7 @@ const KitchenCleaning = ({ onNavigate, user }) => {
   };
 
   const handleAddTask = async () => {
+    if (!canManageTasks) return;
     const name = window.prompt('Task name');
     if (!name?.trim()) return;
     const frequency = window.prompt('Frequency (daily, weekly, monthly)', activeFrequency) || activeFrequency;
@@ -192,9 +197,11 @@ const KitchenCleaning = ({ onNavigate, user }) => {
           </div>
           <div className="kcl-header-actions">
             <button type="button" className="kcl-btn kcl-btn-outline" onClick={handleViewHistory}>History</button>
-            <button type="button" className="kcl-btn kcl-btn-primary" onClick={handleAddTask}>
-              <IconPlus className="kcl-btn-icon" /> Add Task
-            </button>
+            {canManageTasks && (
+              <button type="button" className="kcl-btn kcl-btn-primary" onClick={handleAddTask}>
+                <IconPlus className="kcl-btn-icon" /> Add Task
+              </button>
+            )}
           </div>
         </div>
 
@@ -224,7 +231,9 @@ const KitchenCleaning = ({ onNavigate, user }) => {
             <div className="kcl-empty">
               <div className="kcl-empty-emoji">🧹</div>
               <p className="kcl-empty-title">No tasks</p>
-              <p className="kcl-empty-sub">Add a task to get started</p>
+              <p className="kcl-empty-sub">
+                {canManageTasks ? 'Add a task to get started' : 'No cleaning tasks are scheduled right now'}
+              </p>
             </div>
           ) : (
             tasks.map((t) => {
