@@ -123,11 +123,10 @@ class User(AbstractUser):
         null=True, blank=True,
         related_name="direct_reports",
     )
-    shift_preference = models.CharField(
-        max_length=10,
-        choices=[("day", "Day"), ("night", "Night"), ("flex", "Flex")],
-        default="flex",
+    shift_preference = models.JSONField(
+        default=dict,
         blank=True,
+        help_text="Weekly availability schedule with days and hours",
     )
     is_admin = models.BooleanField(
         default=False,

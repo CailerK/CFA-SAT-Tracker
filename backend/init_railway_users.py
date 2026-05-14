@@ -57,7 +57,7 @@ def upsert_default_store():
 
 def upsert_user(*, email, username, password, first_name, last_name, role,
                 store=None, company_id="02203", is_demo_user=False,
-                is_superuser=False, is_staff=False):
+                is_superuser=False, is_staff=False, is_admin=False):
     """Create the user if missing; otherwise just make sure they're linked
     to the default store + have a preferences row. We never clobber existing
     passwords or roles."""
@@ -69,8 +69,12 @@ def upsert_user(*, email, username, password, first_name, last_name, role,
         if store and existing.store_id is None:
             existing.store = store
             changed = True
+        # Update is_admin flag if specified
+        if is_admin and not existing.is_admin:
+            existing.is_admin = True
+            changed = True
         if changed:
-            existing.save(update_fields=["store"])
+            existing.save(update_fields=["store", "is_admin"])
         UserPreferences.objects.get_or_create(user=existing)
         print(f"  - {email} already exists, ensured store link + prefs.")
         return existing
@@ -83,6 +87,7 @@ def upsert_user(*, email, username, password, first_name, last_name, role,
         role=role,
         company_id=company_id,
         is_demo_user=is_demo_user,
+        is_admin=is_admin,
         store=store,
     )
     if is_superuser:
@@ -94,7 +99,7 @@ def upsert_user(*, email, username, password, first_name, last_name, role,
         user.save()
     UserPreferences.objects.get_or_create(user=user)
     print(f"  + Created {email} ({first_name} {last_name}, role={role}, "
-          f"superuser={is_superuser})")
+          f"admin={is_admin}, superuser={is_superuser})")
     return user
 
 
@@ -148,6 +153,7 @@ def main():
             "last_name": "Manager",
             "role": "manager",
             "is_demo_user": True,
+            "is_admin": True,
         },
         {
             "email": "store@cfasattracker.com",

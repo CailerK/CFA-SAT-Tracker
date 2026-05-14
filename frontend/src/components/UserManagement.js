@@ -143,7 +143,26 @@ const UserManagement = ({ currentUser }) => {
       loadData();
     } catch (err) {
       console.error('Failed to save user:', err);
-      alert(err.message || 'Failed to save user');
+      // Try to extract detailed error message from API response
+      let errorMessage = 'Failed to save user';
+      if (err.message) {
+        errorMessage = err.message;
+      }
+      // If there's a response body with field-specific errors, show those
+      if (typeof err === 'object' && err !== null) {
+        const errors = [];
+        for (const [field, messages] of Object.entries(err)) {
+          if (Array.isArray(messages)) {
+            errors.push(`${field}: ${messages.join(', ')}`);
+          } else if (typeof messages === 'string') {
+            errors.push(`${field}: ${messages}`);
+          }
+        }
+        if (errors.length > 0) {
+          errorMessage = errors.join('\n');
+        }
+      }
+      alert(errorMessage);
     }
   };
 
