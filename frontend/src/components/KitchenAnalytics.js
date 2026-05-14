@@ -1,4 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import './SetupSheetTemplates.css'; // banner
+import './KitchenDashboard.css';     // kitchen tabs (kd-nav*)
+import './KitchenAnalytics.css';
 import kitchenService from '../services/kitchen';
 
 // Map the UI range label to the backend's range string (e.g. "Last 30 Days" → "30d").
@@ -9,9 +12,6 @@ const rangeToDays = (label) => {
   if (/month/i.test(label)) return '30d';
   return '30d';
 };
-import './SetupSheetTemplates.css'; // banner
-import './KitchenDashboard.css';     // kitchen tabs (kd-nav*)
-import './KitchenAnalytics.css';
 
 // ===== Icons =====
 const IconLayoutDashboard = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>);
