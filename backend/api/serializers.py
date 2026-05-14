@@ -231,7 +231,14 @@ class UserManagementDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "initials", "store_name", "created_at", "updated_at"]
 
     def validate(self, data):
-        """Prevent non-superusers from modifying admin/superuser flags."""
+        """
+        Prevent non-superusers from modifying admin/superuser flags.
+        
+        Admins can:
+        - Create new admins (is_admin=True on new users)
+        - NOT modify is_superuser or is_staff
+        - NOT change is_admin on existing admins (can only modify non-admins)
+        """
         request = self.context.get('request')
         if request and not request.user.is_superuser:
             # Regular admins cannot change these fields
@@ -242,12 +249,14 @@ class UserManagementDetailSerializer(serializers.ModelSerializer):
                         field: "Only superusers can modify this field."
                     })
             
-            # Regular admins can't promote others to admin
-            if 'is_admin' in data and data['is_admin']:
-                if not self.instance or not self.instance.is_admin:
+            # For UPDATES: Regular admins can't modify is_admin on existing admins
+            if self.instance and self.instance.is_admin:
+                if 'is_admin' in data and data['is_admin'] != self.instance.is_admin:
                     raise serializers.ValidationError({
-                        'is_admin': "Only superusers can promote users to admin."
+                        'is_admin': "You cannot modify admin status of existing admins."
                     })
+            
+            # For CREATES: Admins CAN create new admins (no restriction)
         
         return data
 

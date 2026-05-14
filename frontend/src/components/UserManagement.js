@@ -444,34 +444,43 @@ const UserManagement = ({ currentUser }) => {
                   </div>
                 )}
 
-                {isSuperuser && (
-                  <div className="form-group">
+                {/* Permission checkboxes */}
+                <div className="form-group">
+                  {/* Admins can set admin checkbox when CREATING, but not when editing existing admins */}
+                  {(isSuperuser || (isAdmin && !editingUser.id)) && (
                     <label className="checkbox-label">
                       <input
                         type="checkbox"
                         checked={editingUser.isAdmin}
                         onChange={(e) => setEditingUser({...editingUser, isAdmin: e.target.checked})}
+                        disabled={isAdmin && editingUser.id && editingUser.isAdmin}
                       />
                       <span>Admin (can manage users)</span>
                     </label>
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={editingUser.isSuperuser}
-                        onChange={(e) => setEditingUser({...editingUser, isSuperuser: e.target.checked, isStaff: e.target.checked})}
-                      />
-                      <span>Superuser (full system access)</span>
-                    </label>
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={editingUser.isDemoUser}
-                        onChange={(e) => setEditingUser({...editingUser, isDemoUser: e.target.checked})}
-                      />
-                      <span>Demo User</span>
-                    </label>
-                  </div>
-                )}
+                  )}
+                  
+                  {/* Only superusers can manage superuser and demo flags */}
+                  {isSuperuser && (
+                    <>
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={editingUser.isSuperuser}
+                          onChange={(e) => setEditingUser({...editingUser, isSuperuser: e.target.checked, isStaff: e.target.checked})}
+                        />
+                        <span>Superuser (full system access)</span>
+                      </label>
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={editingUser.isDemoUser}
+                          onChange={(e) => setEditingUser({...editingUser, isDemoUser: e.target.checked})}
+                        />
+                        <span>Demo User</span>
+                      </label>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>

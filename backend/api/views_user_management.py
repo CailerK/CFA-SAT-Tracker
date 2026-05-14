@@ -46,8 +46,8 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         """
         Return users based on the requesting user's permissions.
         
-        Superusers: See all users (but typically filtered to their store)
-        Admins: See all users in their store
+        Superusers: See all users (including other superusers)
+        Admins: See all users in their store EXCEPT superusers
         """
         user = self.request.user
         
@@ -55,16 +55,15 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         qs = User.objects.select_related('store').order_by('-created_at')
         
         # Superusers can see everyone, but we still scope to their store
-        # unless they explicitly request all stores (future feature)
         if user.is_superuser:
             # For now, scope to their store
             if user.store_id:
                 return qs.filter(store_id=user.store_id)
             return qs
         
-        # Admins see only users in their store
+        # Admins see only users in their store, but NOT superusers
         if user.is_admin and user.store_id:
-            return qs.filter(store_id=user.store_id)
+            return qs.filter(store_id=user.store_id).exclude(is_superuser=True)
         
         # Shouldn't reach here due to permission class, but just in case
         return qs.none()

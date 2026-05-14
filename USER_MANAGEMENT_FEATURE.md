@@ -16,13 +16,15 @@ Added in-app user management interface for superadmins and admins to create, edi
 - ✅ Assign users to stores (if multiple stores exist)
 
 ### Admins (is_admin=True, is_superuser=False)
-- ✅ View all users in their store
+- ✅ View all users in their store (EXCEPT superusers - they are hidden)
 - ✅ Create new users in their store
+- ✅ **Create new admins** (can set is_admin=True when creating)
 - ✅ Edit regular users (team members, shift leads, managers)
 - ✅ Delete regular users (not admins or superusers)
-- ❌ Cannot edit other admins or superusers
-- ❌ Cannot delete admins or superusers
-- ❌ Cannot change admin/superuser status
+- ❌ **Cannot see superusers** (filtered from list)
+- ❌ Cannot edit other admins' permissions
+- ❌ Cannot delete other admins
+- ❌ Cannot change superuser/staff status
 - ❌ Cannot delete themselves
 - ✅ Reset passwords for users they can edit
 
@@ -177,15 +179,20 @@ Located in **Settings → User Management** tab (only visible to admins/superuse
 
 | Action | Superuser | Admin | Regular User |
 |--------|-----------|-------|--------------|
-| View user list | ✅ | ✅ | ❌ |
-| Create user | ✅ | ✅ | ❌ |
+| View user list | ✅ (all users) | ✅ (no superusers) | ❌ |
+| See superusers | ✅ | ❌ | ❌ |
+| Create regular user | ✅ | ✅ | ❌ |
+| Create admin | ✅ | ✅ | ❌ |
+| Create superuser | ✅ | ❌ | ❌ |
 | Edit regular user | ✅ | ✅ | ❌ |
-| Edit admin | ✅ | ❌ | ❌ |
-| Edit superuser | ✅ | ❌ | ❌ |
+| Edit admin permissions | ✅ | ❌ | ❌ |
+| Edit superuser | ✅ | ❌ (can't see) | ❌ |
 | Delete regular user | ✅ | ✅ | ❌ |
 | Delete admin | ✅ | ❌ | ❌ |
+| Delete superuser | ✅ | ❌ (can't see) | ❌ |
 | Delete self | ❌ | ❌ | ❌ |
-| Change admin status | ✅ | ❌ | ❌ |
+| Set admin flag (create) | ✅ | ✅ | ❌ |
+| Change admin flag (edit) | ✅ | ❌ | ❌ |
 | Change superuser status | ✅ | ❌ | ❌ |
 | Reset password | ✅ | ✅ (for users they can edit) | ❌ |
 | Assign to different store | ✅ | ❌ | ❌ |
