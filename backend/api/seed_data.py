@@ -1135,7 +1135,7 @@ def seed_all_for_store(store):
     seed_temperature_targets(store)
     # Phase 6
     seed_departments(store)
-    seed_sample_team_members(store)
+    # seed_sample_team_members(store)  # DISABLED: Don't auto-create demo users
     seed_training_plans(store)
     seed_quick_links(store)
     # Phase 7
