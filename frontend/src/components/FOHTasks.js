@@ -1,129 +1,137 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './FOHTasks.css';
 import TaskHistory from './TaskHistory';
+import fohService from '../services/foh';
+
+// Normalize backend task to {id, text, completed}. The backend returns
+// `today_completion` as either null (not done today) or an object (done) —
+// presence/absence drives the checkbox state.
+const normalizeTask = (raw) => ({
+  id: raw.id,
+  text: raw.text,
+  order: raw.order,
+  completed: Boolean(raw.today_completion),
+  completedAt: raw.today_completion?.completed_at || null,
+  completedBy: raw.today_completion?.completed_by_name || null,
+});
 
 const FOHTasks = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState('opening');
-  const [tasks, setTasks] = useState({
-    opening: [
-      { id: 1, text: 'Stock all wall combines', completed: false },
-      { id: 2, text: 'Stock Ice cream, Milks, Whip Cream, and Shake Base', completed: false },
-      { id: 3, text: 'Make Salad Kits', completed: false },
-      { id: 4, text: 'Dining Room Tables Clean', completed: false },
-      { id: 5, text: 'Glass Cleaned in Dining Room', completed: false },
-      { id: 6, text: 'Tea, Ice, and Lemonade Stocked', completed: false },
-      { id: 7, text: 'All counters wiped down EVERYWHERE', completed: false },
-      { id: 8, text: 'Sweep and Mop Drive', completed: false },
-      { id: 9, text: 'Trays Cleaned', completed: false },
-      { id: 10, text: '3 Coffee base made', completed: false },
-      { id: 11, text: 'Napkins and Drink holders', completed: false },
-      { id: 12, text: 'Shakes-Replace any syrups/Cookies', completed: false },
-      { id: 13, text: 'Dumpster Pad Check', completed: false },
-      { id: 14, text: '8 lemonades made', completed: false },
-      { id: 15, text: 'All Headset batteries charging', completed: false },
-      { id: 16, text: 'Cups and lids', completed: false },
-    ],
-    transition: [
-      { id: 101, text: 'Mid-shift inventory check', completed: false },
-      { id: 102, text: 'Restock napkin holders', completed: false },
-      { id: 103, text: 'Check drink station supplies', completed: false },
-      { id: 104, text: 'Clean and organize POS stations', completed: false },
-      { id: 105, text: 'Sweep dining room floor', completed: false },
-      { id: 106, text: 'Check restroom supplies', completed: false },
-    ],
-    closing: [
-      { id: 201, text: 'Dining Room Trash', completed: false },
-      { id: 202, text: 'Put up propane in marketing closet', completed: false },
-      { id: 203, text: 'make sure heaters are off in drive thru', completed: false },
-      { id: 204, text: 'lock doors', completed: false },
-      { id: 205, text: "Men's Restroom", completed: false },
-      { id: 206, text: "Women's Restroom", completed: false },
-      { id: 207, text: 'Make Salad Kits', completed: false },
-      { id: 208, text: 'Stock Dressings', completed: false },
-      { id: 209, text: 'Stock Ice cream, Milks, Whip Cream, and Shake Base', completed: false },
-      { id: 210, text: 'Break Down and Clean Lemonades', completed: false },
-      { id: 211, text: 'Drain Tea Urns and Take Them to Dishes', completed: false },
-      { id: 212, text: 'Plug in all Ipads, Card Readers, and Headset Batteries', completed: false },
-      { id: 213, text: 'Clean Sinks', completed: false },
-      { id: 214, text: 'Clean FC', completed: false },
-      { id: 215, text: 'Clean Coffees', completed: false },
-      { id: 216, text: 'Clean Trays', completed: false },
-      { id: 217, text: 'Clean Screens', completed: false },
-      { id: 218, text: 'Break Down and Clean Drink Stations', completed: false },
-      { id: 219, text: 'Final walkthrough', completed: false },
-      { id: 220, text: 'Set alarm system', completed: false },
-      { id: 221, text: 'Check all doors locked', completed: false },
-      { id: 222, text: 'Turn off all lights', completed: false },
-      { id: 223, text: 'Count registers', completed: false },
-      { id: 224, text: 'Prepare deposit', completed: false },
-      { id: 225, text: 'Clean shake machine', completed: false },
-      { id: 226, text: 'Mop floors', completed: false },
-      { id: 227, text: 'Take out trash', completed: false },
-      { id: 228, text: 'Clean shake area', completed: false },
-      { id: 229, text: 'Restock sauce bottles', completed: false },
-      { id: 230, text: 'Clean ice machine', completed: false },
-      { id: 231, text: 'Sanitize tables', completed: false },
-      { id: 232, text: 'Clean windows', completed: false },
-      { id: 233, text: 'Stock cups for tomorrow', completed: false },
-      { id: 234, text: 'Check cooler temperatures', completed: false },
-    ]
-  });
+  const [tasks, setTasks] = useState({ opening: [], transition: [], closing: [] });
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [requireInitials, setRequireInitials] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
 
+  // Load tasks from the backend on mount.
+  const refreshTasks = useCallback(async () => {
+    try {
+      const grouped = await fohService.listTasksGroupedByShift();
+      setTasks({
+        opening: (grouped.opening || []).map(normalizeTask),
+        transition: (grouped.transition || []).map(normalizeTask),
+        closing: (grouped.closing || []).map(normalizeTask),
+      });
+      setErrorMessage('');
+    } catch (err) {
+      console.error('Failed to load FOH tasks:', err);
+      setErrorMessage(err.message || 'Could not load tasks.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshTasks();
+  }, [refreshTasks]);
+
   if (showHistory) {
     return <TaskHistory onBack={() => setShowHistory(false)} />;
   }
 
   const tabConfig = {
-    opening: { label: 'Opening', total: 16, icon: '🌅' },
-    transition: { label: 'Transition', total: 6, icon: '🔄' },
-    closing: { label: 'Closing', total: 34, icon: '🌙' }
+    opening: { label: 'Opening', total: tasks.opening.length, icon: '🌅' },
+    transition: { label: 'Transition', total: tasks.transition.length, icon: '🔄' },
+    closing: { label: 'Closing', total: tasks.closing.length, icon: '🌙' },
   };
 
-  const toggleTask = (taskId) => {
+  const toggleTask = async (taskId) => {
+    // Optimistic update — flip the checkbox immediately, then sync to server.
+    const currentList = tasks[activeTab];
+    const target = currentList.find(t => t.id === taskId);
+    if (!target) return;
+    const willBeCompleted = !target.completed;
     setTasks(prev => ({
       ...prev,
-      [activeTab]: prev[activeTab].map(task =>
-        task.id === taskId ? { ...task, completed: !task.completed } : task
-      )
+      [activeTab]: prev[activeTab].map(t =>
+        t.id === taskId ? { ...t, completed: willBeCompleted } : t
+      ),
     }));
-  };
-
-  const getCompletedCount = (tab) => {
-    return tasks[tab].filter(t => t.completed).length;
-  };
-
-  const getProgressPercentage = (tab) => {
-    const completed = getCompletedCount(tab);
-    const total = tabConfig[tab].total;
-    return Math.round((completed / total) * 100);
-  };
-
-  const handleAddTask = () => {
-    if (newTaskName.trim()) {
-      const newTask = {
-        id: Date.now(),
-        text: newTaskName.trim(),
-        completed: false
-      };
+    try {
+      if (willBeCompleted) {
+        await fohService.completeTask(taskId);
+      } else {
+        await fohService.uncompleteTask(taskId);
+      }
+    } catch (err) {
+      // Roll back on failure.
+      console.error('Toggle failed:', err);
+      setErrorMessage('Could not save — change rolled back.');
       setTasks(prev => ({
         ...prev,
-        [activeTab]: [...prev[activeTab], newTask]
+        [activeTab]: prev[activeTab].map(t =>
+          t.id === taskId ? { ...t, completed: target.completed } : t
+        ),
       }));
-      setNewTaskName('');
-      setShowAddTask(false);
     }
   };
 
-  const deleteTask = (taskId) => {
+  const getCompletedCount = (tab) => tasks[tab].filter(t => t.completed).length;
+
+  const getProgressPercentage = (tab) => {
+    const total = tabConfig[tab].total;
+    if (!total) return 0;
+    return Math.round((getCompletedCount(tab) / total) * 100);
+  };
+
+  const handleAddTask = async () => {
+    const text = newTaskName.trim();
+    if (!text) return;
+    try {
+      const created = await fohService.createTask({
+        shift: activeTab,
+        text,
+        order: tasks[activeTab].length,
+      });
+      setTasks(prev => ({
+        ...prev,
+        [activeTab]: [...prev[activeTab], normalizeTask(created)],
+      }));
+      setNewTaskName('');
+      setShowAddTask(false);
+    } catch (err) {
+      console.error('Add task failed:', err);
+      setErrorMessage(err.message || 'Could not add task. Manager role required.');
+    }
+  };
+
+  const deleteTask = async (taskId) => {
+    // Optimistic remove. (Backend soft-archives.)
+    const prevList = tasks[activeTab];
     setTasks(prev => ({
       ...prev,
-      [activeTab]: prev[activeTab].filter(task => task.id !== taskId)
+      [activeTab]: prev[activeTab].filter(t => t.id !== taskId),
     }));
+    try {
+      await fohService.deleteTask(taskId);
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setErrorMessage('Could not delete — change rolled back.');
+      setTasks(prev => ({ ...prev, [activeTab]: prevList }));
+    }
   };
 
   return (

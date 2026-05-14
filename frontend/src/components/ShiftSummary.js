@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import './SetupSheetTemplates.css'; // reuse banner + tabs
 import './ShiftSummary.css';
+import shiftSummaryService from '../services/shiftSummary';
 
 // ===== Icons =====
 const IconLayoutDashboard = (props) => (
@@ -87,10 +88,18 @@ const getGreeting = () => {
 const getCurrentDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 const getDateInputValue = () => new Date().toISOString().slice(0, 10);
 
-const WIN_OPTIONS = ['Strong sales', 'Fast drive-thru', 'Great teamwork', 'Clean handoff', 'Low waste', 'Guest recovery win'];
-const CHALLENGE_OPTIONS = ['Staffing', 'Inventory', 'Customer rush', 'POS / tech', 'Training gaps', 'Equipment issue'];
+// Note: WIN_OPTIONS / CHALLENGE_OPTIONS used to be hardcoded here. They're
+// now loaded from /api/shift-summaries/tags/ so admins can edit them.
 const SHIFT_TYPES = ['Opening', 'Mid', 'Closing'];
 const SHIFT_STATUSES = ['Normal', 'Busy', 'Slow', 'Incident'];
+
+// Convert UI labels to the backend's lowercase enum values.
+const toBackendShiftType = (label) => (label || '').toLowerCase();
+const toUiShiftType = (val) =>
+  ({ opening: 'Opening', mid: 'Mid', closing: 'Closing' }[val] || 'Closing');
+const toBackendShiftStatus = (label) => (label || '').toLowerCase();
+const toUiShiftStatus = (val) =>
+  ({ normal: 'Normal', busy: 'Busy', slow: 'Slow', incident: 'Incident' }[val] || 'Normal');
 
 const toneForStatus = (status) => {
   switch (status) {
@@ -109,6 +118,7 @@ const ShiftSummary = ({ onNavigate, user }) => {
   const [shiftStatus, setShiftStatus] = useState('Normal');
   const [rating, setRating] = useState(4);
   const [hoveredRating, setHoveredRating] = useState(0);
+  // wins/challenges are now Set<Number> of ShiftTag IDs (was Set<String>).
   const [wins, setWins] = useState(new Set());
   const [challenges, setChallenges] = useState(new Set());
   const [recap, setRecap] = useState('');
@@ -118,6 +128,88 @@ const ShiftSummary = ({ onNavigate, user }) => {
   const [handoffNote, setHandoffNote] = useState('');
   const [needsFollowUp, setNeedsFollowUp] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  // Tag catalog loaded from the backend.
+  const [winTags, setWinTags] = useState([]);             // [{id, label, ...}]
+  const [challengeTags, setChallengeTags] = useState([]); // [{id, label, ...}]
+  const [draftId, setDraftId] = useState(null);
+  const [saveStatus, setSaveStatus] = useState(null);     // 'saving'|'saved'|'error'|null
+  const [isLoading, setIsLoading] = useState(true);
+  const autosaveTimer = useRef(null);
+
+  // ---------- Initial load: tags + any existing draft ----------
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [tags, draft] = await Promise.all([
+          shiftSummaryService.listTags(),
+          shiftSummaryService.getDraftToday(),
+        ]);
+        if (cancelled) return;
+        const tagsArray = tags.results || tags || [];
+        setWinTags(tagsArray.filter(t => t.kind === 'win'));
+        setChallengeTags(tagsArray.filter(t => t.kind === 'challenge'));
+        if (draft && draft.id) {
+          setDraftId(draft.id);
+          setShiftDate(draft.shift_date);
+          setShiftType(toUiShiftType(draft.shift_type));
+          setShiftStatus(toUiShiftStatus(draft.shift_status));
+          setRating(draft.rating || 4);
+          setRecap(draft.recap || '');
+          setSalesNote(draft.sales_note || '');
+          setLaborPercent(draft.labor_percent || '');
+          setSosNote(draft.sos_note || '');
+          setHandoffNote(draft.handoff_note || '');
+          setNeedsFollowUp(Boolean(draft.needs_follow_up));
+          const tagIds = (draft.tags || []).map(t => t.id);
+          setWins(new Set(tagsArray
+            .filter(t => t.kind === 'win' && tagIds.includes(t.id))
+            .map(t => t.id)));
+          setChallenges(new Set(tagsArray
+            .filter(t => t.kind === 'challenge' && tagIds.includes(t.id))
+            .map(t => t.id)));
+        }
+      } catch (err) {
+        console.error('Failed to load shift summary state:', err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ---------- Debounced autosave to /draft/today/ ----------
+  const buildPayload = useCallback(() => ({
+    shift_date: shiftDate,
+    shift_type: toBackendShiftType(shiftType),
+    shift_status: toBackendShiftStatus(shiftStatus),
+    rating: rating || 0,
+    recap, sales_note: salesNote,
+    labor_percent: laborPercent ? Number(laborPercent) : null,
+    sos_note: sosNote, handoff_note: handoffNote,
+    needs_follow_up: needsFollowUp,
+    tag_ids: [...wins, ...challenges],
+  }), [shiftDate, shiftType, shiftStatus, rating, recap, salesNote,
+       laborPercent, sosNote, handoffNote, needsFollowUp, wins, challenges]);
+
+  useEffect(() => {
+    if (isLoading) return; // don't autosave before first load completes
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(async () => {
+      setSaveStatus('saving');
+      try {
+        const saved = await shiftSummaryService.saveDraft(buildPayload());
+        if (saved && saved.id) setDraftId(saved.id);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus(null), 1500);
+      } catch (err) {
+        console.error('Autosave failed:', err);
+        setSaveStatus('error');
+      }
+    }, 800);
+    return () => autosaveTimer.current && clearTimeout(autosaveTimer.current);
+  }, [buildPayload, isLoading]);
 
   const tabs = [
     { id: 'templates', label: 'Templates', Icon: IconLayoutDashboard },
@@ -143,7 +235,7 @@ const ShiftSummary = ({ onNavigate, user }) => {
   const toggleWin = toggleSetItem(setWins, wins);
   const toggleChallenge = toggleSetItem(setChallenges, challenges);
 
-  const clearForm = () => {
+  const clearForm = async () => {
     setShiftLead('');
     setShiftDate(getDateInputValue());
     setShiftType('Closing');
@@ -157,10 +249,27 @@ const ShiftSummary = ({ onNavigate, user }) => {
     setSosNote('');
     setHandoffNote('');
     setNeedsFollowUp(false);
+    // Also discard the server-side draft so we start fresh on next visit.
+    try { await shiftSummaryService.discardDraft(); }
+    catch (err) { console.warn('Discard draft failed:', err); }
+    setDraftId(null);
   };
 
-  const handleSave = () => {
-    alert('Shift summary saved (demo).');
+  const handleSave = async () => {
+    setSaveStatus('saving');
+    try {
+      // Cancel any pending autosave so we don't race with the submit.
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+      await shiftSummaryService.submit(buildPayload());
+      setSaveStatus('saved');
+      setDraftId(null);
+      setTimeout(() => setSaveStatus(null), 2000);
+      // Optional: navigate to history so the user sees their submission.
+      if (onNavigate) onNavigate('shift-summary-history');
+    } catch (err) {
+      console.error('Submit failed:', err);
+      setSaveStatus('error');
+    }
   };
 
   const tone = useMemo(() => toneForStatus(shiftStatus), [shiftStatus]);
@@ -332,15 +441,15 @@ const ShiftSummary = ({ onNavigate, user }) => {
               <div className="ssum-field">
                 <label className="ssum-label">What went well?</label>
                 <div className="ssum-chip-group">
-                  {WIN_OPTIONS.map((w) => (
+                  {winTags.map((tag) => (
                     <button
-                      key={w}
+                      key={tag.id}
                       type="button"
-                      aria-pressed={wins.has(w)}
-                      className={`ssum-chip ssum-chip-good ${wins.has(w) ? 'active' : ''}`}
-                      onClick={() => toggleWin(w)}
+                      aria-pressed={wins.has(tag.id)}
+                      className={`ssum-chip ssum-chip-good ${wins.has(tag.id) ? 'active' : ''}`}
+                      onClick={() => toggleWin(tag.id)}
                     >
-                      {w}
+                      {tag.label}
                     </button>
                   ))}
                 </div>
@@ -350,15 +459,15 @@ const ShiftSummary = ({ onNavigate, user }) => {
               <div className="ssum-field">
                 <label className="ssum-label">What challenged the shift?</label>
                 <div className="ssum-chip-group">
-                  {CHALLENGE_OPTIONS.map((c) => (
+                  {challengeTags.map((tag) => (
                     <button
-                      key={c}
+                      key={tag.id}
                       type="button"
-                      aria-pressed={challenges.has(c)}
-                      className={`ssum-chip ssum-chip-warn ${challenges.has(c) ? 'active' : ''}`}
-                      onClick={() => toggleChallenge(c)}
+                      aria-pressed={challenges.has(tag.id)}
+                      className={`ssum-chip ssum-chip-warn ${challenges.has(tag.id) ? 'active' : ''}`}
+                      onClick={() => toggleChallenge(tag.id)}
                     >
-                      {c}
+                      {tag.label}
                     </button>
                   ))}
                 </div>
@@ -447,10 +556,28 @@ const ShiftSummary = ({ onNavigate, user }) => {
                 <button type="button" className="ssum-btn ssum-btn-secondary" onClick={clearForm}>
                   Clear form
                 </button>
-                <button type="button" className="ssum-btn ssum-btn-primary" onClick={handleSave}>
-                  Save shift summary
+                <button
+                  type="button"
+                  className="ssum-btn ssum-btn-primary"
+                  onClick={handleSave}
+                  disabled={saveStatus === 'saving' || isLoading}
+                >
+                  {saveStatus === 'saving' ? 'Saving…'
+                    : saveStatus === 'saved' ? 'Saved ✓'
+                    : saveStatus === 'error' ? 'Try again'
+                    : 'Save shift summary'}
                 </button>
               </div>
+              {saveStatus && (
+                <p
+                  className="ssum-save-hint"
+                  style={{ marginTop: 8, fontSize: 13, color: saveStatus === 'error' ? '#dc2626' : '#16a34a' }}
+                >
+                  {saveStatus === 'saving' && 'Saving draft…'}
+                  {saveStatus === 'saved' && 'Saved'}
+                  {saveStatus === 'error' && 'Could not save — try again.'}
+                </p>
+              )}
             </div>
           </section>
 

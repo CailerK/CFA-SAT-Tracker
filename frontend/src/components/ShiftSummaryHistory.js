@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './ShiftSummaryHistory.css';
+import shiftSummaryService from '../services/shiftSummary';
 
 const ShiftSummaryHistory = ({ onNavigate, user }) => {
   const [activeTab, setActiveTab] = useState('history');
@@ -7,6 +8,24 @@ const ShiftSummaryHistory = ({ onNavigate, user }) => {
   const [shiftFilter, setShiftFilter] = useState('All shifts');
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [summaryFilter, setSummaryFilter] = useState('All summaries');
+  const [summaries, setSummaries] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await shiftSummaryService.list();
+        const rows = res.results || res || [];
+        if (!cancelled) setSummaries(rows);
+      } catch (err) {
+        console.error('Failed to load shift summaries:', err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const tabs = [
     { id: 'templates', label: 'Templates', icon: '📋' },
@@ -112,10 +131,71 @@ const ShiftSummaryHistory = ({ onNavigate, user }) => {
         </div>
       </div>
 
-      {/* Empty State */}
-      <div className="history-empty-state">
-        <p>No saved summaries matched this filter range.</p>
-      </div>
+      {/* List of saved summaries */}
+      {isLoading ? (
+        <div className="history-empty-state">
+          <p>Loading shift summaries…</p>
+        </div>
+      ) : summaries.length === 0 ? (
+        <div className="history-empty-state">
+          <p>No saved summaries matched this filter range.</p>
+        </div>
+      ) : (
+        <div className="history-list" style={{ padding: '16px 24px' }}>
+          {summaries.map((s) => (
+            <div
+              key={s.id}
+              className="history-row"
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 8,
+                padding: 16,
+                marginBottom: 12,
+                background: '#fff',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 16 }}>
+                    {s.shift_lead_name || 'Unknown'} — {s.shift_type} shift
+                  </div>
+                  <div style={{ color: '#6b7280', fontSize: 13, marginTop: 2 }}>
+                    {s.shift_date} • Status: {s.shift_status} • Rating: {s.rating}/5
+                  </div>
+                </div>
+                {s.needs_follow_up && (
+                  <span style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: 12, fontSize: 12 }}>
+                    Follow-up
+                  </span>
+                )}
+              </div>
+              {s.recap && (
+                <p style={{ marginTop: 8, color: '#374151', fontSize: 14 }}>
+                  {s.recap}
+                </p>
+              )}
+              {s.tags && s.tags.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                  {s.tags.map((t) => (
+                    <span
+                      key={t.id}
+                      style={{
+                        fontSize: 12,
+                        padding: '3px 8px',
+                        borderRadius: 12,
+                        background: t.kind === 'win' ? '#dcfce7' : '#fee2e2',
+                        color: t.kind === 'win' ? '#166534' : '#991b1b',
+                      }}
+                    >
+                      {t.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

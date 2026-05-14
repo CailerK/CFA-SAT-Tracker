@@ -374,7 +374,7 @@ class Notification(models.Model):
         ('training_reminder', 'Training Reminder'),
         ('system_update', 'System Update'),
     ]
-    
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     notification_type = models.CharField(max_length=50, choices=NOTIFICATION_TYPES)
     title = models.CharField(max_length=200)
@@ -382,3 +382,160 @@ class Notification(models.Model):
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     action_url = models.URLField(blank=True)
+
+
+# =============================================================================
+# Phase 1: FOH Daily Tasks
+# =============================================================================
+# Pattern: split into a TEMPLATE (the recurring definition; lives forever
+# until archived) and a per-day COMPLETION (one row per template per date).
+# This way we get a free history without ever mutating the template, and
+# yesterday's completions don't carry over to today.
+
+class FOHTaskTemplate(models.Model):
+    """A recurring FOH task definition for a given shift."""
+    SHIFT_CHOICES = [
+        ('opening', 'Opening'),
+        ('transition', 'Transition'),
+        ('closing', 'Closing'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='foh_task_templates'
+    )
+    shift = models.CharField(max_length=20, choices=SHIFT_CHOICES)
+    text = models.CharField(max_length=300)
+    order = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['shift', 'order', 'id']
+        indexes = [
+            models.Index(fields=['store', 'shift']),
+        ]
+
+    def __str__(self):
+        return f"[{self.shift}] {self.text}"
+
+
+class FOHTaskCompletion(models.Model):
+    """One per (template, date). Records who finished the task and when."""
+    template = models.ForeignKey(
+        FOHTaskTemplate, on_delete=models.CASCADE, related_name='completions'
+    )
+    date = models.DateField(
+        help_text="The shift date this completion applies to (local TZ)."
+    )
+    completed_at = models.DateTimeField(auto_now_add=True)
+    completed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='foh_completions',
+    )
+    initials = models.CharField(max_length=4, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['template', 'date'],
+                name='unique_foh_completion_per_day',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['date']),
+        ]
+
+    def __str__(self):
+        return f"{self.template} on {self.date}"
+
+
+# =============================================================================
+# Phase 1: Shift Summary
+# =============================================================================
+
+class ShiftTag(models.Model):
+    """Admin-configurable tags for the wins/challenges chips on a shift summary."""
+    KIND_CHOICES = [
+        ('win', 'Win'),
+        ('challenge', 'Challenge'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='shift_tags'
+    )
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    label = models.CharField(max_length=100)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['kind', 'order', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['store', 'kind', 'label'],
+                name='unique_shift_tag_per_store',
+            ),
+        ]
+
+    def __str__(self):
+        return f"[{self.kind}] {self.label}"
+
+
+class ShiftSummary(models.Model):
+    """End-of-shift summary submitted by the shift lead."""
+    SHIFT_TYPE_CHOICES = [
+        ('opening', 'Opening'),
+        ('mid', 'Mid'),
+        ('closing', 'Closing'),
+    ]
+    SHIFT_STATUS_CHOICES = [
+        ('normal', 'Normal'),
+        ('busy', 'Busy'),
+        ('slow', 'Slow'),
+        ('incident', 'Incident'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='shift_summaries'
+    )
+    shift_lead = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='shift_summaries_led',
+    )
+    shift_date = models.DateField()
+    shift_type = models.CharField(max_length=20, choices=SHIFT_TYPE_CHOICES)
+    shift_status = models.CharField(
+        max_length=20, choices=SHIFT_STATUS_CHOICES, default='normal'
+    )
+    rating = models.PositiveSmallIntegerField(
+        default=3,
+        help_text="1-5 star rating of the shift.",
+    )
+
+    recap = models.TextField(blank=True)
+    sales_note = models.CharField(max_length=200, blank=True)
+    labor_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    sos_note = models.CharField(max_length=200, blank=True)
+    handoff_note = models.TextField(blank=True)
+    needs_follow_up = models.BooleanField(default=False)
+
+    is_draft = models.BooleanField(default=True)
+    tags = models.ManyToManyField(ShiftTag, blank=True, related_name='summaries')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-shift_date', '-id']
+        indexes = [
+            models.Index(fields=['store', 'shift_date']),
+            models.Index(fields=['store', 'is_draft']),
+        ]
+
+    def __str__(self):
+        return f"{self.shift_type} on {self.shift_date} by {self.shift_lead_id}"

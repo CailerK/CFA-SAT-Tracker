@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './Dashboard.css';
 import Sidebar from './Sidebar';
 import QuickActions from './QuickActions';
@@ -35,11 +35,44 @@ import LeadershipDevelopment from './LeadershipDevelopment';
 import Leadership360Evaluations from './Leadership360Evaluations';
 import New360Evaluation from './New360Evaluation';
 
+// Read the current page from the URL hash so browser refresh / back / forward
+// preserve navigation state. Hash format: '#/settings' → 'settings'.
+const pageFromHash = () => {
+  const raw = (window.location.hash || '').replace(/^#\/?/, '');
+  return raw || 'dashboard';
+};
+
 const Dashboard = ({ user, onLogout }) => {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPageRaw] = useState(pageFromHash);
   const [notificationCount, setNotificationCount] = useState(42); // Dynamic notification count
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef(null);
+
+  // Wrap setCurrentPage so it also updates the URL hash. This way a refresh
+  // lands on the same page instead of bouncing back to the dashboard.
+  const setCurrentPage = useCallback((page) => {
+    setCurrentPageRaw(page);
+    const targetHash = page === 'dashboard' ? '' : `#/${page}`;
+    if (window.location.hash !== targetHash) {
+      // Use replaceState when targetHash is empty to avoid leaving '#' in the URL.
+      if (targetHash) {
+        window.location.hash = targetHash;
+      } else {
+        window.history.replaceState(
+          null,
+          '',
+          window.location.pathname + window.location.search
+        );
+      }
+    }
+  }, []);
+
+  // Sync component state when the user hits browser back/forward.
+  useEffect(() => {
+    const onHashChange = () => setCurrentPageRaw(pageFromHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   const toggleProfileDropdown = () => {
     setProfileDropdownOpen(prev => !prev);

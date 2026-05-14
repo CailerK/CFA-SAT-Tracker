@@ -28,6 +28,7 @@ from api.models import (  # noqa: E402
     User,
     UserPreferences,
 )
+from api.seed_data import seed_all_for_store  # noqa: E402
 
 
 DEFAULT_STORE_NUMBER = os.environ.get("DEFAULT_STORE_NUMBER", "02203")
@@ -161,7 +162,11 @@ def main():
     for u in demo_users:
         upsert_user(**u, store=store, company_id=DEFAULT_STORE_NUMBER)
 
-    print("User initialization complete.")
+    # ----- 3. Per-store operational data (FOH tasks, shift tags, etc.) -----
+    print("Per-store seed data:")
+    seed_all_for_store(store)
+
+    print("Initialization complete.")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,21 @@
-from django.urls import path
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
 
-from . import views
-from . import views_stores
+from . import views, views_stores
+from .views_foh import FOHTaskTemplateViewSet
+from .views_shift_summary import ShiftSummaryViewSet, ShiftTagViewSet
+
+
+# DRF router gives us list / detail / retrieve / @action routes for free.
+router = DefaultRouter()
+router.register(r"foh/tasks", FOHTaskTemplateViewSet, basename="foh-task")
+router.register(
+    r"shift-summaries/tags", ShiftTagViewSet, basename="shift-tag"
+)
+router.register(
+    r"shift-summaries", ShiftSummaryViewSet, basename="shift-summary"
+)
+
 
 urlpatterns = [
     # Health / status (public)
@@ -27,4 +41,7 @@ urlpatterns = [
         views_stores.user_preferences_me,
         name="user_preferences_me",
     ),
+
+    # Phase 1: FOH tasks + shift summary (router-managed)
+    path("", include(router.urls)),
 ]
