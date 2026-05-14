@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import teamService from '../services/team';
+import './TeamTraining.css';
 
 // Normalize a backend TraineeAssignment to the trainee row shape the UI uses.
 const normalizeTrainee = (raw) => ({
@@ -13,7 +14,6 @@ const normalizeTrainee = (raw) => ({
   status: raw.status === 'in_progress' ? 'In Progress'
     : raw.status === 'completed' ? 'Completed' : 'Paused',
 });
-import './TeamTraining.css';
 
 /* ----- Inline Lucide icons (stroke = currentColor) ----- */
 const Icon = ({ d, size = 18, stroke = 2, children, viewBox = '0 0 24 24' }) => (

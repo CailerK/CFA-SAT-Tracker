@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import teamService from '../services/team';
+import './TeamMembers.css';
 
 // Map a backend role slug → the display string the UI was built for.
 const formatRole = (slug) => {
@@ -23,7 +24,6 @@ const normalizeMember = (raw) => ({
   shift: raw.shift_preference ? raw.shift_preference[0].toUpperCase() + raw.shift_preference.slice(1) : 'Flex',
   manager: raw.manager_name || null,
 });
-import './TeamMembers.css';
 
 // ===== Icons =====
 const IconArrowLeft = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>);
