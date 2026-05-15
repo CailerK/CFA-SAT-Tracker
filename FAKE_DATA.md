@@ -290,10 +290,11 @@ time to replace demo data with live API calls / database reads / persisted state
 
 | Status | What | Notes |
 |---|---|---|
-| 🔴 | `links` is hardcoded empty array; page always renders the "No Quick Links Yet" empty state | `GET /api/team/quick-links` for the logged-in user/store. |
-| 🔴 | Hero `Manage Categories` button is a no-op | Open categories modal → `GET/POST/PATCH/DELETE /api/team/quick-links/categories`. |
-| 🔴 | Hero `Add Quick Link` button is a no-op | Open add-link modal → `POST /api/team/quick-links` with `{label, url, category, icon}`. |
-| 🔴 | Empty-state `Add Your First Link` button is a no-op | Same add-link flow as above. |
+| ✅ | `links` now loaded via `GET /api/team/quick-links/` and rendered with category-colored borders | Phase 16. |
+| ✅ | Hero `Manage Categories` opens FormModal listing categories with ActionMenu (Edit / Delete) + "+ Add Category" sub-modal | Phase 16. |
+| ✅ | Hero `Add Quick Link` opens FormModal (Label / URL / Icon / Category) — manager-only | Phase 16. |
+| ✅ | Per-link ActionMenu (Edit / Delete) + ConfirmDialog wired (manager-only) | Phase 16. |
+| ✅ | Empty-state CTA hidden for team members; copy switches to "your manager has not added any quick links yet" | Phase 16. |
 | 🟡 | Greeting tagline "Keep your store's essential tools just one click away." is hardcoded copy | OK — static UI copy. |
 | 🟡 | Hero date formats from client `new Date()` | Keep client-side; confirm store timezone. |
 
@@ -364,4 +365,4 @@ time to replace demo data with live API calls / database reads / persisted state
 
 ---
 
-_Last updated: 2026-05-15 — after Phase 14 Kitchen domain wiring (shared `<HistoryDrawer>`; KitchenChecklists Add Task modal + per-row delete; KitchenCleaning Add Task modal + History drawer; KitchenEquipment 4 reusable FormModals replacing 7 prompt chains + per-card `<ActionMenu>` + Upcoming Maintenance drawer; KitchenFoodSafety Record Temperature modal + Manage Tasks/Targets `<ActionMenu>`s + computed column subtitles; KitchenWasteTracker Items Manager + Bulk Entry + `<DatePicker>` + computed Most-Wasted KPI; KitchenAnalytics Edit Goals `<FormModal>`; new equipment + kitchen service methods for SafetyTask / TemperatureTarget / MenuItem CRUD)._
+_Last updated: 2026-05-15 — after Phase 16 Calendar + Surveys + QuickLinks wiring (Calendar New/Edit Event FormModals + toggleable category-legend filters + manager-only day-cell click; TeamSurveys Quick/Advanced Create Survey FormModal with dynamic question list + per-card ActionMenu for Extend/Close/Archive/Delete + Dashboard status-breakdown panel + Take/Results sentinels + fixed `onNavigate` prop bug; TeamQuickLinks Add/Edit Link FormModal + Manage Categories FormModal with inline Add/Edit Category sub-modal + per-link ActionMenu; new service methods `surveysService.update`, `teamService.updateQuickLink`, `teamService.updateLinkCategory`, `teamService.deleteLinkCategory`)._

@@ -186,24 +186,38 @@ This whole page is prompt-driven. Build modals for:
 
 ---
 
-### Phase 16 — Calendar + Surveys
+### Phase 16 — Calendar + Surveys + QuickLinks ✅ _(done 2026-05-15)_
 **Why**: these have working data but bad modals.
 
-#### Calendar.js
-- [ ] **Click empty day cell** → New Event modal. Currently `window.prompt('Event title?')`. (a)
-- [ ] **Click existing event** → Event Detail modal (Edit / Delete / Move). Currently `window.prompt`. (a)
-- [ ] **Category color legend** is rendered but doesn't filter — wire as toggleable filters. (a)
+#### Calendar.js ✅
+- [x] **Click empty day cell** → New Event modal (pre-fills date). Manager-only.
+- [x] **Click existing event** → Edit Event FormModal with Delete in left footer slot → destructive ConfirmDialog.
+- [x] **Category color legend** is now toggleable: clicking dims+strike-throughs that category; "Show all" pill appears whenever filters are active.
+- [x] Dashboard now passes `user` so `isManagerOrAbove` gating works.
 
-#### TeamSurveys.js
-- [ ] **Survey card click** → Take Survey page (if not yet responded) or Results page (if creator). (a + c)
-- [ ] **Quick Survey / Advanced Survey buttons** — replace chained prompts with a Create Survey wizard. (c)
-- [ ] **Dashboard view** — toggle is wired but renders nothing different. Build a stats panel. (b)
-- [ ] **Per-card 3-dot menu** (Extend, Close, Delete, Export). (a)
+#### TeamSurveys.js ✅
+- [x] **Survey card click** → "Take Survey — coming soon" sentinel for team members; "Survey results — coming soon" sentinel for managers (full take/results UI deferred — backend `respond()` + `getResults()` already live).
+- [x] **Quick / Advanced Survey buttons** → replaced 3-prompt chain with **Create Survey FormModal**: TextField title + DatePicker close + Toggle anonymous + dynamic question list. Advanced adds kind SelectField + "+ Add Question".
+- [x] **Dashboard view** now renders a 4-card status breakdown (Active/Closed/Drafts/Archived) with percent-of-total + total-responses footer.
+- [x] **Per-card 3-dot menu**: Extend (PATCH `closes_at`), Close (`status=closed`), Archive (`status=archived`), Delete (DELETE).
+- [x] Fixed long-standing "Back Home" bug — Dashboard was passing `onBack` but TeamSurveys reads `onNavigate`.
 
-#### TeamQuickLinks.js
-- [ ] **Add Quick Link button** — replace chained `window.prompt`s with Add Link `<FormModal>`. (a)
-- [ ] **Manage Categories** button — replace prompts with Categories `<FormModal>` (list + add + delete). (a)
-- [ ] **Per-link delete button** (not rendered) — add hover-to-show trash icon. (a)
+#### TeamQuickLinks.js ✅
+- [x] **Add Quick Link** → replaced 4-prompt chain with **Add Quick Link FormModal** (Label + URL + Icon + Category select). Edit reuses the same modal.
+- [x] **Manage Categories** → replaced 2-prompt chain with **Manage Categories FormModal**: lists every category with color swatch + ActionMenu (Edit / Delete) + "+ Add Category" sub-modal (Name + Color SelectField).
+- [x] **Per-link ActionMenu** (Edit / Delete) appears on every card for managers; opens ConfirmDialog before destroying.
+- [x] Empty-state CTA hidden for team members; copy switches to "your manager has not added…".
+
+**Deferred (not blocking; tracked in `FAKE_DATA.md` for follow-up phases)**:
+- Take Survey UI (one-screen-per-question form + submit).
+- Survey Results UI (per-question chart + response-rate bar).
+- 360 Take/View Evaluation UI (was deferred from Phase 15).
+
+**Backend additions**: none required. Surveys, QuickLinks, and QuickLinkCategories already exposed PATCH/DELETE via `ModelViewSet`.
+
+**Service additions**: `surveysService.update`, `teamService.updateQuickLink`, `teamService.updateLinkCategory`, `teamService.deleteLinkCategory`.
+
+**Net change**: 3 components fully wired, 12+ `window.prompt`/`window.confirm` chains eliminated, 4 new service methods, 1 long-standing prop-name bug fixed (Dashboard ↔ TeamSurveys).
 
 **Estimate**: 1.5 sessions.
 

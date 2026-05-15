@@ -143,6 +143,13 @@ const teamService = {
     });
   },
 
+  async updateQuickLink(id, patch) {
+    return apiService.request(`/team/quick-links/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
   async deleteQuickLink(id) {
     return apiService.request(`/team/quick-links/${id}/`, { method: "DELETE" });
   },
@@ -151,6 +158,19 @@ const teamService = {
     return apiService.request("/team/quick-links/categories/", {
       method: "POST",
       body: JSON.stringify(payload),
+    });
+  },
+
+  async updateLinkCategory(id, patch) {
+    return apiService.request(`/team/quick-links/categories/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  async deleteLinkCategory(id) {
+    return apiService.request(`/team/quick-links/categories/${id}/`, {
+      method: "DELETE",
     });
   },
 };

@@ -21,6 +21,13 @@ const surveysService = {
     });
   },
 
+  async update(id, patch) {
+    return apiService.request(`/surveys/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
   async respond(id, answers) {
     return apiService.request(`/surveys/${id}/respond/`, {
       method: "POST",

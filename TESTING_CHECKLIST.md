@@ -817,6 +817,149 @@ Walk through these one by one — each card on the Quick Actions grid should nav
 
 ---
 
+## UI Phase 15 — Leadership + Training wiring _(2026-05-15)_
+
+> Replaces dead controls and `window.prompt` chains across 5 components with FormModal/ConfirmDialog/ActionMenu primitives. Backend untouched except for `TeamMemberSerializer` exposing `created_at`.
+
+### `/leadership/360` (Leadership360Evaluations)
+
+#### As `admin@gmail.com / admin` (manager):
+- [ ] "+ New Template" button opens **Create 360° Template** FormModal with Name (required), Description, Sections Count fields.
+- [ ] Submitting creates the template; it appears at the bottom of the Templates section.
+- [ ] Each template card has a 3-dot ActionMenu → **Edit** opens the same modal pre-filled.
+- [ ] ActionMenu → **Delete** opens a destructive ConfirmDialog; confirming archives it (disappears from list).
+- [ ] Click an evaluation card → "Take / View Evaluation — coming soon" sentinel ConfirmDialog appears (full take-eval UI deferred).
+
+#### As `demouser@gmail.com / demouser` (team member):
+- [ ] Templates section is read-only — no "+ New Template" button, no 3-dot menu on cards.
+- [ ] Clicking an evaluation card still shows the same "coming soon" sentinel.
+
+### `/leadership/360/new` (New360Evaluation wizard)
+
+#### As manager:
+- [ ] Step 2 (Choose Template) shows a "**+ Create Additional Template**" button below the template grid.
+- [ ] Clicking it opens the inline Create Template FormModal.
+- [ ] After submitting, the new template appears in the grid AND is auto-selected for the current evaluation flow.
+
+#### As team member:
+- [ ] The "+ Create Additional Template" button is hidden.
+
+### `/training/progress` (TeamTraining)
+
+#### As manager:
+- [ ] **Progress** tab (default) shows KPIs, departments, search/status pills, trainee list, pagination — same as before.
+- [ ] "**Assign Training**" button opens FormModal with two SelectFields: Team Member + Training Plan; both required.
+- [ ] Submitting creates a TraineeAssignment; the trainee appears in the list.
+- [ ] Each trainee row has a trash icon → opens ConfirmDialog; confirming removes the assignment.
+- [ ] Clicking a trainee row → "Trainee detail — coming soon" sentinel (full progress drawer deferred).
+- [ ] **Plans** tab lists training plans with name, description, total_steps.
+- [ ] "+ New Plan" opens Create Training Plan FormModal (Name + Description + Total Steps).
+- [ ] Each plan card has an ActionMenu → Edit (FormModal) and Delete (ConfirmDialog).
+- [ ] **New Hires** tab lists members created in the last 30 days with hire date + role.
+- [ ] **Assessments** and **Community** tabs show a "coming soon" placeholder card.
+
+#### As team member:
+- [ ] "Assign Training" button is hidden.
+- [ ] Trash icons on trainee rows are hidden.
+- [ ] "+ New Plan" button + per-plan ActionMenus are hidden (read-only Plans tab).
+
+### `/leadership/development` (LeadershipDevelopment)
+
+#### As any user:
+- [ ] **Settings gear** (top right) → opens "Settings — coming soon" ConfirmDialog (sentinel, replaces dead button).
+- [ ] **Development card** progress bar is no longer hardcoded `0%` — shows the average `progress_percent` of all 360 evaluations where current user is the evaluatee.
+- [ ] If user has no evaluations, progress shows `0%`.
+- [ ] After typing a note + clicking Save, the note appears in the list with a small trash icon.
+- [ ] Clicking the trash icon → ConfirmDialog; confirming removes the note from the list (and the database).
+- [ ] **"See all"** button next to Notes opens a HistoryDrawer listing every note with timestamp.
+- [ ] HistoryDrawer subtitle shows the correct note count.
+
+### `/team-development` (TeamDevelopment)
+
+#### As manager:
+- [ ] **"Edit Tracks"** button (hero, top right) opens **Manage Position Tracks** FormModal listing every track.
+- [ ] Inside, "+ New Track" closes that modal and opens **Create Track** FormModal (Name + Description).
+- [ ] Submitting adds the track and refreshes the list.
+- [ ] Each track row in Manage modal has an ActionMenu → Edit (Create Track FormModal pre-filled) and Delete (ConfirmDialog).
+- [ ] Clicking a member row → **Update Progress** FormModal with Status SelectField + Current Step + Completed Steps NumberFields.
+- [ ] Submitting calls `PATCH /api/team-development/progress/:id/` and refreshes the member list.
+
+#### As team member:
+- [ ] "Edit Tracks" button is hidden.
+- [ ] Member rows are not clickable (no cursor change, no modal opens).
+
+### Backend regression
+- [ ] `GET /api/team/members/` includes `created_at` for each user (needed by New Hires tab).
+
+---
+
+## UI Phase 16 — Calendar + Surveys + QuickLinks wiring _(2026-05-15)_
+
+> Replaces 12+ `window.prompt`/`window.confirm` calls across 3 components with FormModal/ConfirmDialog/ActionMenu primitives. Backend untouched — surveys/quick-links already support PATCH/DELETE via `ModelViewSet`. Service layer adds `surveysService.update`, `teamService.updateQuickLink`, `teamService.updateLinkCategory`, `teamService.deleteLinkCategory`.
+
+### `/calendar` (Calendar)
+
+#### As `admin@gmail.com / admin` (manager):
+- [ ] "+ Add Event" button (top right) opens **New Event** FormModal with TextField title + SelectField category + DatePicker date + TimePicker time + Toggle "All Day" + TextArea notes.
+- [ ] Submitting creates the event; it appears on the correct day cell.
+- [ ] Clicking an empty day cell opens the same modal with that date pre-selected.
+- [ ] Clicking an existing event opens **Edit Event** FormModal pre-filled.
+- [ ] Edit modal has a **Delete** button in the footer's left slot → closes Edit, opens destructive ConfirmDialog.
+- [ ] Confirming delete removes the event from the calendar.
+- [ ] **Category legend** items at the bottom are now buttons — clicking one hides that category's events (line-through + dimmed); clicking again restores. A "Show all" pill appears whenever ≥1 category is hidden.
+
+#### As `demouser@gmail.com / demouser` (team member):
+- [ ] "+ Add Event" button is hidden.
+- [ ] Clicking a day cell does nothing (no cursor change).
+- [ ] Clicking an existing event does nothing.
+- [ ] Category legend filters still work for read-only viewing.
+
+### `/surveys` (TeamSurveys)
+
+#### As manager:
+- [ ] "Quick Survey" button opens **Quick Survey** FormModal: TextField title + DatePicker close date (default +14d) + Toggle anonymous + a single TextField for question 1 (kind locked to text).
+- [ ] "Advanced Survey" button opens **Create Survey (Advanced)** FormModal — same as Quick but with kind SelectField (text/rating/yes_no/multiple_choice) per question and a "+ Add Question" button.
+- [ ] "+ Add Question" appends a question card; each card past the first has a "Remove" link.
+- [ ] Submitting both flows posts to `POST /api/surveys/` with `status: 'active'` and the question list; survey appears in the list view.
+- [ ] Each survey card has a 3-dot ActionMenu (manager-only):
+  - **Extend** → opens FormModal with new close-date DatePicker; submits `PATCH closes_at` + re-opens if closed.
+  - **Close** (active only) → `PATCH status=closed`, card moves to Closed filter.
+  - **Archive** (anything except already-archived) → `PATCH status=archived`.
+  - **Delete** → destructive ConfirmDialog → `DELETE /api/surveys/:id/`.
+- [ ] Clicking a survey card (manager) → "Survey results — coming soon" sentinel ConfirmDialog with response count.
+- [ ] Toggling the **Dashboard** pill at the top hides the "All Surveys" list and shows a 4-card status breakdown (Active / Closed / Drafts / Archived) with percent-of-total, plus a footer line with total responses + avg rate.
+- [ ] "Back Home" button now actually navigates to dashboard (was previously dead).
+
+#### As team member:
+- [ ] Quick Survey / Advanced Survey buttons are hidden.
+- [ ] Per-card 3-dot ActionMenu is hidden.
+- [ ] Clicking a survey card (team member) → "Take this survey — coming soon" sentinel.
+- [ ] Drafts filter still shows nothing (backend hides non-active surveys from non-managers).
+
+### `/team-quick-links` (TeamQuickLinks)
+
+#### As manager:
+- [ ] "+ Add Quick Link" button opens **Add Quick Link** FormModal with TextField label + TextField URL (must start with http:// or https://) + TextField icon/emoji (default 🔗) + SelectField category.
+- [ ] Submitting creates the link; it appears in the grid with the category's color as the border.
+- [ ] Each link card has a 3-dot ActionMenu → **Edit** (same FormModal pre-filled) + **Delete** (ConfirmDialog).
+- [ ] "Manage Categories" button opens **Manage Categories** FormModal listing every category with its color swatch + name + ActionMenu (Edit / Delete).
+- [ ] Inside Manage Categories, "+ Add Category" opens an inline Add/Edit FormModal with Name TextField + Color SelectField (7 preset palette).
+- [ ] Submitting create/edit refreshes the categories list.
+- [ ] Delete Category → ConfirmDialog warning that existing links lose their colored border but keep their URL.
+
+#### As team member:
+- [ ] "+ Add Quick Link" and "Manage Categories" buttons are hidden.
+- [ ] Per-link ActionMenu is hidden.
+- [ ] Empty-state CTA is hidden (copy reads "Your manager has not added any quick links yet").
+- [ ] All link cards remain clickable and open the URL in a new tab.
+
+### Backend regression
+- [ ] `PATCH /api/surveys/:id/` accepts `{ status, closes_at }` (manager-only).
+- [ ] `PATCH /api/team/quick-links/:id/` and `PATCH /api/team/quick-links/categories/:id/` accept partial updates (manager-only).
+- [ ] `DELETE /api/team/quick-links/categories/:id/` archives the category (sets `archived_at`) instead of hard-deleting.
+
+---
+
 ## Bugs / oddities log
 
 > Use this section as you test. Format:

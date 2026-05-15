@@ -368,7 +368,7 @@ const Dashboard = ({ user, onLogout }) => {
         ) : currentPage === 'team-chat' ? (
           <TeamChat onBack={() => setCurrentPage('dashboard')} />
         ) : currentPage === 'calendar' ? (
-          <Calendar onBack={() => setCurrentPage('dashboard')} />
+          <Calendar user={user} onBack={() => setCurrentPage('dashboard')} />
         ) : currentPage === 'guest-recovery' ? (
           <GuestRecovery onBack={() => setCurrentPage('dashboard')} />
         ) : currentPage === 'vendors' ? (
@@ -465,7 +465,7 @@ const Dashboard = ({ user, onLogout }) => {
         ) : currentPage === 'team-surveys' ? (
           <TeamSurveys 
             user={user}
-            onBack={() => setCurrentPage('dashboard')}
+            onNavigate={(page) => setCurrentPage(page)}
           />
         ) : currentPage === 'team-training' ? (
           <TeamTraining 
