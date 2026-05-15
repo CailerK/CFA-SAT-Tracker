@@ -1,0 +1,190 @@
+/* EmployeeRecordsDrawer — right-side slide-in panel. */
+
+.erd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.55);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 60;
+  animation: erd-fade-in 0.16s ease-out;
+}
+@keyframes erd-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.erd-panel {
+  width: 100%;
+  max-width: 520px;
+  height: 100%;
+  background: #ffffff;
+  box-shadow: -16px 0 32px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  animation: erd-slide-in 0.18s ease-out;
+}
+@keyframes erd-slide-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ----- Header ----- */
+.erd-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.erd-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+.erd-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+.erd-close {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+.erd-close:hover { background: #f3f4f6; color: #111827; }
+
+/* ----- Add button row ----- */
+.erd-actions {
+  padding: 12px 24px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.erd-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.erd-add-btn:hover { background: #b91c1c; }
+
+/* ----- List ----- */
+.erd-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.erd-empty {
+  color: #6b7280;
+  font-size: 13px;
+  margin: 8px 0;
+  text-align: center;
+  padding: 32px 0;
+}
+
+/* ----- Record card ----- */
+.erd-record {
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #d1d5db;
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #ffffff;
+  transition: border-color 0.15s ease;
+}
+.erd-record-warning      { border-left-color: #f97316; }
+.erd-record-pip          { border-left-color: #dc2626; }
+.erd-record-admin        { border-left-color: #2563eb; }
+.erd-record-recognition  { border-left-color: #16a34a; }
+
+.erd-record-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.erd-record-title {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+.erd-record-delete {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.erd-record-delete:hover { background: #fee2e2; color: #b91c1c; }
+
+/* Kind pill — small inline tag */
+.erd-kind-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.erd-kind-warning      { background: #ffedd5; color: #c2410c; }
+.erd-kind-pip          { background: #fee2e2; color: #b91c1c; }
+.erd-kind-admin        { background: #dbeafe; color: #1d4ed8; }
+.erd-kind-recognition  { background: #dcfce7; color: #15803d; }
+
+/* Meta row */
+.erd-record-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.erd-status {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.erd-status-documented { background: #f3f4f6; color: #374151; }
+.erd-status-pending    { background: #fef3c7; color: #92400e; }
+.erd-status-resolved   { background: #dcfce7; color: #166534; }
+.erd-record-by { font-style: italic; }
+
+.erd-record-body {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Tablet+ */
+@media (max-width: 640px) {
+  .erd-panel {
+    max-width: 100%;
+  }
+}

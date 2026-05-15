@@ -5,11 +5,12 @@ import apiService from "./api";
 const teamService = {
   // ---------------- Members ----------------
 
-  async listMembers({ status, q, dept } = {}) {
+  async listMembers({ status, q, dept, ordering } = {}) {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
     if (q) params.set("q", q);
     if (dept) params.set("dept", dept);
+    if (ordering) params.set("ordering", ordering);
     const qs = params.toString() ? `?${params}` : "";
     return apiService.request(`/team/members/${qs}`);
   },

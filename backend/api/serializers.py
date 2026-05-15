@@ -876,20 +876,43 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
 
 class TeamMemberSerializer(serializers.ModelSerializer):
-    """The Team Members page consumes a list of users with extra fields."""
+    """The Team Members page consumes a list of users with extra fields.
+
+    Reads return: id, name (derived), initials, email, phone, role,
+    shift_preference, is_admin/is_active/is_demo_user, manager (id) +
+    manager_name (derived), and `departments` as objects.
+
+    Writes accept: first_name + last_name (mapped to the underlying User
+    fields), email, phone, role, shift_preference, is_admin / is_active,
+    manager, and `department_slugs` (list of Department.name slugs). On
+    create, the serializer generates a username from the local-part of the
+    email and assigns a random password — admins can later reset via the
+    User Management page.
+    """
+    # Reads
     name = serializers.SerializerMethodField()
     initials = serializers.CharField(read_only=True)
     manager_name = serializers.SerializerMethodField()
     departments = serializers.SerializerMethodField()
 
+    # Writes
+    first_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    last_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    department_slugs = serializers.ListField(
+        child=serializers.CharField(),
+        write_only=True, required=False,
+        help_text="List of Department.name slugs (e.g. ['foh','kitchen']).",
+    )
+
     class Meta:
         model = User
         fields = [
             "id", "name", "initials", "email", "phone",
+            "first_name", "last_name",
             "role", "shift_preference",
             "is_admin", "is_active", "is_demo_user",
             "manager", "manager_name",
-            "departments",
+            "departments", "department_slugs",
             "avatar",
         ]
         read_only_fields = ["id", "name", "initials", "manager_name", "departments"]
@@ -908,6 +931,68 @@ class TeamMemberSerializer(serializers.ModelSerializer):
             {"id": d.id, "name": d.display_name or d.name, "slug": d.name}
             for d in obj.departments.all()
         ]
+
+    # ---- write helpers ----
+
+    def _apply_departments(self, user, slugs):
+        """Replace the user's department memberships with the given slugs,
+        scoped to the user's own store. Unknown slugs are silently dropped
+        rather than raising — keeps the modal forgiving of stale options."""
+        if user.store_id is None:
+            user.departments.set([])
+            return
+        depts = Department.objects.filter(
+            store=user.store, name__in=slugs,
+        )
+        user.departments.set(list(depts))
+
+    def create(self, validated_data):
+        first_name = validated_data.pop("first_name", "") or ""
+        last_name = validated_data.pop("last_name", "") or ""
+        department_slugs = validated_data.pop("department_slugs", None)
+
+        email = (validated_data.get("email") or "").strip()
+        if not email:
+            raise serializers.ValidationError({"email": "Email is required."})
+
+        # Auto-derive a username from the local-part if not supplied.
+        base = (email.split("@", 1)[0] or "member").lower()
+        username = base
+        suffix = 1
+        while User.objects.filter(username=username).exists():
+            suffix += 1
+            username = f"{base}{suffix}"
+
+        user = User(
+            email=email,
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            **validated_data,
+        )
+        user.set_password(User.objects.make_random_password())
+        user.save()
+
+        if department_slugs is not None:
+            self._apply_departments(user, department_slugs)
+        return user
+
+    def update(self, instance, validated_data):
+        first_name = validated_data.pop("first_name", None)
+        last_name = validated_data.pop("last_name", None)
+        department_slugs = validated_data.pop("department_slugs", None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if first_name is not None:
+            instance.first_name = first_name
+        if last_name is not None:
+            instance.last_name = last_name
+        instance.save()
+
+        if department_slugs is not None:
+            self._apply_departments(instance, department_slugs)
+        return instance
 
 
 # ============================================================================

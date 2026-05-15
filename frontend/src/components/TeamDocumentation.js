@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import teamService from '../services/team';
+import { isManagerOrAbove } from '../utils/access';
+import { ConfirmDialog } from './ui';
+import EmployeeRecordsDrawer from './EmployeeRecordsDrawer';
 import './SetupSheetTemplates.css'; // shared red hero banner
 import './TeamDocumentation.css';
 
@@ -25,10 +28,15 @@ const FILTERS = [
 ];
 
 const TeamDocumentation = ({ onNavigate, user }) => {
+  const canManage = isManagerOrAbove(user);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [employees, setEmployees] = useState([]);
   const [stats, setStats] = useState({ total: 0, disciplinary: 0, admin: 0, employeesWithDocs: 0 });
+  // Drawer + confirm-delete modal state.
+  const [drawerEmployee, setDrawerEmployee] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null); // { employee, recordId }
+  const [notImplemented, setNotImplemented] = useState(null); // { title, message }
 
   const refresh = useCallback(async () => {
     try {
@@ -57,16 +65,23 @@ const TeamDocumentation = ({ onNavigate, user }) => {
   // Provide an alias so the existing STATS references below still work.
   const STATS = stats;
 
-  const handleDeleteLatest = async (employee) => {
+  const handleDeleteLatest = (employee) => {
+    // Opens a ConfirmDialog instead of window.confirm. The actual call
+    // happens in onConfirm so the dialog can show a spinner state.
     const latestId = employee?.latest?.id;
     if (!latestId) return;
-    const confirmed = window.confirm(`Delete the latest documentation record for ${employee.name}?`);
-    if (!confirmed) return;
+    setConfirmDel({ employee, recordId: latestId });
+  };
+
+  const performDeleteLatest = async () => {
+    if (!confirmDel) return;
     try {
-      await teamService.deleteRecord(latestId);
+      await teamService.deleteRecord(confirmDel.recordId);
+      setConfirmDel(null);
       await refresh();
     } catch (err) {
       console.error('Failed to delete documentation record:', err);
+      setConfirmDel(null);
     }
   };
 
@@ -101,10 +116,28 @@ const TeamDocumentation = ({ onNavigate, user }) => {
               <div className="td-banner-subtitle-row">
                 <p className="sst-banner-subtitle">Professional documentation system for tracking team member records</p>
                 <div className="td-banner-actions">
-                  <button type="button" className="td-banner-icon-btn" aria-label="View Analytics" title="View Analytics">
+                  <button
+                    type="button"
+                    className="td-banner-icon-btn"
+                    aria-label="View Analytics"
+                    title="View Analytics"
+                    onClick={() => setNotImplemented({
+                      title: 'Analytics — coming soon',
+                      message: 'Documentation analytics (trends, by-department breakdowns, risk scoring) is on the roadmap. Watch this space.',
+                    })}
+                  >
                     <IconBarChart className="td-banner-icon" />
                   </button>
-                  <button type="button" className="td-banner-icon-btn" aria-label="Documentation Preferences" title="Documentation Preferences">
+                  <button
+                    type="button"
+                    className="td-banner-icon-btn"
+                    aria-label="Documentation Preferences"
+                    title="Documentation Preferences"
+                    onClick={() => setNotImplemented({
+                      title: 'Preferences — coming soon',
+                      message: 'Documentation preferences (default record templates, escalation rules, retention policy) is on the roadmap.',
+                    })}
+                  >
                     <IconSettings className="td-banner-icon" />
                   </button>
                 </div>
@@ -185,22 +218,36 @@ const TeamDocumentation = ({ onNavigate, user }) => {
         {/* Employee cards grid */}
         <div className="td-grid">
           {filtered.map((e) => (
-            <article key={e.id} className={`td-card td-card-${e.riskLevel}`}>
+            <article
+              key={e.id}
+              className={`td-card td-card-${e.riskLevel}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => setDrawerEmployee(e)}
+              onKeyDown={(ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                  ev.preventDefault();
+                  setDrawerEmployee(e);
+                }
+              }}
+            >
               <div className="td-card-head">
                 <div className={`td-avatar td-avatar-${e.riskLevel}`}>{e.initials}</div>
                 <div className="td-card-head-text">
                   <h3 className="td-name">{e.name}</h3>
                   <p className="td-role">{e.role}</p>
                 </div>
-                <button
-                  type="button"
-                  className="td-delete-btn"
-                  title="Delete latest documentation record"
-                  aria-label={`Delete latest documentation for ${e.name}`}
-                  onClick={() => handleDeleteLatest(e)}
-                >
-                  <IconTrash className="td-delete-icon" />
-                </button>
+                {canManage && (
+                  <button
+                    type="button"
+                    className="td-delete-btn"
+                    title="Delete latest documentation record"
+                    aria-label={`Delete latest documentation for ${e.name}`}
+                    onClick={(ev) => { ev.stopPropagation(); handleDeleteLatest(e); }}
+                  >
+                    <IconTrash className="td-delete-icon" />
+                  </button>
+                )}
               </div>
 
               <div className="td-counts">
@@ -247,6 +294,39 @@ const TeamDocumentation = ({ onNavigate, user }) => {
           </div>
         )}
       </div>
+
+      {/* Per-employee records drawer (click a card to open). */}
+      <EmployeeRecordsDrawer
+        isOpen={!!drawerEmployee}
+        employee={drawerEmployee}
+        canManage={canManage}
+        onClose={() => setDrawerEmployee(null)}
+        onChanged={refresh}
+      />
+
+      {/* Delete-latest confirmation (from card trash button). */}
+      <ConfirmDialog
+        isOpen={!!confirmDel}
+        title="Delete latest documentation record?"
+        message={confirmDel
+          ? `The most recent record for ${confirmDel.employee.name} will be permanently removed.`
+          : ''}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={performDeleteLatest}
+        onClose={() => setConfirmDel(null)}
+      />
+
+      {/* Not-implemented sentinel for banner action icons. */}
+      <ConfirmDialog
+        isOpen={!!notImplemented}
+        title={notImplemented?.title || ''}
+        message={notImplemented?.message || ''}
+        confirmLabel="Got it"
+        cancelLabel="Close"
+        onConfirm={() => setNotImplemented(null)}
+        onClose={() => setNotImplemented(null)}
+      />
     </div>
   );
 };

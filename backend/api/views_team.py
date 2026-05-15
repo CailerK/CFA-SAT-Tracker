@@ -105,7 +105,24 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
                 | Q(last_name__icontains=q)
                 | Q(email__icontains=q)
             )
-        return qs.distinct().order_by("first_name", "last_name", "id")
+
+        # ?ordering=name|-name|email|role|-role|recent|-recent
+        # `name` sorts by first_name then last_name; `recent` is created_at.
+        ordering = (params.get("ordering") or "").strip()
+        order_map = {
+            "name":      ["first_name", "last_name", "id"],
+            "-name":     ["-first_name", "-last_name", "-id"],
+            "email":     ["email", "id"],
+            "-email":    ["-email", "-id"],
+            "role":      ["role", "first_name", "last_name"],
+            "-role":     ["-role", "first_name", "last_name"],
+            "recent":    ["-created_at", "-id"],
+            "-recent":   ["created_at", "id"],
+        }
+        order_fields = order_map.get(ordering) or [
+            "first_name", "last_name", "id",
+        ]
+        return qs.distinct().order_by(*order_fields)
 
     def perform_create(self, serializer):
         # New members are always added to the requester's store.

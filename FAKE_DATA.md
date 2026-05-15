@@ -240,10 +240,8 @@ time to replace demo data with live API calls / database reads / persisted state
 | 🔴 | `riskLevel` (`standard` / `mid` / `high`) driving card left border + avatar gradient is derived client-side from verbatim LD Growth classes | Should be returned by API (e.g. based on Disc count threshold) or computed from real counts. |
 | 🔴 | `latest.kind` (`admin` / `warning`) picks the tile color + emoji (📄 blue / ⚠️ red) — currently hardcoded per row | Derive from real record type enum. |
 | 🔴 | `latest.status` values (`Documented` / `Pending`) drive the purple / amber status pills — hardcoded | Derive from real doc state machine. |
-| 🟠 | Card click has no handler (cursor is a pointer though) | Open an employee documentation detail page. |
-| 🟠 | Per-card trash button has no handler | `DELETE /api/team/documentation/records/:id` (latest record). |
-| 🟠 | Hero banner bar-chart + settings icon buttons have no handlers | Wire to analytics view + preferences modal. |
-| 🟡 | Search + filter pills filter client-side only; adequate until paginated | Pass to API when there are > ~50 rows. |
+| � | Search + filter pills filter client-side only; adequate until paginated | Pass to API when there are > ~50 rows. |
+| � | Hero banner Analytics / Settings buttons open a "Coming soon" `ConfirmDialog` sentinel (Phase 12 wiring) | Build documentation analytics page + preferences modal (`GET /api/team/documentation/analytics`, `GET/PATCH /api/team/documentation/preferences`). |
 
 ### `frontend/src/components/TeamMembers.js`
 
@@ -363,4 +361,4 @@ time to replace demo data with live API calls / database reads / persisted state
 
 ---
 
-_Last updated: 2026-04-24 — after 360° Evaluations & Team Development redesign._
+_Last updated: 2026-05-15 — after Phase 12 Team Members + Documentation wiring (Add/Edit modals, ActionMenu row actions, EmployeeRecordsDrawer, ConfirmDialog deletes, banner sentinels)._

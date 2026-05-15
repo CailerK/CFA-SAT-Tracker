@@ -1,6 +1,27 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import teamService from '../services/team';
+import { isManagerOrAbove } from '../utils/access';
+import { ActionMenu, ConfirmDialog, FormModal, SelectField } from './ui';
+import MemberFormModal from './MemberFormModal';
 import './TeamMembers.css';
+
+// Filter / sort option lists used by the dropdowns in the filter bar.
+const DEPARTMENT_FILTERS = [
+  { value: '',           label: 'All Departments' },
+  { value: 'foh',        label: 'Front of House' },
+  { value: 'kitchen',    label: 'Kitchen' },
+  { value: 'management', label: 'Management' },
+  { value: 'facilities', label: 'Facilities' },
+  { value: 'catering',   label: 'Catering' },
+];
+
+const SORT_OPTIONS = [
+  { value: 'name',   label: 'Sort: Name (A–Z)' },
+  { value: '-name',  label: 'Sort: Name (Z–A)' },
+  { value: 'email',  label: 'Sort: Email' },
+  { value: 'role',   label: 'Sort: Role' },
+  { value: 'recent', label: 'Sort: Recently Added' },
+];
 
 // Map a backend role slug → the display string the UI was built for.
 const formatRole = (slug) => {
@@ -51,10 +72,10 @@ const IconChevronLeft = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox=
 const IconMoreHorizontal = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>);
 const IconMoreVertical = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>);
 
-// ===== DEMO DATA (see FAKE_DATA.md) =====
 const ITEMS_PER_PAGE = 10;
 
-const TeamMembers = ({ onBack, onNavigate }) => {
+const TeamMembers = ({ user, onBack, onNavigate }) => {
+  const canManage = isManagerOrAbove(user);
   const [activeTab, setActiveTab] = useState('active');
   const [managersOpen, setManagersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,11 +85,25 @@ const TeamMembers = ({ onBack, onNavigate }) => {
   const [managers, setManagers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load roster + stats on mount and whenever tab/search changes.
+  // Filter / sort state
+  const [deptFilter, setDeptFilter] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+
+  // Modal state
+  const [memberForm, setMemberForm] = useState(null); // null | { member } (null inside = create)
+  const [confirmDialog, setConfirmDialog] = useState(null); // {title, message, destructive, onConfirm}
+  const [reassign, setReassign] = useState(null); // { member, managerId }
+
+  // Load roster + stats on mount and whenever tab/search/filter/sort change.
   const refresh = useCallback(async () => {
     try {
       const [list, stats, managerList] = await Promise.all([
-        teamService.listMembers({ status: activeTab, q: searchQuery.trim() || undefined }),
+        teamService.listMembers({
+          status: activeTab,
+          q: searchQuery.trim() || undefined,
+          dept: deptFilter || undefined,
+          ordering: sortBy || undefined,
+        }),
         teamService.getStats(),
         teamService.listMembers({ status: 'managers' }),
       ]);
@@ -82,7 +117,7 @@ const TeamMembers = ({ onBack, onNavigate }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [activeTab, searchQuery]);
+  }, [activeTab, searchQuery, deptFilter, sortBy]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -111,61 +146,61 @@ const TeamMembers = ({ onBack, onNavigate }) => {
     if (onNavigate) return onNavigate('dashboard');
   };
 
-  const handleMemberAction = async (member) => {
-    const defaultAction = member.isActive ? 'edit' : 'activate';
-    const action = window.prompt(
-      `Type "edit" or "${member.isActive ? 'deactivate' : 'activate'}" for ${member.name}.`,
-      defaultAction
-    );
-    if (!action) return;
-    const choice = action.trim().toLowerCase();
+  // ----- Action handlers -----
+  // All three (Edit / Toggle Active / Reassign Manager) get reached via
+  // the per-row ActionMenu below. They each open a styled modal or
+  // ConfirmDialog rather than the legacy window.prompt chain.
+  const openEdit = (member) => setMemberForm({ member });
+  const openCreate = () => setMemberForm({ member: null });
 
-    try {
-      if (choice === 'deactivate' || choice === 'activate') {
-        await teamService.updateMember(member.id, {
-          is_active: choice === 'activate',
-        });
+  const handleToggleActive = (member) => {
+    const willBeActive = !member.isActive;
+    setConfirmDialog({
+      title: willBeActive ? `Activate ${member.name}?` : `Deactivate ${member.name}?`,
+      message: willBeActive
+        ? `${member.name} will return to the active roster and be assignable again.`
+        : `${member.name} will move to the Inactive tab and disappear from pickers. You can reactivate them later.`,
+      destructive: !willBeActive,
+      confirmLabel: willBeActive ? 'Activate' : 'Deactivate',
+      onConfirm: async () => {
+        await teamService.updateMember(member.id, { is_active: willBeActive });
         await refresh();
-        return;
-      }
-
-      if (choice !== 'edit') return;
-
-      const role = window.prompt(
-        'Role slug',
-        member.roleSlug
-      );
-      if (role == null) return;
-
-      const managerPrompt = managers
-        .filter((m) => m.id !== member.id)
-        .map((m) => m.name)
-        .join('\n');
-      const managerInput = window.prompt(
-        `Manager name (leave blank for none)\n${managerPrompt}`,
-        member.manager || ''
-      );
-      if (managerInput == null) return;
-
-      const phone = window.prompt('Phone', member.phone || '');
-      if (phone == null) return;
-
-      const nextManager = managers.find(
-        (candidate) =>
-          candidate.id !== member.id
-          && candidate.name.toLowerCase() === managerInput.trim().toLowerCase()
-      );
-
-      await teamService.updateMember(member.id, {
-        role: role.trim().toLowerCase().replace(/\s+/g, '_'),
-        manager: managerInput.trim() ? nextManager?.id || member.managerId || null : null,
-        phone: phone.trim(),
-      });
-      await refresh();
-    } catch (err) {
-      console.error('Failed to update team member:', err);
-    }
+        setConfirmDialog(null);
+      },
+    });
   };
+
+  const openReassign = (member) => {
+    setReassign({ member, managerId: member.managerId ? String(member.managerId) : '' });
+  };
+  const submitReassign = async () => {
+    if (!reassign) return;
+    const next = reassign.managerId ? Number(reassign.managerId) : null;
+    await teamService.updateMember(reassign.member.id, { manager: next });
+    await refresh();
+    setReassign(null);
+  };
+
+  // Build the action list for a given row. Used in both desktop + mobile.
+  const actionsFor = (m) => {
+    if (!canManage) return [];
+    return [
+      { label: 'Edit Member',     onClick: () => openEdit(m) },
+      { label: 'Reassign Manager', onClick: () => openReassign(m) },
+      { divider: true },
+      {
+        label: m.isActive ? 'Deactivate' : 'Reactivate',
+        destructive: m.isActive,
+        onClick: () => handleToggleActive(m),
+      },
+    ];
+  };
+
+  // Pretty label for the current filter/sort dropdowns.
+  const deptLabel =
+    DEPARTMENT_FILTERS.find((d) => d.value === deptFilter)?.label || 'All Departments';
+  const sortLabel =
+    SORT_OPTIONS.find((s) => s.value === sortBy)?.label || 'Sort: Name';
 
   return (
     <div className="tm-page">
@@ -181,6 +216,18 @@ const TeamMembers = ({ onBack, onNavigate }) => {
               <p className="tm-subtitle">Manage your team roster and permissions</p>
             </div>
           </div>
+          {canManage && (
+            <div className="tm-header-actions">
+              <button
+                type="button"
+                className="tm-add-btn"
+                onClick={openCreate}
+              >
+                <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}>+</span>
+                <span>Add Member</span>
+              </button>
+            </div>
+          )}
         </header>
 
         {/* Filter bar */}
@@ -196,17 +243,30 @@ const TeamMembers = ({ onBack, onNavigate }) => {
             />
           </div>
           <div className="tm-filter-actions">
-            <button type="button" className="tm-filter-btn">
-              <span>All Departments</span>
-              <IconChevronDown className="tm-filter-chevron" />
-            </button>
-            <button type="button" className="tm-filter-btn">
-              <span>Sort: Name</span>
-              <IconChevronDown className="tm-filter-chevron" />
-            </button>
-            <button type="button" className="tm-icon-btn" aria-label="More options">
-              <IconMoreHorizontal className="tm-filter-chevron" />
-            </button>
+            <ActionMenu
+              trigger={(
+                <button type="button" className="tm-filter-btn">
+                  <span>{deptLabel}</span>
+                  <IconChevronDown className="tm-filter-chevron" />
+                </button>
+              )}
+              actions={DEPARTMENT_FILTERS.map((opt) => ({
+                label: opt.label,
+                onClick: () => { setDeptFilter(opt.value); setPage(1); },
+              }))}
+            />
+            <ActionMenu
+              trigger={(
+                <button type="button" className="tm-filter-btn">
+                  <span>{sortLabel}</span>
+                  <IconChevronDown className="tm-filter-chevron" />
+                </button>
+              )}
+              actions={SORT_OPTIONS.map((opt) => ({
+                label: opt.label,
+                onClick: () => setSortBy(opt.value),
+              }))}
+            />
           </div>
         </div>
 
@@ -262,7 +322,7 @@ const TeamMembers = ({ onBack, onNavigate }) => {
                     key={manager.id}
                     type="button"
                     className="tm-manager-link"
-                    onClick={() => handleMemberAction(manager)}
+                    onClick={() => canManage && openEdit(manager)}
                     style={{ display: 'block', marginBottom: 8 }}
                   >
                     {manager.name} · {manager.role}
@@ -335,14 +395,23 @@ const TeamMembers = ({ onBack, onNavigate }) => {
                 </div>
 
                 <div className="tm-cell-actions">
-                  <button
-                    type="button"
-                    className="tm-row-action-btn"
-                    aria-label={`Actions for ${m.name}`}
-                    onClick={() => handleMemberAction(m)}
-                  >
-                    <IconMoreVertical className="tm-row-action-icon" />
-                  </button>
+                  {canManage ? (
+                    <ActionMenu
+                      align="right"
+                      actions={actionsFor(m)}
+                      trigger={(
+                        <button
+                          type="button"
+                          className="tm-row-action-btn"
+                          aria-label={`Actions for ${m.name}`}
+                        >
+                          <IconMoreVertical className="tm-row-action-icon" />
+                        </button>
+                      )}
+                    />
+                  ) : (
+                    <span aria-hidden="true" />
+                  )}
                 </div>
               </div>
             ))}
@@ -367,14 +436,23 @@ const TeamMembers = ({ onBack, onNavigate }) => {
                       <p className="tm-email">{m.email}</p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="tm-row-action-btn"
-                    aria-label={`Actions for ${m.name}`}
-                    onClick={() => handleMemberAction(m)}
-                  >
-                    <IconMoreVertical className="tm-row-action-icon" />
-                  </button>
+                  {canManage ? (
+                    <ActionMenu
+                      align="right"
+                      actions={actionsFor(m)}
+                      trigger={(
+                        <button
+                          type="button"
+                          className="tm-row-action-btn"
+                          aria-label={`Actions for ${m.name}`}
+                        >
+                          <IconMoreVertical className="tm-row-action-icon" />
+                        </button>
+                      )}
+                    />
+                  ) : (
+                    <span className="tm-row-action-placeholder" aria-hidden="true" />
+                  )}
                 </div>
 
                 <div className="tm-card-grid">
@@ -452,6 +530,48 @@ const TeamMembers = ({ onBack, onNavigate }) => {
           </div>
         </div>
       </div>
+
+      {/* Add / Edit Member modal (manager+ only — gated by openEdit/openCreate) */}
+      <MemberFormModal
+        isOpen={!!memberForm}
+        member={memberForm?.member || null}
+        managers={managers}
+        onClose={() => setMemberForm(null)}
+        onSaved={async () => { setMemberForm(null); await refresh(); }}
+      />
+
+      {/* Reassign manager mini-modal — a SelectField inside a FormModal. */}
+      <FormModal
+        isOpen={!!reassign}
+        title={reassign ? `Reassign Manager — ${reassign.member.name}` : ''}
+        submitLabel="Save"
+        size="sm"
+        onClose={() => setReassign(null)}
+        onSubmit={submitReassign}
+      >
+        <SelectField
+          label="Reports To"
+          value={reassign?.managerId || ''}
+          onChange={(v) => setReassign((r) => r && ({ ...r, managerId: v }))}
+          options={[
+            { value: '', label: 'No manager' },
+            ...managers
+              .filter((mm) => !reassign || mm.id !== reassign.member.id)
+              .map((mm) => ({ value: String(mm.id), label: mm.name })),
+          ]}
+        />
+      </FormModal>
+
+      {/* Activate / Deactivate confirmation */}
+      <ConfirmDialog
+        isOpen={!!confirmDialog}
+        title={confirmDialog?.title || ''}
+        message={confirmDialog?.message || ''}
+        confirmLabel={confirmDialog?.confirmLabel || 'Confirm'}
+        destructive={!!confirmDialog?.destructive}
+        onConfirm={confirmDialog?.onConfirm}
+        onClose={() => setConfirmDialog(null)}
+      />
     </div>
   );
 };

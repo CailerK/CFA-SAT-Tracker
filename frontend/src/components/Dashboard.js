@@ -448,6 +448,7 @@ const Dashboard = ({ user, onLogout }) => {
           />
         ) : currentPage === 'team-members' ? (
           <TeamMembers 
+            user={user}
             onBack={() => setCurrentPage('dashboard')}
           />
         ) : currentPage === 'team-documentation' ? (
