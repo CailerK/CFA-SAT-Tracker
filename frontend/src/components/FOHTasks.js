@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './FOHTasks.css';
 import TaskHistory from './TaskHistory';
 import fohService from '../services/foh';
+import settingsService from '../services/settings';
 import useCentralDayRefresh from '../hooks/useCentralDayRefresh';
 import { isManagerOrAbove } from '../utils/access';
+import { FormModal, TextField } from './ui';
 
 // Normalize backend task to {id, text, completed}. The backend returns
 // `today_completion` as either null (not done today) or an object (done) —
@@ -42,7 +44,14 @@ const FOHTasks = ({ user }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  // requireInitials mirrors StoreSettings.foh_require_initials from backend.
   const [requireInitials, setRequireInitials] = useState(false);
+  const [requireInitialsSaving, setRequireInitialsSaving] = useState(false);
+  // initialsModal: { taskId } | null — opens when require-initials is ON
+  // and a team member tries to mark a task complete.
+  const [initialsModal, setInitialsModal] = useState(null);
+  const [initialsInput, setInitialsInput] = useState('');
+  const [initialsError, setInitialsError] = useState('');
   const [newTaskName, setNewTaskName] = useState('');
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragOverTaskId, setDragOverTaskId] = useState(null);
@@ -78,18 +87,64 @@ const FOHTasks = ({ user }) => {
 
   useCentralDayRefresh(refreshTasks);
 
+  // Hydrate the require-initials toggle from StoreSettings on mount so it
+  // persists across sessions / shared devices.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const settings = await settingsService.getStoreSettings();
+        if (cancelled) return;
+        setRequireInitials(!!settings?.foh_require_initials);
+      } catch (err) {
+        console.error('Failed to load FOH store settings:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Persist the toggle to StoreSettings on user change. Manager-only at the
+  // backend, but we hide the toggle UI for team members too.
+  const handleToggleRequireInitials = async (next) => {
+    if (!canManageTasks) return;
+    const prev = requireInitials;
+    setRequireInitials(next);
+    setRequireInitialsSaving(true);
+    try {
+      await settingsService.updateStoreSettings({ foh_require_initials: next });
+    } catch (err) {
+      console.error('Failed to save require-initials setting:', err);
+      setRequireInitials(prev);
+      setErrorMessage('Could not save setting — manager role required.');
+    } finally {
+      setRequireInitialsSaving(false);
+    }
+  };
+
   const tabConfig = {
     opening: { label: 'Opening', total: tasks.opening.length, icon: '🌅' },
     transition: { label: 'Transition', total: tasks.transition.length, icon: '🔄' },
     closing: { label: 'Closing', total: tasks.closing.length, icon: '🌙' },
   };
 
+  // Mark a task complete or undo a previous completion. If the store has
+  // require-initials ON and we're about to complete, route through the
+  // initials FormModal first; otherwise fire the API call immediately.
   const toggleTask = async (taskId) => {
-    // Optimistic update — flip the checkbox immediately, then sync to server.
     const currentList = tasks[activeTab];
     const target = currentList.find(t => t.id === taskId);
     if (!target) return;
     const willBeCompleted = !target.completed;
+
+    // Require-initials path: open the prompt instead of completing now.
+    if (willBeCompleted && requireInitials) {
+      setInitialsError('');
+      setInitialsInput((user?.firstName?.[0] || '') + (user?.lastName?.[0] || ''));
+      setInitialsModal({ taskId });
+      return;
+    }
+
+    // Optimistic update — flip the checkbox immediately, then sync to server.
     setTasks(prev => ({
       ...prev,
       [activeTab]: prev[activeTab].map(t =>
@@ -112,6 +167,50 @@ const FOHTasks = ({ user }) => {
           t.id === taskId ? { ...t, completed: target.completed } : t
         ),
       }));
+    }
+  };
+
+  // Submit handler for the initials FormModal: validates, optimistically
+  // marks the task complete, then POSTs to /complete/ with initials. Rolls
+  // back the optimistic state on failure.
+  const submitInitials = async () => {
+    if (!initialsModal) return;
+    const trimmed = (initialsInput || '').trim().toUpperCase();
+    if (!trimmed) {
+      setInitialsError('Initials are required.');
+      throw new Error('Missing initials');
+    }
+    if (trimmed.length > 4) {
+      setInitialsError('Use up to 4 letters.');
+      throw new Error('Initials too long');
+    }
+    const { taskId } = initialsModal;
+    const currentList = tasks[activeTab];
+    const target = currentList.find(t => t.id === taskId);
+    if (!target) {
+      setInitialsModal(null);
+      return;
+    }
+    setTasks(prev => ({
+      ...prev,
+      [activeTab]: prev[activeTab].map(t =>
+        t.id === taskId ? { ...t, completed: true } : t
+      ),
+    }));
+    try {
+      await fohService.completeTask(taskId, { initials: trimmed });
+      setInitialsModal(null);
+      setInitialsInput('');
+    } catch (err) {
+      console.error('Complete with initials failed:', err);
+      setTasks(prev => ({
+        ...prev,
+        [activeTab]: prev[activeTab].map(t =>
+          t.id === taskId ? { ...t, completed: false } : t
+        ),
+      }));
+      setInitialsError(err?.message || 'Could not save — change rolled back.');
+      throw err;
     }
   };
 
@@ -490,11 +589,12 @@ const FOHTasks = ({ user }) => {
               <div className="settings-option-content">
                 <div className="settings-option-header">
                   <h3>Require Team Member Initials</h3>
-                  <label className="toggle-switch">
+                  <label className="toggle-switch" style={canManageTasks ? undefined : { opacity: 0.5, cursor: 'not-allowed' }}>
                     <input
                       type="checkbox"
                       checked={requireInitials}
-                      onChange={(e) => setRequireInitials(e.target.checked)}
+                      disabled={!canManageTasks || requireInitialsSaving}
+                      onChange={(e) => handleToggleRequireInitials(e.target.checked)}
                     />
                     <span className="toggle-slider"></span>
                   </label>
@@ -507,6 +607,28 @@ const FOHTasks = ({ user }) => {
           </div>
         </div>
       )}
+
+      {/* Initials prompt FormModal (opens when require-initials is ON) */}
+      <FormModal
+        isOpen={!!initialsModal}
+        title="Enter Your Initials"
+        submitLabel="Mark Complete"
+        size="sm"
+        onClose={() => { setInitialsModal(null); setInitialsInput(''); setInitialsError(''); }}
+        onSubmit={submitInitials}
+        submitDisabled={!initialsInput.trim()}
+        errorMessage={initialsError}
+      >
+        <TextField
+          label="Initials"
+          value={initialsInput}
+          onChange={(v) => setInitialsInput(v.toUpperCase().slice(0, 4))}
+          placeholder="e.g. CK"
+          required
+          autoFocus
+          help="Up to 4 letters. Your store requires initials before marking tasks complete."
+        />
+      </FormModal>
 
       {/* Add Task Modal */}
       {showAddTask && (

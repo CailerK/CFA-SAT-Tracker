@@ -15,7 +15,7 @@ Mutations:
   GET   /api/foh/tasks/history/?range=7d     completion rollup
 """
 
-from datetime import timedelta
+from datetime import date as _date_cls, timedelta
 
 from django.db.models import Prefetch
 from django.utils import timezone
@@ -149,18 +149,37 @@ class FOHTaskTemplateViewSet(StoreScopedViewSet):
     def history(self, request):
         """Per-day rollup grouped by shift.
 
-        Query: ?range=7d|14d|30d  (default 7d)
+        Query:
+          ?range=7d|14d|30d  (default 7d)
+          ?start=YYYY-MM-DD&end=YYYY-MM-DD  (overrides range when both given)
         Response: [{date, opening: {done, total}, transition: {…}, closing: {…}, total: {…}, completed: [...], missed: [...]}]
         """
-        range_arg = request.query_params.get("range", "7d")
-        try:
-            days = int(range_arg.rstrip("d"))
-        except ValueError:
-            days = 7
-        days = min(max(days, 1), 90)
-
-        end = _today()
-        start = end - timedelta(days=days - 1)
+        start_arg = request.query_params.get("start")
+        end_arg = request.query_params.get("end")
+        if start_arg and end_arg:
+            try:
+                start = _date_cls.fromisoformat(start_arg)
+                end = _date_cls.fromisoformat(end_arg)
+            except ValueError:
+                raise ValidationError({
+                    "start": "Expected YYYY-MM-DD.",
+                    "end": "Expected YYYY-MM-DD.",
+                })
+            if start > end:
+                start, end = end, start
+            days = (end - start).days + 1
+            # Cap to 365 days so a malicious/typo'd range can't OOM the rollup.
+            if days > 365:
+                raise ValidationError({"range": "Custom date range cannot exceed 365 days."})
+        else:
+            range_arg = request.query_params.get("range", "7d")
+            try:
+                days = int(range_arg.rstrip("d"))
+            except ValueError:
+                days = 7
+            days = min(max(days, 1), 90)
+            end = _today()
+            start = end - timedelta(days=days - 1)
 
         # Completions over the date range.
         completions = (

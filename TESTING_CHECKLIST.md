@@ -960,6 +960,52 @@ Walk through these one by one — each card on the Quick Actions grid should nav
 
 ---
 
+## UI Phase 17 — FOH + Cleaning polish _(2026-05-15)_
+
+> Replaces 4 dead controls (FOH initials toggle, TaskHistory date picker, two of CleaningMaintenance's header buttons) and extends the FOH history endpoint to accept arbitrary date ranges.
+
+### `/foh-tasks` (FOHTasks)
+
+#### As `admin@gmail.com / admin` (manager):
+- [ ] Open Settings (top-right gear) → "Require Team Member Initials" toggle reflects the current `StoreSettings.foh_require_initials` value on load.
+- [ ] Flipping the toggle calls `PATCH /api/stores/me/settings/` and persists across page reloads.
+- [ ] With toggle ON, tapping a task checkbox opens an **Enter Your Initials** FormModal pre-filled with the user's first+last initial.
+- [ ] Submitting valid initials (≤4 letters) marks the task complete and stores initials on `FOHTaskCompletion`.
+- [ ] Cancelling the modal leaves the task unchecked.
+- [ ] With toggle OFF, checkboxes complete immediately (no modal).
+
+#### As `demouser@gmail.com / demouser` (team member):
+- [ ] Toggle in the Settings modal is disabled (cannot change), but still reflects the current store value.
+- [ ] If toggle is ON store-wide, team member sees the same initials modal before each completion.
+
+### `/foh-tasks` → History (TaskHistory)
+
+#### As any user:
+- [ ] 7d / 14d / 30d preset pills still work as before.
+- [ ] A new **Custom** pill (and the previously-dead date label button) both open a **Pick a Date Range** FormModal with two DatePicker fields.
+- [ ] Submitting a valid range triggers `GET /api/foh/tasks/history/?start=…&end=…` and the day cards render that span.
+- [ ] Start > end is rejected client-side with an inline error.
+- [ ] Range >365 days is rejected client-side; the backend also enforces this cap.
+- [ ] After applying a custom range, the Custom pill stays active and the date-label button shows the resolved span.
+- [ ] Clicking a preset pill exits Custom mode.
+
+### `/cleaning` (CleaningMaintenance)
+
+#### As any user:
+- [ ] Header no longer has the dead duplicate calendar-icon button — only History (clock) + Settings (gear) + Add (manager).
+- [ ] Clock button opens a **Cleaning History** drawer listing the last 30 days of completions (task name + frequency + who + when).
+- [ ] Empty state copy reads "No completions recorded in the last 30 days."
+- [ ] Gear button opens a "Cleaning settings — coming soon" sentinel ConfirmDialog.
+
+### Backend regression
+- [ ] `GET /api/foh/tasks/history/?range=7d` still returns the 7-day rollup (unchanged behaviour).
+- [ ] `GET /api/foh/tasks/history/?start=2026-04-01&end=2026-04-30` returns the rollup for that window.
+- [ ] `GET /api/foh/tasks/history/?start=…&end=…` with start > end auto-swaps the two dates.
+- [ ] `GET /api/foh/tasks/history/?start=…&end=…` with a span > 365 days returns a 400 validation error.
+- [ ] `PATCH /api/stores/me/settings/` with `{foh_require_initials: true}` persists the change (manager-only).
+
+---
+
 ## Bugs / oddities log
 
 > Use this section as you test. Format:

@@ -71,11 +71,22 @@ const fohService = {
     });
   },
 
-  /** GET: completion history rollup for the past N days. */
-  async getHistory({ range = "7d" } = {}) {
-    return apiService.request(
-      `/foh/tasks/history/?range=${encodeURIComponent(range)}`
-    );
+  /** GET: completion history rollup.
+   *
+   * Pass either `{ range: '7d'|'14d'|'30d'|'Nd' }` for a preset window, or
+   * `{ start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' }` for a custom date range.
+   * When both `start` and `end` are provided, the backend uses them and
+   * ignores `range`.
+   */
+  async getHistory({ range = "7d", start, end } = {}) {
+    const params = new URLSearchParams();
+    if (start && end) {
+      params.set("start", start);
+      params.set("end", end);
+    } else {
+      params.set("range", range);
+    }
+    return apiService.request(`/foh/tasks/history/?${params}`);
   },
 };
 

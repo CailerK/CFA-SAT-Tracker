@@ -56,7 +56,7 @@ time to replace demo data with live API calls / database reads / persisted state
 | 🔴 | `toggleTask(id)` only mutates local state | `POST /api/foh/tasks/:id/complete` with user initials + timestamp. |
 | 🔴 | `deleteTask(id)` only mutates local state | `DELETE /api/foh/tasks/:id`. |
 | 🔴 | `handleAddTask` only mutates local state | `POST /api/foh/tasks`. |
-| 🟠 | "Require Team Member Initials" toggle is local | Store setting: `PATCH /api/stores/me/settings`. |
+| ✅ | "Require Team Member Initials" toggle now persists to `StoreSettings.foh_require_initials` (manager-only) and triggers an Initials FormModal before completion | Phase 17. |
 | 🟡 | Subtitle "6:30 AM - 11:00 AM • Lunch rush preparation" in Add Task modal header is hardcoded | Could be derived from shift config. |
 | 🟠 | Grip/drag handle is visual-only; no reorder persistence | `PATCH /api/foh/tasks/reorder`. |
 
@@ -365,4 +365,4 @@ time to replace demo data with live API calls / database reads / persisted state
 
 ---
 
-_Last updated: 2026-05-15 — after Phase 16 Calendar + Surveys + QuickLinks wiring (Calendar New/Edit Event FormModals + toggleable category-legend filters + manager-only day-cell click; TeamSurveys Quick/Advanced Create Survey FormModal with dynamic question list + per-card ActionMenu for Extend/Close/Archive/Delete + Dashboard status-breakdown panel + Take/Results sentinels + fixed `onNavigate` prop bug; TeamQuickLinks Add/Edit Link FormModal + Manage Categories FormModal with inline Add/Edit Category sub-modal + per-link ActionMenu; new service methods `surveysService.update`, `teamService.updateQuickLink`, `teamService.updateLinkCategory`, `teamService.deleteLinkCategory`)._
+_Last updated: 2026-05-15 — after Phase 17 FOH + Cleaning polish (FOHTasks "Require Initials" toggle persisted to `StoreSettings.foh_require_initials` + Initials FormModal before completion; TaskHistory custom date-range FormModal + backend `start`/`end` query params on `GET /api/foh/tasks/history/`; CleaningMaintenance dropped dead duplicate header button, clock → HistoryDrawer of last 30 days, gear → coming-soon sentinel ConfirmDialog)._

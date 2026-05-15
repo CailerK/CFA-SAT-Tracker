@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import fohService from '../services/foh';
+import { FormModal, DatePicker } from './ui';
 import './TaskHistory.css';
 
 const SHIFT_TABS = [
@@ -54,9 +55,23 @@ const getShiftLabel = (shift) => {
   return 'Task';
 };
 
+// YYYY-MM-DD for today / N-days-ago — used to pre-fill the custom range modal.
+const isoToday = () => new Date().toISOString().slice(0, 10);
+const isoDaysAgo = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+};
+
 const TaskHistory = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState('all');
+  // dateRange is either a preset id like '7d' or 'custom' when using start/end.
   const [dateRange, setDateRange] = useState('7d');
+  // customRange: { start, end } | null — applied when dateRange === 'custom'.
+  const [customRange, setCustomRange] = useState(null);
+  // rangeModal: { start, end } | null — backing state for the picker FormModal.
+  const [rangeModal, setRangeModal] = useState(null);
+  const [rangeError, setRangeError] = useState('');
   const [historyData, setHistoryData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -65,7 +80,9 @@ const TaskHistory = ({ onBack }) => {
     (async () => {
       try {
         setIsLoading(true);
-        const res = await fohService.getHistory({ range: dateRange });
+        const res = dateRange === 'custom' && customRange?.start && customRange?.end
+          ? await fohService.getHistory({ start: customRange.start, end: customRange.end })
+          : await fohService.getHistory({ range: dateRange });
         if (cancelled) return;
         setHistoryData(res.days || []);
       } catch (err) {
@@ -76,7 +93,40 @@ const TaskHistory = ({ onBack }) => {
       }
     })();
     return () => { cancelled = true; };
-  }, [dateRange]);
+  }, [dateRange, customRange]);
+
+  // ---- Custom date range modal handlers ----
+  const openRangeModal = () => {
+    setRangeError('');
+    setRangeModal({
+      start: customRange?.start || isoDaysAgo(13),
+      end: customRange?.end || isoToday(),
+    });
+  };
+
+  const submitRangeModal = async () => {
+    if (!rangeModal) return;
+    const { start, end } = rangeModal;
+    if (!start || !end) {
+      setRangeError('Both start and end dates are required.');
+      throw new Error('Missing dates');
+    }
+    if (start > end) {
+      setRangeError('Start date must be on or before end date.');
+      throw new Error('Bad range');
+    }
+    // Cap at 365 days client-side to mirror the backend safety check.
+    const startMs = new Date(start).getTime();
+    const endMs = new Date(end).getTime();
+    const dayCount = Math.round((endMs - startMs) / (1000 * 60 * 60 * 24)) + 1;
+    if (dayCount > 365) {
+      setRangeError('Custom date range cannot exceed 365 days.');
+      throw new Error('Range too long');
+    }
+    setCustomRange({ start, end });
+    setDateRange('custom');
+    setRangeModal(null);
+  };
 
   const tabStats = useMemo(() => {
     const totals = {
@@ -112,6 +162,8 @@ const TaskHistory = ({ onBack }) => {
     });
     return `${label(oldest)} - ${label(newest)}`;
   }, [historyData, dateRange]);
+
+  const isCustom = dateRange === 'custom';
 
   return (
     <div className="task-history-page">
@@ -175,9 +227,22 @@ const TaskHistory = ({ onBack }) => {
                 {range.label}
               </button>
             ))}
+            <button
+              type="button"
+              className={`range-button ${isCustom ? 'active' : ''}`}
+              onClick={openRangeModal}
+              title="Pick a custom start and end date"
+            >
+              Custom
+            </button>
           </div>
           <div className="date-picker-wrapper">
-            <button className="date-picker-button">
+            <button
+              type="button"
+              className="date-picker-button"
+              onClick={openRangeModal}
+              title="Pick a custom start and end date"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
                 <line x1="16" y1="2" x2="16" y2="6"/>
@@ -315,6 +380,32 @@ const TaskHistory = ({ onBack }) => {
           })}
         </div>
       )}
+
+      {/* ---- Custom date range FormModal ---- */}
+      <FormModal
+        isOpen={!!rangeModal}
+        title="Pick a Date Range"
+        submitLabel="Apply"
+        size="sm"
+        onClose={() => setRangeModal(null)}
+        onSubmit={submitRangeModal}
+        submitDisabled={!rangeModal?.start || !rangeModal?.end}
+        errorMessage={rangeError}
+      >
+        <DatePicker
+          label="Start Date"
+          value={rangeModal?.start || ''}
+          onChange={(v) => setRangeModal((r) => r && ({ ...r, start: v }))}
+          required
+        />
+        <DatePicker
+          label="End Date"
+          value={rangeModal?.end || ''}
+          onChange={(v) => setRangeModal((r) => r && ({ ...r, end: v }))}
+          required
+          help="Up to 365 days."
+        />
+      </FormModal>
     </div>
   );
 };

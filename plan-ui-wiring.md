@@ -223,17 +223,25 @@ This whole page is prompt-driven. Build modals for:
 
 ---
 
-### Phase 17 — FOH + Cleaning polish
+### Phase 17 — FOH + Cleaning polish ✅ _(done 2026-05-15)_
 **Why**: low backlog, mostly small bugs.
 
-#### FOHTasks.js
-- [ ] **"Require Team Member Initials" toggle** → persist to `StoreSettings.foh_require_initials` (backend already has this field!). When ON, `toggleTask` should prompt for initials before completing. (a + c)
+#### FOHTasks.js ✅
+- [x] **"Require Team Member Initials" toggle** now hydrates from `GET /api/stores/me/settings/` on mount and persists via `PATCH /api/stores/me/settings/` (manager-gated). When ON, `toggleTask` opens an **Initials FormModal** before completing; submit sends the trimmed initials with `POST /api/foh/tasks/:id/complete/`.
+- [x] Toggle is disabled for team members + while saving; failure rolls back the optimistic UI and surfaces the error inline.
 
-#### TaskHistory.js
-- [ ] **Date picker button** → wire to a `<DatePicker>` range selector. Backend already accepts arbitrary ranges. (a + c)
+#### TaskHistory.js ✅
+- [x] **Date picker button** now opens a **Pick a Date Range FormModal** with two DatePicker fields. A new "Custom" preset pill mirrors the same flow.
+- [x] Backend `GET /api/foh/tasks/history/` extended to accept `?start=YYYY-MM-DD&end=YYYY-MM-DD` (overrides `range=Nd`); capped at 365 days. Frontend `fohService.getHistory` accepts `{ start, end }`.
 
-#### CleaningMaintenance.js
-- [ ] **Header has 3 buttons** (settings, history, settings) with no handlers and one is a duplicate. Audit: keep History (wire to `cleaningService.getHistory`), drop the duplicate settings, decide on the remaining gear. (a)
+#### CleaningMaintenance.js ✅
+- [x] Dropped the dead duplicate calendar-icon "Settings" button.
+- [x] **Clock button** now opens a **HistoryDrawer** sourced from `cleaningService.getHistory({ scope: 'foh', range: '30d' })`.
+- [x] **Gear button** now opens a "Cleaning settings — coming soon" sentinel ConfirmDialog so users don't silently no-op the click (full Cleaning settings UI deferred — backend `cleaning_settings` is already there).
+
+**Backend additions**: `views_foh.py history()` action now accepts `start`/`end` query params (in addition to `range=Nd`).
+
+**Net change**: 3 components wired, 1 backend endpoint extended (+~20 LOC in `views_foh.py`), 1 service method extended (`fohService.getHistory`), 4 dead buttons fixed or removed.
 
 **Estimate**: half a session.
 
