@@ -1,0 +1,408 @@
+/* =========================================================================
+   Shared UI primitives (Phase 11)
+   - Modal overlay + content
+   - Buttons (primary / secondary / danger / ghost)
+   - Form fields
+   - Action menu popover
+   - Chip multi-select
+   Theme: CFA red #E51636
+   ========================================================================= */
+
+/* ===== Modal overlay + container ===== */
+.ui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: ui-fade-in 0.12s ease-out;
+}
+
+@keyframes ui-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.ui-modal-content {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: ui-scale-in 0.14s ease-out;
+}
+
+.ui-modal-content.ui-modal-lg { max-width: 760px; }
+.ui-modal-content.ui-modal-sm { max-width: 420px; }
+
+@keyframes ui-scale-in {
+  from { transform: scale(0.96); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+.ui-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.ui-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.ui-modal-close {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+  color: #6b7280;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.12s ease;
+}
+.ui-modal-close:hover { background: #f3f4f6; color: #111827; }
+
+.ui-modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.ui-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid #f3f4f6;
+  background: #fafafa;
+}
+
+/* ===== Buttons ===== */
+.ui-btn {
+  appearance: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: background 0.12s ease, transform 0.05s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+}
+
+.ui-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ui-btn-primary {
+  background: #E51636;
+  color: white;
+}
+.ui-btn-primary:hover:not(:disabled) { background: #c4112d; }
+.ui-btn-primary:active:not(:disabled) { transform: translateY(1px); }
+
+.ui-btn-secondary {
+  background: white;
+  color: #374151;
+  border-color: #e5e7eb;
+}
+.ui-btn-secondary:hover:not(:disabled) { background: #f9fafb; }
+
+.ui-btn-danger {
+  background: #dc2626;
+  color: white;
+}
+.ui-btn-danger:hover:not(:disabled) { background: #b91c1c; }
+
+.ui-btn-ghost {
+  background: transparent;
+  color: #6b7280;
+}
+.ui-btn-ghost:hover:not(:disabled) { background: #f3f4f6; color: #111827; }
+
+/* ===== Form fields ===== */
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.ui-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.ui-field-required {
+  color: #dc2626;
+  margin-left: 2px;
+}
+
+.ui-field-help {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.ui-field-input,
+.ui-field-textarea,
+.ui-field-select {
+  appearance: none;
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #111827;
+  background: white;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  box-sizing: border-box;
+}
+
+.ui-field-input:focus,
+.ui-field-textarea:focus,
+.ui-field-select:focus {
+  outline: 0;
+  border-color: #E51636;
+  box-shadow: 0 0 0 3px rgba(229, 22, 54, 0.12);
+}
+
+.ui-field-textarea {
+  resize: vertical;
+  min-height: 72px;
+  font-family: inherit;
+  line-height: 1.45;
+}
+
+.ui-field-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 32px;
+}
+
+.ui-field-error-text {
+  font-size: 12px;
+  color: #dc2626;
+  margin-top: 2px;
+}
+
+.ui-field.has-error .ui-field-input,
+.ui-field.has-error .ui-field-textarea,
+.ui-field.has-error .ui-field-select {
+  border-color: #dc2626;
+}
+
+/* Inline two-column field row */
+.ui-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ===== Toggle switch ===== */
+.ui-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+}
+
+.ui-toggle input { display: none; }
+
+.ui-toggle-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: #d1d5db;
+  border-radius: 999px;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.ui-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.ui-toggle input:checked + .ui-toggle-track {
+  background: #E51636;
+}
+
+.ui-toggle input:checked + .ui-toggle-track .ui-toggle-thumb {
+  transform: translateX(16px);
+}
+
+/* ===== Action menu popover (3-dot ⋮) ===== */
+.ui-action-menu-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.ui-action-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  min-width: 168px;
+  padding: 4px;
+  z-index: 200;
+  animation: ui-fade-in 0.1s ease-out;
+}
+
+.ui-action-menu-item {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #111827;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+}
+
+.ui-action-menu-item:hover { background: #f3f4f6; }
+
+.ui-action-menu-item.destructive { color: #dc2626; }
+.ui-action-menu-item.destructive:hover { background: #fef2f2; }
+
+.ui-action-menu-divider {
+  height: 1px;
+  background: #f3f4f6;
+  margin: 4px 0;
+}
+
+/* ===== Chip multi-select ===== */
+.ui-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ui-chip {
+  appearance: none;
+  background: white;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  font-family: inherit;
+}
+
+.ui-chip:hover:not(:disabled) {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.ui-chip.selected {
+  background: #E51636;
+  color: white;
+  border-color: #E51636;
+}
+
+/* ===== UserPicker (combobox) ===== */
+.ui-user-picker {
+  position: relative;
+}
+
+.ui-user-picker-input {
+  /* inherits from .ui-field-input */
+}
+
+.ui-user-picker-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 2px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.ui-user-picker-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.ui-user-picker-item:hover { background: #f3f4f6; }
+.ui-user-picker-item.selected { background: #fff5f6; }
+
+.ui-user-picker-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #E51636 0%, #c4112d 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ui-user-picker-name { font-weight: 500; color: #111827; }
+.ui-user-picker-meta { font-size: 12px; color: #6b7280; }
+
+/* ===== Save status pill (used in FormModal footer) ===== */
+.ui-save-status {
+  font-size: 13px;
+  color: #6b7280;
+  margin-right: auto;
+}
+.ui-save-status.success { color: #16a34a; }
+.ui-save-status.error   { color: #dc2626; }
