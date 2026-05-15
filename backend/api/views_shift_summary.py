@@ -51,6 +51,17 @@ class ShiftSummaryViewSet(StoreScopedViewSet):
         status_q = self.request.query_params.get("status")
         if status_q:
             qs = qs.filter(shift_status=status_q)
+        # Date range — accepts ISO yyyy-mm-dd. Either bound is optional.
+        start_date = self.request.query_params.get("start_date")
+        if start_date:
+            qs = qs.filter(shift_date__gte=start_date)
+        end_date = self.request.query_params.get("end_date")
+        if end_date:
+            qs = qs.filter(shift_date__lte=end_date)
+        # Follow-up convenience filter (?follow_up=true).
+        follow_up = self.request.query_params.get("follow_up")
+        if follow_up in {"1", "true", "yes"}:
+            qs = qs.filter(needs_follow_up=True)
         return qs.order_by("-shift_date", "-id")
 
     def perform_create(self, serializer):

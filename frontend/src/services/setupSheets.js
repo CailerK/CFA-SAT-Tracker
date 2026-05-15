@@ -41,6 +41,13 @@ const setupSheetsService = {
     });
   },
 
+  /** Clone an existing template (with its time blocks) as a new template. */
+  async duplicateTemplate(id) {
+    return apiService.request(`/setup-sheets/templates/${id}/duplicate/`, {
+      method: "POST",
+    });
+  },
+
   /** Atomically replace a template's time blocks. Each block:
    *  { day_of_week, start_time, end_time, label, order,
    *    positions_needed: { front_counter: [], drive_thru: [], kitchen: [] } }

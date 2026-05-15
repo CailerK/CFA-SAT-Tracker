@@ -377,6 +377,7 @@ const Dashboard = ({ user, onLogout }) => {
           <Settings onBack={() => setCurrentPage('dashboard')} currentUser={user} />
         ) : currentPage === 'setup-sheet-templates' ? (
           <SetupSheetTemplates 
+            user={user}
             onBack={() => setCurrentPage('dashboard')} 
             onNavigate={(page, data) => setCurrentPage(page, data?.templateId ?? null)}
           />

@@ -236,7 +236,9 @@ const ShiftSummary = ({ onNavigate, user }) => {
   const toggleChallenge = toggleSetItem(setChallenges, challenges);
 
   const clearForm = async () => {
-    setShiftLead('');
+    // Reset shift lead display to the current user (it's auto-recorded by the
+    // backend; we don't want to leave a blank readonly field after clear).
+    setShiftLead(user?.firstName ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : '');
     setShiftDate(getDateInputValue());
     setShiftType('Closing');
     setShiftStatus('Normal');
@@ -389,10 +391,14 @@ const ShiftSummary = ({ onNavigate, user }) => {
                   <input
                     id="shiftLead"
                     className="ssum-input"
-                    placeholder="Who ran the shift?"
-                    value={shiftLead}
-                    onChange={(e) => setShiftLead(e.target.value)}
+                    value={shiftLead || 'Unknown'}
+                    readOnly
+                    disabled
+                    title="The shift lead is auto-recorded as the user submitting this summary."
                   />
+                  <span className="ssum-help" style={{ display: 'block', marginTop: 4, fontSize: 12, color: '#6b7280' }}>
+                    Auto-recorded as the user submitting this summary.
+                  </span>
                 </div>
                 <div className="ssum-field">
                   <label htmlFor="shiftDate" className="ssum-label">Shift date</label>

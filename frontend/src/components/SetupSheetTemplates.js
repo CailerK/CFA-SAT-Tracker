@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './SetupSheetTemplates.css';
 import setupSheetsService from '../services/setupSheets';
+import { isManagerOrAbove } from '../utils/access';
+import {
+  ActionMenu, ConfirmDialog, FormModal, TextField, TextArea,
+} from './ui';
 
 // Format an ISO datetime like "2026-04-18T18:32:11.244Z" → "Apr 18, 2026"
 const formatDate = (iso) => {
@@ -90,9 +94,14 @@ const getCurrentDate = () => {
   return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 };
 
-const SetupSheetTemplates = ({ onBack, onNavigate }) => {
+const SetupSheetTemplates = ({ onBack, onNavigate, user }) => {
+  const canManage = isManagerOrAbove(user);
   const [activeTab, setActiveTab] = useState('templates');
   const [templates, setTemplates] = useState([]);
+  // Modal state: rename + delete confirm.
+  const [renameTarget, setRenameTarget] = useState(null); // { id, name, description }
+  const [renameError, setRenameError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
 
   const refresh = useCallback(async () => {
     try {
@@ -140,15 +149,77 @@ const SetupSheetTemplates = ({ onBack, onNavigate }) => {
     }
   };
 
-  const handleDeleteTemplate = async (template) => {
-    const confirmed = window.confirm(`Delete template "${template.name}"?`);
-    if (!confirmed) return;
+  // Open the styled ConfirmDialog instead of a native confirm.
+  const handleDeleteTemplate = (template) => setDeleteTarget(template);
+
+  const performDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await setupSheetsService.deleteTemplate(template.id);
+      await setupSheetsService.deleteTemplate(deleteTarget.id);
+      setDeleteTarget(null);
       await refresh();
     } catch (err) {
       console.error('Failed to delete setup template:', err);
+      setDeleteTarget(null);
     }
+  };
+
+  // Duplicate via the new POST /templates/:id/duplicate/ action.
+  const handleDuplicateTemplate = async (template) => {
+    try {
+      await setupSheetsService.duplicateTemplate(template.id);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to duplicate setup template:', err);
+    }
+  };
+
+  // Rename / edit description: opens a small FormModal.
+  const handleRenameTemplate = (template) => {
+    setRenameError('');
+    setRenameTarget({
+      id: template.id,
+      name: template.name,
+      description: template.description || '',
+    });
+  };
+
+  const submitRename = async () => {
+    if (!renameTarget) return;
+    if (!renameTarget.name.trim()) {
+      setRenameError('Name is required.');
+      throw new Error('Name is required.');
+    }
+    try {
+      await setupSheetsService.updateTemplate(renameTarget.id, {
+        name: renameTarget.name.trim(),
+        description: renameTarget.description,
+      });
+      setRenameTarget(null);
+      await refresh();
+    } catch (err) {
+      const detail = err?.data
+        ? Object.entries(err.data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' \u2022 ')
+        : (err?.message || 'Save failed.');
+      setRenameError(detail);
+      throw err;
+    }
+  };
+
+  // Build the per-card action list — referenced from the 3-dot trigger.
+  const cardActions = (template) => {
+    const actions = [
+      { label: 'Open', onClick: () => handleEditTemplate(template) },
+    ];
+    if (canManage) {
+      actions.push(
+        { label: 'Rename', onClick: () => handleRenameTemplate(template) },
+        { label: 'Duplicate', onClick: () => handleDuplicateTemplate(template) },
+        { divider: true },
+        { label: 'Delete', onClick: () => handleDeleteTemplate(template), destructive: true },
+      );
+    }
+    return actions;
   };
 
   const handleTabClick = (tabId) => {
@@ -218,6 +289,46 @@ const SetupSheetTemplates = ({ onBack, onNavigate }) => {
           </button>
         </div>
 
+        {/* Rename / edit modal */}
+        <FormModal
+          isOpen={!!renameTarget}
+          title="Edit Template Details"
+          submitLabel="Save"
+          size="sm"
+          onClose={() => setRenameTarget(null)}
+          onSubmit={submitRename}
+          submitDisabled={!renameTarget?.name?.trim()}
+          errorMessage={renameError}
+        >
+          <TextField
+            label="Template Name"
+            value={renameTarget?.name || ''}
+            onChange={(v) => setRenameTarget((t) => t && ({ ...t, name: v }))}
+            required
+            autoFocus
+          />
+          <TextArea
+            label="Description"
+            value={renameTarget?.description || ''}
+            onChange={(v) => setRenameTarget((t) => t && ({ ...t, description: v }))}
+            placeholder="Optional — what is this template for?"
+            rows={3}
+          />
+        </FormModal>
+
+        {/* Delete confirmation */}
+        <ConfirmDialog
+          isOpen={!!deleteTarget}
+          title="Delete this template?"
+          message={deleteTarget
+            ? `“${deleteTarget.name}” and all of its time blocks will be permanently archived. This cannot be undone.`
+            : ''}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={performDelete}
+          onClose={() => setDeleteTarget(null)}
+        />
+
         {/* Templates Grid */}
         <div className="sst-grid">
           {templates.map((template) => (
@@ -233,17 +344,21 @@ const SetupSheetTemplates = ({ onBack, onNavigate }) => {
                   <div className="sst-card-icon">
                     <IconLayers className="sst-card-icon-svg" />
                   </div>
-                  <button
-                    className="sst-card-menu"
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteTemplate(template);
-                    }}
-                    aria-label="Template options"
-                  >
-                    <IconMoreVertical className="sst-card-menu-icon" />
-                  </button>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ActionMenu
+                      align="right"
+                      actions={cardActions(template)}
+                      trigger={(
+                        <button
+                          className="sst-card-menu"
+                          type="button"
+                          aria-label="Template options"
+                        >
+                          <IconMoreVertical className="sst-card-menu-icon" />
+                        </button>
+                      )}
+                    />
+                  </div>
                 </div>
 
                 <h3 className="sst-card-title">{template.name}</h3>

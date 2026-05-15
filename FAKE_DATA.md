@@ -17,6 +17,7 @@ time to replace demo data with live API calls / database reads / persisted state
 - 🔴 **Critical** — must be replaced before production (save/load flows, mutations).
 - 🟠 **Important** — user-visible data that should come from API.
 - 🟡 **Cosmetic** — demo copy, default values, UX polish.
+- ✅ **Resolved** — previously fake; now wired to real backend / proper UI.
 
 ---
 
@@ -83,9 +84,9 @@ time to replace demo data with live API calls / database reads / persisted state
 
 | Status | What | Notes |
 |---|---|---|
-| 🔴 | `templates` state hardcoded: `NewMain / Main (Copy) / 9/15 - 9/22 / Summer` with fake dates and timeBlock counts | `GET /api/setup-templates`. |
-| 🔴 | Card click navigates to `edit-template` with the template object; no real template loader | `GET /api/setup-templates/:id`. |
-| 🔴 | 3-dot menu button is visual-only | Menu actions: rename, duplicate, share, delete → `PATCH/POST/DELETE`. |
+| ✅ | ~~`templates` state hardcoded~~ — **resolved**: now loads from `GET /api/setup-sheets/templates/`. | |
+| ✅ | ~~Card click navigates to `edit-template` with no real loader~~ — **resolved**: `SetupSheetTemplateEdit` page hydrates via `GET /api/setup-sheets/templates/:id/`. | |
+| ✅ | ~~3-dot menu button is visual-only~~ — **resolved (Phase 13)**: `<ActionMenu>` with Open / Rename / Duplicate / Delete (manager+ gated), Rename `<FormModal>`, Delete `<ConfirmDialog>`, Duplicate via new `POST /api/setup-sheets/templates/:id/duplicate/`. | |
 
 ### `frontend/src/components/SetupSheetBuilder.js`
 
@@ -100,12 +101,12 @@ time to replace demo data with live API calls / database reads / persisted state
 
 | Status | What | Notes |
 |---|---|---|
-| 🔴 | `savedSetups` state has **one** hardcoded entry: `{id:1, name:'4-19-25', weekRange:'Apr 18 – Apr 25, 2026', isShared:true, owner:'Savannah Holloway', employees:560, areas:94, hours:0, updatedAt:'Updated 12 minutes ago'}` | `GET /api/setup-sheets?mine=true`. |
-| 🔴 | Search only filters in-memory | Server-side search: `GET /api/setup-sheets?q=...`. |
-| 🟠 | "Sort by Date" button is visual-only (no state, no handler body) | Local or server-side sort; wire onClick. |
-| 🔴 | Card click navigates `'setup-detail'` which has no route yet | Add route + detail page; `GET /api/setup-sheets/:id`. |
-| 🔴 | 3-dot menu is visual-only | Edit / share / delete actions. |
-| 🟡 | "Updated 12 minutes ago" is static string | Compute from `setup.updatedAt` timestamp w/ relative-time lib. |
+| ✅ | ~~`savedSetups` state hardcoded~~ — **resolved**: now loads from `GET /api/setup-sheets/`. | |
+| � | Search filters client-side only (small dataset, fine for now) | Move to `?q=` once paginated. |
+| ✅ | ~~"Sort by Date" button visual-only~~ — **resolved (Phase 13)**: `<ActionMenu>` with Date / Name / Owner client-side sort. | |
+| � | Card click opens a "Coming soon" sentinel (Phase 13 wiring) | Build read-only Setup Detail view (`GET /api/setup-sheets/:id` already exists). |
+| ✅ | ~~3-dot menu visual-only~~ — **resolved (Phase 13)**: `<ActionMenu>` with Open / Duplicate / Share / Delete (manager+ for Share/Delete), Share via `<UserPicker>` `<FormModal>`, Delete via `<ConfirmDialog>`. | |
+| ✅ | ~~"Updated 12 minutes ago" static~~ — **resolved**: derived from `updated_at` via `relativeTime()` helper. | |
 
 ---
 
@@ -115,6 +116,7 @@ time to replace demo data with live API calls / database reads / persisted state
 
 | Status | What | Notes |
 |---|---|---|
+| ✅ | ~~Shift Lead input was decorative (never sent in `buildPayload`)~~ — **resolved (Phase 13)**: input is now read-only and shows the auto-recorded current user. | |
 | 🔴 | All form state (`shiftLead`, `shiftDate`, `shiftType`, `shiftStatus`, `rating`, `wins`, `challenges`, `recap`, `salesNote`, `laborPercent`, `sosNote`, `handoffNote`, `needsFollowUp`) is local `useState` | `POST /api/shift-summaries` on Save; `GET /api/shift-summaries/today` on mount (resume draft). |
 | 🔴 | `handleSave` just `alert('Shift summary saved (demo).')` | Real save + redirect to history. |
 | 🔴 | `clearForm` only resets local state | Should also DELETE any in-progress draft on server. |
@@ -361,4 +363,4 @@ time to replace demo data with live API calls / database reads / persisted state
 
 ---
 
-_Last updated: 2026-05-15 — after Phase 12 Team Members + Documentation wiring (Add/Edit modals, ActionMenu row actions, EmployeeRecordsDrawer, ConfirmDialog deletes, banner sentinels)._
+_Last updated: 2026-05-15 — after Phase 13 Setup Sheets + Shift Summary History wiring (template ActionMenu/Rename/Duplicate, SavedSetups ActionMenu/Share UserPicker/Sort, ShiftSummaryHistory real filter dropdowns + Print + PDF sentinel + ShiftSummaryDetailModal, read-only Shift Lead, backend duplicate-template + start_date/end_date/follow_up filters)._

@@ -7,12 +7,21 @@
 import apiService from "./api";
 
 const shiftSummaryService = {
-  /** GET the list of submitted summaries with optional filters. */
-  async list({ range, shift, status: shiftStatus } = {}) {
+  /** GET the list of submitted summaries with optional filters.
+   *
+   *  Supported filters:
+   *    - start_date / end_date  (ISO yyyy-mm-dd)
+   *    - shift                  ('opening' | 'mid' | 'closing')
+   *    - status                 ('normal' | 'busy' | 'slow' | 'incident')
+   *    - follow_up              (boolean — only return summaries flagged for follow-up)
+   */
+  async list({ start_date, end_date, shift, status: shiftStatus, follow_up } = {}) {
     const params = new URLSearchParams();
-    if (range) params.set("range", range);
+    if (start_date) params.set("start_date", start_date);
+    if (end_date) params.set("end_date", end_date);
     if (shift) params.set("shift", shift);
     if (shiftStatus) params.set("status", shiftStatus);
+    if (follow_up) params.set("follow_up", "true");
     const qs = params.toString() ? `?${params}` : "";
     return apiService.request(`/shift-summaries/${qs}`);
   },

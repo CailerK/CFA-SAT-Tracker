@@ -2,7 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import './SetupSheetTemplates.css'; // reuse banner + tab styles
 import './SavedSetups.css';
 import setupSheetsService from '../services/setupSheets';
-import teamService from '../services/team';
+import { isManagerOrAbove } from '../utils/access';
+import {
+  ActionMenu, ConfirmDialog, FormModal, UserPicker, SelectField,
+} from './ui';
 
 // "2026-05-13T17:30Z" → "Updated 12 minutes ago" — quick relative-time helper.
 const relativeTime = (iso) => {
@@ -138,27 +141,43 @@ const getCurrentDate = () => {
   return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 };
 
+const SORT_OPTIONS = [
+  { value: 'date',  label: 'Sort by Date' },
+  { value: 'name',  label: 'Sort by Name' },
+  { value: 'owner', label: 'Sort by Owner' },
+];
+
 const SavedSetups = ({ onNavigate, user }) => {
+  const canManage = isManagerOrAbove(user);
   const [activeTab] = useState('saved');
   const [searchQuery, setSearchQuery] = useState('');
   const [savedSetups, setSavedSetups] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
+  const [sortBy, setSortBy] = useState('date');
+
+  // Modal state.
+  const [shareTarget, setShareTarget] = useState(null);   // { setup, userId, permission }
+  const [shareError, setShareError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
+  const [notImplemented, setNotImplemented] = useState(null); // { title, message }
+
+  const normalize = (r) => ({
+    id: r.id,
+    name: r.name,
+    weekRange: r.week_range || '',
+    isShared: Boolean(r.is_shared),
+    owner: r.owner_name || '',
+    employees: r.employees_count || 0,
+    areas: r.areas_count || 0,
+    hours: Number(r.hours || 0),
+    updatedAt: relativeTime(r.updated_at),
+    updatedAtRaw: r.updated_at || '',
+  });
 
   const refresh = async () => {
     try {
       const res = await setupSheetsService.listSheets();
       const rows = res.results || res || [];
-      setSavedSetups(rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        weekRange: r.week_range || '',
-        isShared: Boolean(r.is_shared),
-        owner: r.owner_name || '',
-        employees: r.employees_count || 0,
-        areas: r.areas_count || 0,
-        hours: Number(r.hours || 0),
-        updatedAt: relativeTime(r.updated_at),
-      })));
+      setSavedSetups(rows.map(normalize));
     } catch (err) {
       console.error('Failed to load saved setups:', err);
     }
@@ -169,30 +188,12 @@ const SavedSetups = ({ onNavigate, user }) => {
     let cancelled = false;
     (async () => {
       try {
-        const [sheetsRes, membersRes] = await Promise.all([
-          setupSheetsService.listSheets(),
-          teamService.listMembers({ status: 'active' }),
-        ]);
+        const sheetsRes = await setupSheetsService.listSheets();
         if (cancelled) return;
         const rows = sheetsRes.results || sheetsRes || [];
-        setSavedSetups(rows.map((r) => ({
-          id: r.id,
-          name: r.name,
-          weekRange: r.week_range || '',
-          isShared: Boolean(r.is_shared),
-          owner: r.owner_name || '',
-          employees: r.employees_count || 0,
-          areas: r.areas_count || 0,
-          hours: Number(r.hours || 0),
-          updatedAt: relativeTime(r.updated_at),
-        })));
-        const memberRows = membersRes.results || membersRes || [];
-        setTeamMembers(memberRows.map((member) => ({
-          id: member.id,
-          name: member.name || member.email,
-        })));
+        setSavedSetups(rows.map(normalize));
       } catch (err) {
-        console.error('Failed to load saved setup reference data:', err);
+        console.error('Failed to load saved setups:', err);
       }
     })();
     return () => { cancelled = true; };
@@ -213,11 +214,27 @@ const SavedSetups = ({ onNavigate, user }) => {
     else if (tabId === 'history') onNavigate && onNavigate('shift-summary-history');
   };
 
+  // Filter + sort. Both happen client-side; the backend already returns the
+  // current store's sheets, and the dataset is small.
   const filteredSetups = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return savedSetups;
-    return savedSetups.filter((s) => s.name.toLowerCase().includes(q));
-  }, [savedSetups, searchQuery]);
+    let rows = q
+      ? savedSetups.filter((s) => s.name.toLowerCase().includes(q))
+      : [...savedSetups];
+    if (sortBy === 'name') {
+      rows.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } else if (sortBy === 'owner') {
+      rows.sort((a, b) => (a.owner || '').localeCompare(b.owner || ''));
+    } else {
+      // Default — newest first by updatedAt timestamp.
+      rows.sort((a, b) => {
+        const ta = a.updatedAtRaw ? new Date(a.updatedAtRaw).getTime() : 0;
+        const tb = b.updatedAtRaw ? new Date(b.updatedAtRaw).getTime() : 0;
+        return tb - ta;
+      });
+    }
+    return rows;
+  }, [savedSetups, searchQuery, sortBy]);
 
   const handleDuplicateSetup = async (setup) => {
     try {
@@ -228,44 +245,75 @@ const SavedSetups = ({ onNavigate, user }) => {
     }
   };
 
-  const handleDeleteSetup = async (setup) => {
-    const confirmed = window.confirm(`Delete "${setup.name}"?`);
-    if (!confirmed) return;
+  // Open ConfirmDialog (replaces window.confirm).
+  const handleDeleteSetup = (setup) => setDeleteTarget(setup);
+
+  const performDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await setupSheetsService.deleteSheet(setup.id);
+      await setupSheetsService.deleteSheet(deleteTarget.id);
+      setDeleteTarget(null);
       await refresh();
     } catch (err) {
       console.error('Failed to delete setup sheet:', err);
+      setDeleteTarget(null);
     }
   };
 
-  const handleShareSetup = async (setup) => {
-    if (!teamMembers.length) return;
-    const person = window.prompt(`Share "${setup.name}" with which team member?\n${teamMembers.map((member) => member.name).join('\n')}`);
-    if (!person?.trim()) return;
-    const member = teamMembers.find((item) => item.name.toLowerCase() === person.trim().toLowerCase());
-    if (!member) return;
+  // Open the share FormModal (replaces window.prompt).
+  const handleShareSetup = (setup) => {
+    setShareError('');
+    setShareTarget({ setup, userId: null, permission: 'view' });
+  };
+
+  const submitShare = async () => {
+    if (!shareTarget?.userId) {
+      setShareError('Pick a teammate to share with.');
+      throw new Error('No user selected');
+    }
     try {
-      await setupSheetsService.shareSheet(setup.id, { user_id: member.id, permission: 'view' });
+      await setupSheetsService.shareSheet(shareTarget.setup.id, {
+        user_id: shareTarget.userId,
+        permission: shareTarget.permission,
+      });
+      setShareTarget(null);
       await refresh();
     } catch (err) {
-      console.error('Failed to share setup sheet:', err);
+      const detail = err?.data
+        ? Object.entries(err.data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' \u2022 ')
+        : (err?.message || 'Share failed.');
+      setShareError(detail);
+      throw err;
     }
   };
 
-  const handleCardAction = async (setup) => {
-    const action = window.prompt('Type duplicate, share, or delete', 'duplicate');
-    if (!action) return;
-    if (action.toLowerCase() === 'share') {
-      await handleShareSetup(setup);
-      return;
-    }
-    if (action.toLowerCase() === 'delete') {
-      await handleDeleteSetup(setup);
-      return;
-    }
-    await handleDuplicateSetup(setup);
+  // Card body click — currently we don't yet have a Setup Detail page.
+  // Surface a clear sentinel rather than silently doing nothing OR (the old
+  // behavior) duplicating the sheet.
+  const handleOpenSetup = (setup) => {
+    setNotImplemented({
+      title: `Open “${setup.name}”`,
+      message: 'A read-only Setup Detail view is on the roadmap. For now use Duplicate to spin off an editable copy, or rebuild the week from the template.',
+    });
   };
+
+  // Per-card 3-dot ActionMenu.
+  const cardActions = (setup) => {
+    const actions = [
+      { label: 'Open', onClick: () => handleOpenSetup(setup) },
+      { label: 'Duplicate', onClick: () => handleDuplicateSetup(setup) },
+    ];
+    if (canManage) {
+      actions.push(
+        { label: 'Share', onClick: () => handleShareSetup(setup) },
+        { divider: true },
+        { label: 'Delete', onClick: () => handleDeleteSetup(setup), destructive: true },
+      );
+    }
+    return actions;
+  };
+
+  const sortLabel = SORT_OPTIONS.find((o) => o.value === sortBy)?.label || 'Sort';
 
   return (
     <div className="sst-page">
@@ -327,11 +375,20 @@ const SavedSetups = ({ onNavigate, user }) => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <button type="button" className="ss-sort-btn">
-            <IconArrowUpDown className="ss-sort-icon" />
-            <span className="ss-sort-label-full">Sort by Date</span>
-            <span className="ss-sort-label-short">Date</span>
-          </button>
+          <ActionMenu
+            align="right"
+            actions={SORT_OPTIONS.map((opt) => ({
+              label: opt.label,
+              onClick: () => setSortBy(opt.value),
+            }))}
+            trigger={(
+              <button type="button" className="ss-sort-btn">
+                <IconArrowUpDown className="ss-sort-icon" />
+                <span className="ss-sort-label-full">{sortLabel}</span>
+                <span className="ss-sort-label-short">{sortLabel.replace(/^Sort by /, '')}</span>
+              </button>
+            )}
+          />
         </div>
 
         {/* Count */}
@@ -347,7 +404,13 @@ const SavedSetups = ({ onNavigate, user }) => {
               className="ss-card"
               role="button"
               tabIndex={0}
-              onClick={() => handleDuplicateSetup(setup)}
+              onClick={() => handleOpenSetup(setup)}
+              onKeyDown={(ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                  ev.preventDefault();
+                  handleOpenSetup(setup);
+                }
+              }}
             >
               {/* Red gradient header */}
               <div className="ss-card-header">
@@ -368,17 +431,21 @@ const SavedSetups = ({ onNavigate, user }) => {
                     <p className="ss-card-range">{setup.weekRange}</p>
                   </div>
                 </div>
-                <button
-                  className="ss-card-menu"
-                  type="button"
-                  aria-label="Setup options"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCardAction(setup);
-                  }}
-                >
-                  <IconMoreVertical className="ss-card-menu-icon" />
-                </button>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <ActionMenu
+                    align="right"
+                    actions={cardActions(setup)}
+                    trigger={(
+                      <button
+                        className="ss-card-menu"
+                        type="button"
+                        aria-label="Setup options"
+                      >
+                        <IconMoreVertical className="ss-card-menu-icon" />
+                      </button>
+                    )}
+                  />
+                </div>
               </div>
 
               {/* White body */}
@@ -418,6 +485,58 @@ const SavedSetups = ({ onNavigate, user }) => {
           ))}
         </div>
       </div>
+
+      {/* Share Setup modal — UserPicker + permission select. */}
+      <FormModal
+        isOpen={!!shareTarget}
+        title={shareTarget ? `Share “${shareTarget.setup.name}”` : ''}
+        submitLabel="Share"
+        size="sm"
+        onClose={() => setShareTarget(null)}
+        onSubmit={submitShare}
+        submitDisabled={!shareTarget?.userId}
+        errorMessage={shareError}
+      >
+        <UserPicker
+          label="Share With"
+          value={shareTarget?.userId || null}
+          onChange={(id) => setShareTarget((s) => s && ({ ...s, userId: id }))}
+          required
+        />
+        <SelectField
+          label="Permission"
+          value={shareTarget?.permission || 'view'}
+          onChange={(v) => setShareTarget((s) => s && ({ ...s, permission: v }))}
+          options={[
+            { value: 'view', label: 'View only' },
+            { value: 'edit', label: 'Can edit' },
+          ]}
+        />
+      </FormModal>
+
+      {/* Delete confirmation. */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="Delete this setup sheet?"
+        message={deleteTarget
+          ? `“${deleteTarget.name}” will be permanently removed. This cannot be undone.`
+          : ''}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={performDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
+
+      {/* Not-implemented sentinel for card click "Open" — detail view TBD. */}
+      <ConfirmDialog
+        isOpen={!!notImplemented}
+        title={notImplemented?.title || ''}
+        message={notImplemented?.message || ''}
+        confirmLabel="Got it"
+        cancelLabel="Close"
+        onConfirm={() => setNotImplemented(null)}
+        onClose={() => setNotImplemented(null)}
+      />
     </div>
   );
 };

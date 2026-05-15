@@ -82,6 +82,40 @@ class SetupSheetTemplateViewSet(StoreScopedViewSet):
         instance.archived_at = timezone.now()
         instance.save(update_fields=["archived_at"])
 
+    @action(detail=True, methods=["post"], url_path="duplicate")
+    def duplicate(self, request, pk=None):
+        """Clone an existing template (name + description + every TimeBlock)
+        into a new template owned by the current user. The new template's
+        name is suffixed with " (Copy)" — managers can rename right after.
+        """
+        source = self.get_object()
+        time_blocks = list(source.time_blocks.all())
+        with transaction.atomic():
+            clone = SetupSheetTemplate.objects.create(
+                store=request.user.store,
+                created_by=request.user,
+                name=f"{source.name} (Copy)"[:200],
+                description=source.description or "",
+            )
+            TimeBlock.objects.bulk_create([
+                TimeBlock(
+                    template=clone,
+                    day_of_week=tb.day_of_week,
+                    label=tb.label,
+                    start_time=tb.start_time,
+                    end_time=tb.end_time,
+                    position=tb.position,
+                    positions_needed=tb.positions_needed,
+                    notes=tb.notes,
+                    order=tb.order,
+                )
+                for tb in time_blocks
+            ])
+        return Response(
+            SetupSheetTemplateSerializer(clone).data,
+            status=status.HTTP_201_CREATED,
+        )
+
     @action(detail=True, methods=["post"], url_path="save-time-blocks")
     def save_time_blocks(self, request, pk=None):
         """Atomically replace this template's time blocks with the supplied list.
