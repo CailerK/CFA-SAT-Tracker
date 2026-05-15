@@ -89,8 +89,7 @@ const Sidebar = ({ currentPage, onPageChange }) => {
       active: currentPage === 'development',
       hasDropdown: true,
       dropdownItems: [
-        { id: 'leadership', label: 'Leadership Development' },
-        { id: 'training', label: 'Training Modules' },
+        { id: 'leadership', label: 'Leadership' },
         { id: 'leadership-360', label: '360° Evaluations' },
         { id: 'team-development', label: 'Team Development' }
       ]

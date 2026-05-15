@@ -49,7 +49,7 @@ For cards/rows that link to a "not implemented yet" page, use the existing `__no
 
 Phases are ordered roughly by daily-use frequency × user value. Each phase is independently shippable.
 
-### Phase 11 — Foundation: build A1–A4 shared components
+### Phase 11 — Foundation: build A1–A4 shared components ✅ _(done 2026-05-14)_
 **Goal**: stop reinventing modals.
 
 - [ ] Build `<ActionMenu>` (popover with click-outside-to-close).
@@ -61,7 +61,7 @@ Phases are ordered roughly by daily-use frequency × user value. Each phase is i
 
 ---
 
-### Phase 12 — Team Members + Documentation
+### Phase 12 — Team Members + Documentation ✅ _(done 2026-05-14)_
 **Why first**: the Team page is the most-visited admin page and currently has no Add Member button at all.
 
 #### TeamMembers.js
@@ -83,7 +83,7 @@ Phases are ordered roughly by daily-use frequency × user value. Each phase is i
 
 ---
 
-### Phase 13 — Setup Sheets + Shift Summary History
+### Phase 13 — Setup Sheets + Shift Summary History ✅ _(done 2026-05-14)_
 **Why**: managers use these weekly; ShiftSummaryHistory filters are 100% dead.
 
 #### SetupSheetTemplates.js
@@ -109,7 +109,7 @@ Phases are ordered roughly by daily-use frequency × user value. Each phase is i
 
 ---
 
-### Phase 14 — Kitchen domain (the prompt-flood)
+### Phase 14 — Kitchen domain (the prompt-flood) ✅ _(done 2026-05-15)_
 **Why**: every kitchen page uses `window.prompt`. Highest UX gain.
 
 #### KitchenChecklists.js

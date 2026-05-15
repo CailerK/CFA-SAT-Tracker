@@ -1623,6 +1623,86 @@ class LeadershipNote(models.Model):
         return f"Note by {self.user.get_full_name()}: {preview}"
 
 
+class UserDevelopmentPlan(models.Model):
+    """Per-user enrollment in a leadership development plan.
+
+    The catalog of plans (slug -> name/description/total_steps) lives in the
+    frontend constant `DEV_PLANS` for now while the user transcribes plans 1
+    by 1. This model only tracks per-user enrollment status + progress.
+    """
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('completed', 'Completed'),
+    ]
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='development_plans'
+    )
+    plan_key = models.CharField(
+        max_length=80,
+        help_text="Slug identifier like 'heart-of-leadership', 'path-to-director'.",
+    )
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default='active'
+    )
+    current_step = models.PositiveIntegerField(default=0)
+    total_steps = models.PositiveIntegerField(default=0)
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-started_at', '-id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'plan_key'],
+                name='unique_dev_plan_per_user',
+            ),
+        ]
+
+    @property
+    def progress_percent(self):
+        if not self.total_steps:
+            return 100 if self.status == 'completed' else 0
+        return min(100, int(round((self.current_step / self.total_steps) * 100)))
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.plan_key} ({self.status})"
+
+
+class LessonCompletion(models.Model):
+    """Marks a single lesson within a development-plan enrollment as complete.
+
+    Lesson definitions live in the frontend constant `DEV_PLANS[*].lessons`;
+    this model only stores the (enrollment, lesson_key, completed_at) tuple.
+    Deleting a row "un-completes" the lesson.
+    """
+    enrollment = models.ForeignKey(
+        UserDevelopmentPlan,
+        on_delete=models.CASCADE,
+        related_name='lesson_completions',
+    )
+    lesson_key = models.CharField(
+        max_length=80,
+        help_text="Slug or index identifier for the lesson, e.g. '01', "
+                  "'week-1-introduction'.",
+    )
+    completed_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-completed_at', '-id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['enrollment', 'lesson_key'],
+                name='unique_lesson_completion_per_enrollment',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.enrollment} - {self.lesson_key}"
+
+
 # =============================================================================
 # Phase 8: Calendar
 # =============================================================================

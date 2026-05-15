@@ -300,6 +300,50 @@ time to replace demo data with live API calls / database reads / persisted state
 
 ---
 
+## Leadership (`/leadership`)
+
+### `frontend/src/components/LeadershipDevelopment.js`
+
+| Status | What | Notes |
+|---|---|---|
+| 🟠 | `AREA_DEFS` map (12 areas × 4 metrics + 4–9 task templates per area) hardcoded inline | Move to backend: `LeadershipKpi` model (per-store, per-area metric defs + targets + values) + `LeadershipTask` model (per-area task templates). |
+| 🟠 | Metric tiles always render `—` for the value (no current-value source) | Once `LeadershipKpi.values` exists, hydrate per-tile. Tile click should open Edit Value modal — currently a no-op `<button>`. |
+| 🟠 | Today's Tasks completion is **local React state only** (`completedTaskIds` set) — toggling a task does NOT persist | `POST /api/leadership/tasks/:id/complete` (and a daily reset cron, or a `completed_for_date` join model). |
+| 🟡 | Trend icon is hardcoded to a `minus` (no real trend data) | Compute from previous-period `LeadershipKpi.values`. |
+| 🟡 | "Custom Area" tile uses placeholder metric labels (`Metric 1`, `Metric 2`, …) | Once a user picks Custom Area we should prompt for label + target inline. |
+| ✅ | Development card now renders **two states at the same card size**: active enrollment with progress, OR a "Browse plans" CTA pill. Both navigate to `/dev-plans`. Active enrollment + progress hydrated from `GET /api/leadership/development-plans/`. | Backend `UserDevelopmentPlan` model is live (migration 0015). Catalog of plans (`DEV_PLANS` array) still hardcoded in `LeadershipDevPlans.js` — user is transcribing them 1 by 1. |
+
+---
+
+## Leadership > Development Plans (`/dev-plans`)
+
+### `frontend/src/components/LeadershipDevPlans.js`
+
+| Status | What | Notes |
+|---|---|---|
+| 🟠 | `DEV_PLANS` catalog hardcoded as a frontend constant. **The Heart of Leadership** is fully populated (19 lessons w/ verbatim copy from LD Growth); other plans pending user transcription | Each new plan gets `key`, `name`, `tagline`, `description`, `category`, `icon`, `accent`, optional `estimated_hours`, and a `lessons: []` array. `total_steps` is auto-computed from `lessons.length`. |
+| ✅ | Per-user enrollment status (`active`/`completed`) + `current_step` / `total_steps` persisted via `UserDevelopmentPlan` (migration `0015_user_development_plan.py`) | Endpoints: `GET/POST /api/leadership/development-plans/`, `PATCH /:id/`, `DELETE /:id/`. `completed_at` auto-stamped. |
+| ✅ | **1-active-plan-per-user** enforced on backend (`UserDevelopmentPlanViewSet.perform_create/_update`) **and** mirrored client-side: blocked Start / Restart buttons show "Active plan in progress" with a tooltip. Successful enroll deep-links into the plan detail page. | |
+| ✅ | Active cards now expose a **"View plan"** button (navigates to `dev-plan-detail`). Manual "Mark complete" was removed in favor of per-lesson check-offs that auto-flip the enrollment to `completed`. | |
+| ✅ | Filter pills (All / Active / Completed / Available) with live counts | Counts derived locally from cross-reference of `DEV_PLANS` × user enrollments. |
+
+---
+
+## Leadership > Plan Detail (`/dev-plan-detail/:planKey`)
+
+### `frontend/src/components/LeadershipPlanDetail.js`
+
+| Status | What | Notes |
+|---|---|---|
+| ✅ | Pixel-match LD Growth's plan detail page: back arrow + title + `X% complete · N of M lessons` + Unenroll + purple progress bar + accordion lesson cards with type-colored icons (Activity = emerald target, Reading = blue book, Reflection = amber lightbulb, Assessment = purple clipboard, Video = red play). | |
+| ✅ | Per-lesson completion persisted via `LessonCompletion` model (migration `0016_lesson_completion.py`). Endpoints: `GET /api/leadership/lesson-completions/?enrollment=:id`, `POST`, `DELETE /:id/`. | Round-trip on every toggle; refresh of enrollment after each so `progress_percent` + status stay in sync. |
+| ✅ | Auto-complete: when the last lesson is checked the enrollment auto-flips to `status='completed'` with `completed_at=now()` (sync logic in `LessonCompletionViewSet._sync_enrollment`). Unchecking a final lesson rolls it back to `active`. | |
+| ✅ | Unenroll button at the top opens a `ConfirmDialog`; on confirm the enrollment row is deleted (CASCADE drops all `LessonCompletion` rows) and the user lands back on the library. | |
+| 🟡 | Markdown rendering is intentionally tiny: `**bold**`, `•` bullets, paragraph splits. No links/images yet — every LD Growth lesson body the user has shared is plain text + emoji. | If we add resource links (TED Talk URL, Purdue worksheet PDF, etc.), extend `renderInline()` in `LeadershipPlanDetail.js`. |
+| 🟡 | Lesson "notes" field on `LessonCompletion` is stored but not yet exposed in the UI | Future: a notes textarea inside the expanded lesson body for self-documentation. |
+
+---
+
 ## Leadership 360° Evaluations
 
 ### `frontend/src/components/Leadership360Evaluations.js`
@@ -365,4 +409,4 @@ time to replace demo data with live API calls / database reads / persisted state
 
 ---
 
-_Last updated: 2026-05-15 — after Phase 18 Settings + Misc polish (Settings "Reset to Default" buttons on General + Store Info panels now reload that panel from the server via a destructive ConfirmDialog; NotificationDropdown per-row dismiss "X" only marks-read in-place — no navigation/close; TeamChat manager-only "+ New Channel" sidebar button + FormModal with auto-slug and auto-select). **All 18 UI-wiring phases complete.**_
+_Last updated: 2026-05-15 — Heart of Leadership plan-detail page shipped end-to-end. New backend model `LessonCompletion` (migration `0016_lesson_completion.py`, unique `(enrollment, lesson_key)`) + viewset `LessonCompletionViewSet` with `_sync_enrollment()` that auto-recomputes `current_step` and auto-flips `status` to `completed` (or back to `active` on un-completion). `UserDevelopmentPlanViewSet` now enforces **1-active-plan-per-user** in both `perform_create` and `perform_update`. New frontend page `LeadershipPlanDetail.js` (route `dev-plan-detail/:planKey`) pixel-matches LD Growth's lesson list with type-colored icons (Activity/Reading/Reflection/Assessment/Video), accordion expansion, optimistic check-offs, and Unenroll confirm. Heart of Leadership is fully populated (19 lessons w/ verbatim copy). Library page upgrades: Active cards now show **"View plan"** (navigates to detail) instead of "Mark complete"; blocked Start/Restart buttons relabel to "Active plan in progress". Dashboard Development card click is smart: jumps to detail when active, library when not._

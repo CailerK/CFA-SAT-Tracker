@@ -32,6 +32,7 @@ from .models import (
     KitchenChecklistTask,
     LeadershipArea,
     LeadershipNote,
+    LessonCompletion,
     MaintenanceLog,
     MaintenanceSchedule,
     MealPeriod,
@@ -59,6 +60,7 @@ from .models import (
     TrainingActivity,
     TrainingPlan,
     User,
+    UserDevelopmentPlan,
     UserPreferences,
     Vendor,
     WasteEntry,
@@ -1230,6 +1232,39 @@ class LeadershipNoteSerializer(serializers.ModelSerializer):
         model = LeadershipNote
         fields = ["id", "user", "text", "created_at"]
         read_only_fields = ["id", "created_at"]
+
+
+class LessonCompletionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LessonCompletion
+        fields = ["id", "enrollment", "lesson_key", "completed_at", "notes"]
+        read_only_fields = ["id", "completed_at"]
+
+
+class UserDevelopmentPlanSerializer(serializers.ModelSerializer):
+    progress_percent = serializers.IntegerField(read_only=True)
+    # Embed the keys of every completed lesson so the plan-detail page can
+    # render checkmarks without a second request.
+    completed_lesson_keys = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserDevelopmentPlan
+        fields = [
+            "id", "user", "plan_key", "status",
+            "current_step", "total_steps",
+            "started_at", "completed_at", "updated_at",
+            "progress_percent",
+            "completed_lesson_keys",
+        ]
+        read_only_fields = [
+            "id", "user", "started_at", "updated_at", "progress_percent",
+            "completed_lesson_keys",
+        ]
+
+    def get_completed_lesson_keys(self, obj):
+        return list(
+            obj.lesson_completions.values_list('lesson_key', flat=True)
+        )
 
 
 # ============================================================================

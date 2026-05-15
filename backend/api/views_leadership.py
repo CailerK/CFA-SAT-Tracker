@@ -17,8 +17,10 @@ from .models import (
     EvaluationEvaluator,
     LeadershipArea,
     LeadershipNote,
+    LessonCompletion,
     PositionTrack,
     TrackProgress,
+    UserDevelopmentPlan,
 )
 from .permissions import IsManagerOrAbove
 from .serializers import (
@@ -27,8 +29,10 @@ from .serializers import (
     EvaluationEvaluatorSerializer,
     LeadershipAreaSerializer,
     LeadershipNoteSerializer,
+    LessonCompletionSerializer,
     PositionTrackSerializer,
     TrackProgressSerializer,
+    UserDevelopmentPlanSerializer,
 )
 from .viewsets import StoreScopedViewSet
 
@@ -263,3 +267,119 @@ class LeadershipNoteViewSet(StoreScopedViewSet):
     def perform_create(self, serializer):
         # Auto-set the user to the current user.
         serializer.save(user=self.request.user)
+
+
+class UserDevelopmentPlanViewSet(StoreScopedViewSet):
+    """
+    CRUD for a user's enrollment in leadership development plans.
+
+    The catalog of plans (slug -> name/description/total_steps) lives in the
+    frontend constant `DEV_PLANS` while the user transcribes them. Each row
+    here is a single user's enrollment in one plan, with status + current_step.
+
+    Business rule: a user may only have **one active enrollment at a time**.
+    Completed enrollments are unlimited (history). Enforced in `perform_create`
+    and `perform_update` below.
+    """
+    queryset = UserDevelopmentPlan.objects.select_related('user').prefetch_related(
+        'lesson_completions'
+    )
+    serializer_class = UserDevelopmentPlanSerializer
+
+    def get_queryset(self):
+        return UserDevelopmentPlan.objects.filter(
+            user=self.request.user,
+        ).prefetch_related('lesson_completions')
+
+    def _has_other_active(self, exclude_id=None):
+        qs = UserDevelopmentPlan.objects.filter(
+            user=self.request.user, status='active',
+        )
+        if exclude_id is not None:
+            qs = qs.exclude(id=exclude_id)
+        return qs.exists()
+
+    def perform_create(self, serializer):
+        # New enrollments default to status='active' — block if one already exists.
+        intended_status = serializer.validated_data.get('status', 'active')
+        if intended_status == 'active' and self._has_other_active():
+            raise ValidationError(
+                {'detail': 'You already have an active development plan. '
+                           'Complete or remove it before starting another.'}
+            )
+        serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        new_status = serializer.validated_data.get('status', instance.status)
+        # Block reactivation if another plan is active.
+        if (new_status == 'active'
+                and instance.status != 'active'
+                and self._has_other_active(exclude_id=instance.id)):
+            raise ValidationError(
+                {'detail': 'You already have another active development plan. '
+                           'Complete or remove it before reactivating this one.'}
+            )
+        # Auto-stamp completed_at when transitioning to completed; clear it on
+        # transitions back to active so re-enrolling resets the timestamp.
+        if new_status == 'completed' and instance.status != 'completed':
+            serializer.save(completed_at=timezone.now())
+        elif new_status == 'active' and instance.status == 'completed':
+            serializer.save(completed_at=None)
+        else:
+            serializer.save()
+
+
+class LessonCompletionViewSet(StoreScopedViewSet):
+    """
+    Per-lesson completion records inside a development-plan enrollment.
+
+    Users can only see/manage completions for their own enrollments.
+    Creating a row marks the lesson done; deleting it un-completes the lesson.
+    The parent enrollment's `current_step` is auto-synced to the count of
+    completed lessons, and the enrollment is auto-flipped to `completed` once
+    all lessons are done (and back to `active` when a final one is removed).
+    """
+    queryset = LessonCompletion.objects.select_related('enrollment', 'enrollment__user')
+    serializer_class = LessonCompletionSerializer
+
+    def get_queryset(self):
+        return LessonCompletion.objects.filter(
+            enrollment__user=self.request.user,
+        ).select_related('enrollment')
+
+    def _validate_enrollment(self, enrollment):
+        if enrollment.user_id != self.request.user.id:
+            raise ValidationError(
+                {'enrollment': 'You can only manage completions for your '
+                               'own enrollments.'}
+            )
+
+    def _sync_enrollment(self, enrollment):
+        """Recalc current_step from completions and flip status if needed."""
+        completed_count = enrollment.lesson_completions.count()
+        enrollment.current_step = completed_count
+        total = enrollment.total_steps or 0
+        if total > 0 and completed_count >= total:
+            if enrollment.status != 'completed':
+                enrollment.status = 'completed'
+                enrollment.completed_at = timezone.now()
+        else:
+            # Roll back from 'completed' if a row was deleted after auto-complete.
+            if enrollment.status == 'completed':
+                enrollment.status = 'active'
+                enrollment.completed_at = None
+        enrollment.save(
+            update_fields=['current_step', 'status', 'completed_at', 'updated_at']
+        )
+
+    def perform_create(self, serializer):
+        enrollment = serializer.validated_data['enrollment']
+        self._validate_enrollment(enrollment)
+        instance = serializer.save()
+        self._sync_enrollment(instance.enrollment)
+
+    def perform_destroy(self, instance):
+        enrollment = instance.enrollment
+        super().perform_destroy(instance)
+        self._sync_enrollment(enrollment)

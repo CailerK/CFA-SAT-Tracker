@@ -195,7 +195,8 @@
 
 .l360-search {
   position: relative;
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   display: block;
 }
 .l360-search-icon {
@@ -234,8 +235,9 @@
   box-shadow: 0 1px 2px rgba(0,0,0,0.04);
   padding: 0.25rem;
   display: inline-flex;
-  align-self: flex-start;
-  overflow: hidden;
+  flex-shrink: 0;
+  align-self: center;
+  white-space: nowrap;
 }
 .l360-pill {
   padding: 0.5rem 1rem;

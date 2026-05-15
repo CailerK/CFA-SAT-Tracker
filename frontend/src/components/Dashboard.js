@@ -37,6 +37,8 @@ import TeamTraining from './TeamTraining';
 import TeamQuickLinks from './TeamQuickLinks';
 import TeamDevelopment from './TeamDevelopment';
 import LeadershipDevelopment from './LeadershipDevelopment';
+import LeadershipDevPlans from './LeadershipDevPlans';
+import LeadershipPlanDetail from './LeadershipPlanDetail';
 import Leadership360Evaluations from './Leadership360Evaluations';
 import New360Evaluation from './New360Evaluation';
 
@@ -489,6 +491,16 @@ const Dashboard = ({ user, onLogout }) => {
         ) : currentPage === 'leadership' ? (
           <LeadershipDevelopment 
             user={user}
+            onNavigate={(page, data) => setCurrentPage(page, data?.planKey ?? null)}
+          />
+        ) : currentPage === 'dev-plans' ? (
+          <LeadershipDevPlans
+            user={user}
+            onNavigate={(page, data) => setCurrentPage(page, data?.planKey ?? null)}
+          />
+        ) : currentPage === 'dev-plan-detail' ? (
+          <LeadershipPlanDetail
+            planKey={currentParam}
             onNavigate={(page) => setCurrentPage(page)}
           />
         ) : currentPage === 'team-development' ? (

@@ -133,6 +133,66 @@ const leadershipService = {
       method: "DELETE",
     });
   },
+
+  // ---------------- Development Plans (per-user enrollment) ----------------
+  // Catalog of plans lives in the frontend constant `DEV_PLANS` while the
+  // user transcribes them; backend stores only enrollments.
+
+  async listMyDevPlans() {
+    return apiService.request("/leadership/development-plans/");
+  },
+
+  async enrollInDevPlan({ plan_key, total_steps = 0, current_step = 0 }) {
+    return apiService.request("/leadership/development-plans/", {
+      method: "POST",
+      body: JSON.stringify({
+        plan_key,
+        total_steps,
+        current_step,
+        status: "active",
+      }),
+    });
+  },
+
+  async updateDevPlan(id, patch) {
+    return apiService.request(`/leadership/development-plans/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  async deleteDevPlan(id) {
+    return apiService.request(`/leadership/development-plans/${id}/`, {
+      method: "DELETE",
+    });
+  },
+
+  // ---------------- Lesson completions (per enrollment) ----------------
+
+  async listLessonCompletions(enrollmentId) {
+    const qs = enrollmentId
+      ? `?enrollment=${encodeURIComponent(enrollmentId)}`
+      : "";
+    return apiService.request(`/leadership/lesson-completions/${qs}`);
+  },
+
+  async completeLesson({ enrollmentId, lessonKey, notes = "" }) {
+    return apiService.request("/leadership/lesson-completions/", {
+      method: "POST",
+      body: JSON.stringify({
+        enrollment: enrollmentId,
+        lesson_key: lessonKey,
+        notes,
+      }),
+    });
+  },
+
+  async uncompleteLesson(completionId) {
+    return apiService.request(
+      `/leadership/lesson-completions/${completionId}/`,
+      { method: "DELETE" },
+    );
+  },
 };
 
 export default leadershipService;

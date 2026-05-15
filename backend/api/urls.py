@@ -30,8 +30,10 @@ from .views_leadership import (
     Evaluation360ViewSet,
     LeadershipAreaViewSet,
     LeadershipNoteViewSet,
+    LessonCompletionViewSet,
     PositionTrackViewSet,
     TrackProgressViewSet,
+    UserDevelopmentPlanViewSet,
 )
 from .views_phase8 import (
     CalendarEventViewSet,
@@ -162,6 +164,16 @@ router.register(
     r"leadership/notes",
     LeadershipNoteViewSet,
     basename="leadership-note",
+)
+router.register(
+    r"leadership/development-plans",
+    UserDevelopmentPlanViewSet,
+    basename="leadership-dev-plan",
+)
+router.register(
+    r"leadership/lesson-completions",
+    LessonCompletionViewSet,
+    basename="leadership-lesson-completion",
 )
 # Phase 8: Calendar, Guest Recovery, Vendors, Team Chat, Surveys
 router.register(
