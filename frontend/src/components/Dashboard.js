@@ -483,6 +483,7 @@ const Dashboard = ({ user, onLogout }) => {
           />
         ) : currentPage === 'new-360-evaluation' ? (
           <New360Evaluation 
+            user={user}
             onBack={() => setCurrentPage('leadership-360')}
           />
         ) : currentPage === 'leadership' ? (

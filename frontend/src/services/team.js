@@ -74,6 +74,24 @@ const teamService = {
     return apiService.request("/training/plans/");
   },
 
+  async createPlan(payload) {
+    return apiService.request("/training/plans/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updatePlan(id, patch) {
+    return apiService.request(`/training/plans/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  async deletePlan(id) {
+    return apiService.request(`/training/plans/${id}/`, { method: "DELETE" });
+  },
+
   async listTrainees({ status, q } = {}) {
     const params = new URLSearchParams();
     if (status && status !== "all") params.set("status", status);

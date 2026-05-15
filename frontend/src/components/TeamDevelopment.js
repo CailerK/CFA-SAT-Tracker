@@ -1,6 +1,11 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import leadershipService from '../services/leadership';
 import './TeamDevelopment.css';
+import { isManagerOrAbove } from '../utils/access';
+import {
+  ActionMenu, ConfirmDialog, FormModal,
+  TextField, TextArea, SelectField, NumberField,
+} from './ui';
 
 /* ----- Inline Lucide icons ----- */
 const Icon = ({ size = 18, stroke = 2, children }) => (
@@ -39,11 +44,22 @@ const formatToday = () =>
   new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
 const TeamDevelopment = ({ user }) => {
+  const canManage = isManagerOrAbove(user);
   const [active, setActive] = useState('all');
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState('my-team');
   const [members, setMembers] = useState([]);
   const [tracks, setTracks] = useState([]);
+
+  // ---- Modal state ----
+  // trackModal: { id?, name, description } | null — Create/Edit Track form.
+  const [trackModal, setTrackModal] = useState(null);
+  const [trackError, setTrackError] = useState('');
+  const [deleteTrack, setDeleteTrack] = useState(null); // track record
+  const [tracksManagerOpen, setTracksManagerOpen] = useState(false);
+  // progressModal: { id, name, status, current_step, completed_steps } | null — Update Progress drawer.
+  const [progressModal, setProgressModal] = useState(null);
+  const [progressError, setProgressError] = useState('');
 
   const refresh = useCallback(async () => {
     try {
@@ -91,55 +107,101 @@ const TeamDevelopment = ({ user }) => {
 
   const displayName = user?.firstName || user?.name || 'Demo User';
 
-  const handleEditTracks = async () => {
-    const action = window.prompt('Type create, rename, or delete', 'create');
-    if (!action) return;
-    const choice = action.trim().toLowerCase();
+  const buildErrorDetail = (err) =>
+    err?.data
+      ? Object.entries(err.data)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+          .join(' \u2022 ')
+      : (err?.message || 'Save failed.');
 
+  // ---- Manage Tracks FormModal (replaces 5-prompt chain) ----
+  const openTracksManager = () => {
+    if (!canManage) return;
+    setTracksManagerOpen(true);
+  };
+
+  const openCreateTrack = () => {
+    if (!canManage) return;
+    setTrackError('');
+    setTrackModal({ name: '', description: '' });
+  };
+
+  const openEditTrack = (track) => {
+    if (!canManage) return;
+    setTrackError('');
+    setTrackModal({
+      id: track.id,
+      name: track.name || '',
+      description: track.description || '',
+    });
+  };
+
+  const submitTrack = async () => {
+    if (!trackModal) return;
+    const { id, name, description } = trackModal;
+    if (!name.trim()) {
+      setTrackError('Track name is required.');
+      throw new Error('Missing name');
+    }
     try {
-      if (choice === 'create') {
-        const name = window.prompt('Track name');
-        if (!name?.trim()) return;
-        const description = window.prompt('Track description', '') || '';
+      if (id) {
+        await leadershipService.updateTrack(id, {
+          name: name.trim(),
+          description: (description || '').trim(),
+        });
+      } else {
         await leadershipService.createTrack({
           name: name.trim(),
-          description,
+          description: (description || '').trim(),
           order: tracks.length,
         });
-        await refresh();
-        return;
       }
-
-      const suggested = tracks.find((track) => track.slug === active)?.name || tracks[0]?.name || '';
-      const trackName = window.prompt(
-        `Which track?\n${tracks.map((track) => track.name).join('\n')}`,
-        suggested
-      );
-      if (!trackName?.trim()) return;
-      const target = tracks.find(
-        (track) => track.name.toLowerCase() === trackName.trim().toLowerCase()
-      );
-      if (!target) return;
-
-      if (choice === 'delete') {
-        const confirmed = window.confirm(`Delete "${target.name}"?`);
-        if (!confirmed) return;
-        await leadershipService.deleteTrack(target.id);
-        await refresh();
-        return;
-      }
-
-      if (choice !== 'rename') return;
-      const name = window.prompt('Updated track name', target.name);
-      if (!name?.trim()) return;
-      const description = window.prompt('Updated description', target.description || '') || '';
-      await leadershipService.updateTrack(target.id, {
-        name: name.trim(),
-        description,
-      });
+      setTrackModal(null);
       await refresh();
     } catch (err) {
-      console.error('Failed to manage development tracks:', err);
+      setTrackError(buildErrorDetail(err));
+      throw err;
+    }
+  };
+
+  const performDeleteTrack = async () => {
+    if (!deleteTrack) return;
+    try {
+      await leadershipService.deleteTrack(deleteTrack.id);
+      setDeleteTrack(null);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to delete track:', err);
+      setDeleteTrack(null);
+    }
+  };
+
+  // ---- Update Progress modal (member row click) ----
+  const openUpdateProgress = (member) => {
+    if (!canManage) return;
+    setProgressError('');
+    setProgressModal({
+      id: member.id,
+      name: member.name,
+      status: member.status || 'not_started',
+      current_step: member.currentStep || 0,
+      completed_steps: member.completedSteps || 0,
+    });
+  };
+
+  const submitProgress = async () => {
+    if (!progressModal) return;
+    try {
+      await leadershipService.updateProgress(progressModal.id, {
+        status: progressModal.status,
+        current_step: Number(progressModal.current_step) || 0,
+        completed_steps: Number(progressModal.completed_steps) || 0,
+      });
+      setProgressModal(null);
+      await refresh();
+    } catch (err) {
+      setProgressError(buildErrorDetail(err));
+      throw err;
     }
   };
 
@@ -165,10 +227,12 @@ const TeamDevelopment = ({ user }) => {
                 <p>Empowering your team&rsquo;s growth journey</p>
               </div>
             </div>
-            <button className="tdev-hero-btn" type="button" onClick={handleEditTracks}>
-              <IconEdit size={16} />
-              <span>Edit Tracks</span>
-            </button>
+            {canManage && (
+              <button className="tdev-hero-btn" type="button" onClick={openTracksManager}>
+                <IconEdit size={16} />
+                <span>Edit Tracks</span>
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -257,7 +321,22 @@ const TeamDevelopment = ({ user }) => {
         ) : (
           <div className="tdev-members">
             {filtered.map((m) => (
-              <div key={m.id} className="tdev-member">
+              <div
+                key={m.id}
+                className="tdev-member"
+                role={canManage ? 'button' : undefined}
+                tabIndex={canManage ? 0 : undefined}
+                onClick={canManage ? () => openUpdateProgress(m) : undefined}
+                onKeyDown={canManage
+                  ? (ev) => {
+                      if (ev.key === 'Enter' || ev.key === ' ') {
+                        ev.preventDefault();
+                        openUpdateProgress(m);
+                      }
+                    }
+                  : undefined}
+                style={canManage ? { cursor: 'pointer' } : undefined}
+              >
                 <span className="tdev-avatar">{m.initials}</span>
                 <div className="tdev-member-body">
                   <h4>{m.name}</h4>
@@ -269,6 +348,140 @@ const TeamDevelopment = ({ user }) => {
           </div>
         )}
       </section>
+
+      {/* ---- Manage Tracks list modal ---- */}
+      <FormModal
+        isOpen={tracksManagerOpen}
+        title="Manage Position Tracks"
+        submitLabel="Done"
+        size="md"
+        onClose={() => setTracksManagerOpen(false)}
+        onSubmit={async () => setTracksManagerOpen(false)}
+      >
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <button
+            type="button"
+            className="ui-btn ui-btn-primary"
+            onClick={() => { setTracksManagerOpen(false); openCreateTrack(); }}
+          >
+            + New Track
+          </button>
+        </div>
+        {tracks.length === 0 ? (
+          <p style={{ color: '#6b7280', textAlign: 'center', padding: '24px 0' }}>
+            No tracks yet. Click “+ New Track” to create the first one.
+          </p>
+        ) : (
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
+            {tracks.map((t) => (
+              <li
+                key={t.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '10px 12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 8,
+                  background: '#fff',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: '#111827' }}>{t.name}</div>
+                  {t.description && (
+                    <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>{t.description}</div>
+                  )}
+                </div>
+                <ActionMenu
+                  align="right"
+                  actions={[
+                    { label: 'Edit', onClick: () => { setTracksManagerOpen(false); openEditTrack(t); } },
+                    { divider: true },
+                    { label: 'Delete', destructive: true,
+                      onClick: () => { setTracksManagerOpen(false); setDeleteTrack(t); } },
+                  ]}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </FormModal>
+
+      {/* ---- Create / Edit Track FormModal ---- */}
+      <FormModal
+        isOpen={!!trackModal}
+        title={trackModal?.id ? 'Edit Track' : 'Create Track'}
+        submitLabel={trackModal?.id ? 'Save Track' : 'Create Track'}
+        size="sm"
+        onClose={() => setTrackModal(null)}
+        onSubmit={submitTrack}
+        submitDisabled={!trackModal?.name?.trim()}
+        errorMessage={trackError}
+      >
+        <TextField
+          label="Track Name"
+          value={trackModal?.name || ''}
+          onChange={(v) => setTrackModal((m) => m && ({ ...m, name: v }))}
+          placeholder="e.g. Shift Lead"
+          required
+          autoFocus
+        />
+        <TextArea
+          label="Description"
+          value={trackModal?.description || ''}
+          onChange={(v) => setTrackModal((m) => m && ({ ...m, description: v }))}
+          placeholder="What does this track cover?"
+          rows={3}
+        />
+      </FormModal>
+
+      {/* ---- Delete track confirm ---- */}
+      <ConfirmDialog
+        isOpen={!!deleteTrack}
+        title="Delete this track?"
+        message={deleteTrack
+          ? `“${deleteTrack.name}” will be archived. Existing member progress on it stays intact.`
+          : ''}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={performDeleteTrack}
+        onClose={() => setDeleteTrack(null)}
+      />
+
+      {/* ---- Update Progress FormModal ---- */}
+      <FormModal
+        isOpen={!!progressModal}
+        title={progressModal ? `Update Progress — ${progressModal.name}` : 'Update Progress'}
+        submitLabel="Save"
+        size="sm"
+        onClose={() => setProgressModal(null)}
+        onSubmit={submitProgress}
+        errorMessage={progressError}
+      >
+        <SelectField
+          label="Status"
+          value={progressModal?.status || 'not_started'}
+          onChange={(v) => setProgressModal((m) => m && ({ ...m, status: v }))}
+          options={[
+            { value: 'not_started', label: 'Not Started' },
+            { value: 'in_progress', label: 'In Progress' },
+            { value: 'on_hold', label: 'On Hold' },
+            { value: 'completed', label: 'Completed' },
+          ]}
+        />
+        <NumberField
+          label="Current Step"
+          value={progressModal?.current_step ?? ''}
+          onChange={(v) => setProgressModal((m) => m && ({ ...m, current_step: v }))}
+          step="1"
+        />
+        <NumberField
+          label="Completed Steps"
+          value={progressModal?.completed_steps ?? ''}
+          onChange={(v) => setProgressModal((m) => m && ({ ...m, completed_steps: v }))}
+          step="1"
+        />
+      </FormModal>
     </div>
   );
 };

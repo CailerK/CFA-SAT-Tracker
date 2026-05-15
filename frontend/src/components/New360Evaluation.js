@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import leadershipService from '../services/leadership';
 import teamService from '../services/team';
 import './New360Evaluation.css';
+import { isManagerOrAbove } from '../utils/access';
+import { FormModal, TextField, TextArea, NumberField } from './ui';
 
 const getDefaultStartDate = () => new Date().toISOString().slice(0, 10);
 
@@ -11,7 +13,8 @@ const getDefaultDueDate = () => {
   return date.toISOString().slice(0, 10);
 };
 
-const New360Evaluation = ({ onBack }) => {
+const New360Evaluation = ({ onBack, user }) => {
+  const canManage = isManagerOrAbove(user);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedLeader, setSelectedLeader] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -23,26 +26,33 @@ const New360Evaluation = ({ onBack }) => {
   const [selectedEvaluatorUserId, setSelectedEvaluatorUserId] = useState('');
   const [selectedEvaluatorType, setSelectedEvaluatorType] = useState('peer');
   const [saveStatus, setSaveStatus] = useState(null);
+  // Inline Create Template FormModal so users can add a template mid-wizard.
+  const [templateModal, setTemplateModal] = useState(null); // { name, description, sections_count }
+  const [templateError, setTemplateError] = useState('');
 
   // Load real templates from the backend on mount. Falls back to the
   // hardcoded list (defined below) if the API returns empty.
+  const loadTemplates = async () => {
+    try {
+      const res = await leadershipService.listTemplates();
+      const rows = res.results || res || [];
+      if (rows.length) {
+        setTemplates(rows.map((t) => ({
+          id: t.id,
+          name: t.name,
+          description: t.description || 'Leadership 360 evaluation template',
+          sections: t.sections_count || 6,
+        })));
+      }
+    } catch (err) {
+      console.error('Failed to load 360 templates:', err);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await leadershipService.listTemplates();
-        const rows = res.results || res || [];
-        if (!cancelled && rows.length) {
-          setTemplates(rows.map((t) => ({
-            id: t.id,
-            name: t.name,
-            description: t.description || 'Leadership 360 evaluation template',
-            sections: t.sections_count || 6,
-          })));
-        }
-      } catch (err) {
-        console.error('Failed to load 360 templates:', err);
-      }
+      if (!cancelled) await loadTemplates();
     })();
     (async () => {
       try {
@@ -119,6 +129,50 @@ const New360Evaluation = ({ onBack }) => {
 
   const removeEvaluator = (id) => {
     setEvaluators((current) => current.filter((item) => item.id !== id));
+  };
+
+  // ---- Inline Create Template flow ----
+  const openCreateTemplate = () => {
+    if (!canManage) return;
+    setTemplateError('');
+    setTemplateModal({ name: '', description: '', sections_count: 6 });
+  };
+
+  const submitTemplate = async () => {
+    if (!templateModal) return;
+    const { name, description, sections_count } = templateModal;
+    if (!name.trim()) {
+      setTemplateError('Template name is required.');
+      throw new Error('Missing name');
+    }
+    try {
+      const created = await leadershipService.createTemplate({
+        name: name.trim(),
+        description: (description || '').trim(),
+        sections_count: Number(sections_count) || 0,
+        is_active: true,
+      });
+      // Append to local list immediately and auto-select it for the wizard.
+      setTemplates((prev) => [
+        ...prev,
+        {
+          id: created.id,
+          name: created.name,
+          description: created.description || 'Leadership 360 evaluation template',
+          sections: created.sections_count || 6,
+        },
+      ]);
+      setSelectedTemplate(created.id);
+      setTemplateModal(null);
+    } catch (err) {
+      const detail = err?.data
+        ? Object.entries(err.data)
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+            .join(' \u2022 ')
+        : (err?.message || 'Save failed.');
+      setTemplateError(detail);
+      throw err;
+    }
   };
 
   return (
@@ -201,7 +255,15 @@ const New360Evaluation = ({ onBack }) => {
                     </div>
                   ))}
                 </div>
-                <button className="btn-create-template">+ Create Additional Template</button>
+                {canManage && (
+                  <button
+                    type="button"
+                    className="btn-create-template"
+                    onClick={openCreateTemplate}
+                  >
+                    + Create Additional Template
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -326,6 +388,42 @@ const New360Evaluation = ({ onBack }) => {
           )}
         </div>
       </div>
+
+      {/* ---- Inline Create Template modal (shown only inside Step 2) ---- */}
+      <FormModal
+        isOpen={!!templateModal}
+        title="Create 360° Template"
+        submitLabel="Create Template"
+        size="sm"
+        onClose={() => setTemplateModal(null)}
+        onSubmit={submitTemplate}
+        submitDisabled={!templateModal?.name?.trim()}
+        errorMessage={templateError}
+      >
+        <TextField
+          label="Template Name"
+          value={templateModal?.name || ''}
+          onChange={(v) => setTemplateModal((m) => m && ({ ...m, name: v }))}
+          placeholder="e.g. Director Leadership Review"
+          required
+          autoFocus
+        />
+        <TextArea
+          label="Description"
+          value={templateModal?.description || ''}
+          onChange={(v) => setTemplateModal((m) => m && ({ ...m, description: v }))}
+          placeholder="Briefly describe when this template should be used."
+          rows={3}
+        />
+        <NumberField
+          label="Sections Count"
+          value={templateModal?.sections_count ?? ''}
+          onChange={(v) => setTemplateModal((m) => m && ({ ...m, sections_count: v }))}
+          placeholder="e.g. 6"
+          step="1"
+          required
+        />
+      </FormModal>
     </div>
   );
 };

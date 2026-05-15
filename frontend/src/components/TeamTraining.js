@@ -1,6 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import teamService from '../services/team';
 import './TeamTraining.css';
+import { isManagerOrAbove } from '../utils/access';
+import {
+  ActionMenu, ConfirmDialog, FormModal,
+  TextField, TextArea, NumberField, SelectField,
+} from './ui';
 
 // Normalize a backend TraineeAssignment to the trainee row shape the UI uses.
 const normalizeTrainee = (raw) => ({
@@ -56,6 +61,7 @@ const TABS = [
 ];
 
 const TeamTraining = ({ user }) => {
+  const canManage = isManagerOrAbove(user);
   const [activeTab, setActiveTab] = useState('progress');
   const [deptView, setDeptView] = useState('department');
   const [statusTab, setStatusTab] = useState('active');
@@ -69,6 +75,16 @@ const TeamTraining = ({ user }) => {
   const [totalTrainees, setTotalTrainees] = useState(0);
   const [plans, setPlans] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
+
+  // ---- Modal state ----
+  const [assignModal, setAssignModal] = useState(null); // { user, plan }
+  const [assignError, setAssignError] = useState('');
+  const [deleteTrainee, setDeleteTrainee] = useState(null); // trainee row
+  const [planModal, setPlanModal] = useState(null); // { id?, name, description, total_steps }
+  const [planError, setPlanError] = useState('');
+  const [deletePlan, setDeletePlan] = useState(null); // plan record
+  // traineeSentinel: { title, message } | null — deferred Trainee Detail drawer.
+  const [traineeSentinel, setTraineeSentinel] = useState(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -122,42 +138,125 @@ const TeamTraining = ({ user }) => {
 
   const displayName = user?.firstName || user?.name || 'Demo User';
 
-  const handleAssignTraining = async () => {
-    if (!teamMembers.length || !plans.length) return;
-    const memberInput = window.prompt(
-      `Assign training to which team member?\n${teamMembers.map((m) => m.name || m.email).join('\n')}`
-    );
-    if (!memberInput?.trim()) return;
-    const planInput = window.prompt(
-      `Assign which training plan?\n${plans.map((p) => p.name).join('\n')}`
-    );
-    if (!planInput?.trim()) return;
+  const buildErrorDetail = (err) =>
+    err?.data
+      ? Object.entries(err.data)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+          .join(' \u2022 ')
+      : (err?.message || 'Save failed.');
 
-    const member = teamMembers.find((m) =>
-      (m.name || '').toLowerCase() === memberInput.trim().toLowerCase()
-      || (m.email || '').toLowerCase() === memberInput.trim().toLowerCase()
-    );
-    const plan = plans.find((p) => p.name.toLowerCase() === planInput.trim().toLowerCase());
-    if (!member || !plan) return;
+  // ---- Assign Training modal (replaces 2 chained window.prompts) ----
+  const openAssignTraining = () => {
+    if (!canManage) return;
+    setAssignError('');
+    setAssignModal({ user: '', plan: '' });
+  };
 
+  const submitAssign = async () => {
+    if (!assignModal) return;
+    const { user: memberId, plan: planId } = assignModal;
+    if (!memberId || !planId) {
+      setAssignError('Pick both a team member and a training plan.');
+      throw new Error('Missing fields');
+    }
     try {
-      await teamService.assignTraining({ user: member.id, plan: plan.id });
+      await teamService.assignTraining({ user: memberId, plan: planId });
+      setAssignModal(null);
       await refresh();
     } catch (err) {
-      console.error('Failed to assign training:', err);
+      setAssignError(buildErrorDetail(err));
+      throw err;
     }
   };
 
-  const handleDeleteTrainee = async (trainee) => {
-    const confirmed = window.confirm(`Remove ${trainee.name} from this training plan?`);
-    if (!confirmed) return;
+  // ---- Delete trainee (replaces window.confirm) ----
+  const performDeleteTrainee = async () => {
+    if (!deleteTrainee) return;
     try {
-      await teamService.deleteTrainee(trainee.id);
+      await teamService.deleteTrainee(deleteTrainee.id);
+      setDeleteTrainee(null);
       await refresh();
     } catch (err) {
       console.error('Failed to delete trainee assignment:', err);
+      setDeleteTrainee(null);
     }
   };
+
+  // ---- Create / Edit Training Plan modal ----
+  const openCreatePlan = () => {
+    if (!canManage) return;
+    setPlanError('');
+    setPlanModal({ name: '', description: '', total_steps: 5 });
+  };
+
+  const openEditPlan = (plan) => {
+    if (!canManage) return;
+    setPlanError('');
+    setPlanModal({
+      id: plan.id,
+      name: plan.name || '',
+      description: plan.description || '',
+      total_steps: plan.total_steps ?? 0,
+    });
+  };
+
+  const submitPlan = async () => {
+    if (!planModal) return;
+    const { id, name, description, total_steps } = planModal;
+    if (!name.trim()) {
+      setPlanError('Plan name is required.');
+      throw new Error('Missing name');
+    }
+    try {
+      const payload = {
+        name: name.trim(),
+        description: (description || '').trim(),
+        total_steps: Number(total_steps) || 0,
+      };
+      const created = id
+        ? await teamService.updatePlan(id, payload)
+        : await teamService.createPlan(payload);
+      setPlanModal(null);
+      // Refresh plans list inline.
+      setPlans((prev) => {
+        if (id) return prev.map((p) => (p.id === id ? { ...p, ...created } : p));
+        return [...prev, created];
+      });
+    } catch (err) {
+      setPlanError(buildErrorDetail(err));
+      throw err;
+    }
+  };
+
+  const performDeletePlan = async () => {
+    if (!deletePlan) return;
+    try {
+      await teamService.deletePlan(deletePlan.id);
+      setPlans((prev) => prev.filter((p) => p.id !== deletePlan.id));
+      setDeletePlan(null);
+    } catch (err) {
+      console.error('Failed to delete training plan:', err);
+      setDeletePlan(null);
+    }
+  };
+
+  // ---- Trainee row click (deferred detail drawer) ----
+  const handleTraineeClick = (trainee) => {
+    setTraineeSentinel({
+      title: 'Trainee detail — coming soon',
+      message:
+        `${trainee.name}’s detailed progress, step-by-step status, and "Mark Complete / Pause" `
+        + `controls will live here. Backend ("updateTrainee") is already live.`,
+    });
+  };
+
+  // New-Hires tab: members created in the last 30 days.
+  const newHires = useMemo(() => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    return (teamMembers || [])
+      .filter((m) => m.created_at && new Date(m.created_at).getTime() >= cutoff)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }, [teamMembers]);
 
   return (
     <div className="tt-page">
@@ -242,6 +341,9 @@ const TeamTraining = ({ user }) => {
         </div>
       </section>
 
+      {/* ----- Tab-conditional content ----- */}
+      {activeTab === 'progress' && (
+      <>
       {/* Department / Recent card */}
       <section className="tt-card">
         <div className="tt-seg">
@@ -308,10 +410,12 @@ const TeamTraining = ({ user }) => {
                 onClick={() => setStatusTab('completed')}
               >Completed</button>
             </div>
-            <button className="tt-btn-assign" type="button" onClick={handleAssignTraining}>
-              <IconPlus size={16} />
-              <span>Assign Training</span>
-            </button>
+            {canManage && (
+              <button className="tt-btn-assign" type="button" onClick={openAssignTraining}>
+                <IconPlus size={16} />
+                <span>Assign Training</span>
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -327,7 +431,20 @@ const TeamTraining = ({ user }) => {
         </div>
         <div className="tt-list-body">
           {filtered.map((t) => (
-            <div key={t.id} role="button" tabIndex={0} className="tt-trainee">
+            <div
+              key={t.id}
+              role="button"
+              tabIndex={0}
+              className="tt-trainee"
+              onClick={() => handleTraineeClick(t)}
+              onKeyDown={(ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                  ev.preventDefault();
+                  handleTraineeClick(t);
+                }
+              }}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="tt-trainee-left">
                 <span className="tt-avatar">{t.initials}</span>
                 <div className="tt-trainee-body">
@@ -338,17 +455,19 @@ const TeamTraining = ({ user }) => {
                         <IconClockSm size={12} />
                         {t.status}
                       </span>
-                      <button
-                        type="button"
-                        className="tt-icon-btn"
-                        aria-label={`Delete training progress for ${t.name}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteTrainee(t);
-                        }}
-                      >
-                        <IconTrash2 size={14} />
-                      </button>
+                      {canManage && (
+                        <button
+                          type="button"
+                          className="tt-icon-btn"
+                          aria-label={`Delete training progress for ${t.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTrainee(t);
+                          }}
+                        >
+                          <IconTrash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <p className="tt-trainee-role">{t.role} · {t.dept}</p>
@@ -403,6 +522,232 @@ const TeamTraining = ({ user }) => {
           >Next</button>
         </div>
       </section>
+      </>
+      )}
+
+      {/* ---- Training Plans tab ---- */}
+      {activeTab === 'plans' && (
+        <section className="tt-card tt-list-card">
+          <div className="tt-list-head">
+            <div>
+              <h3 className="tt-list-title">Training Plans</h3>
+              <p className="tt-list-sub">{plans.length} plan{plans.length === 1 ? '' : 's'} available</p>
+            </div>
+            {canManage && (
+              <button className="tt-btn-assign" type="button" onClick={openCreatePlan}>
+                <IconPlus size={16} />
+                <span>New Plan</span>
+              </button>
+            )}
+          </div>
+          <div className="tt-list-body">
+            {plans.length === 0 ? (
+              <div className="tt-empty-mini">
+                <IconClipboardList size={28} />
+                <p>No training plans yet. Create your first to get started.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 12 }}>
+                {plans.map((p) => (
+                  <article
+                    key={p.id}
+                    className="tt-trainee"
+                    style={canManage ? { cursor: 'pointer' } : undefined}
+                    onClick={() => canManage && openEditPlan(p)}
+                  >
+                    <div className="tt-trainee-left">
+                      <span className="tt-avatar"><IconClipboardList size={18} /></span>
+                      <div className="tt-trainee-body">
+                        <h4 className="tt-trainee-name">{p.name}</h4>
+                        <p className="tt-trainee-role">
+                          {p.description || 'No description'} · {p.total_steps || 0} step{p.total_steps === 1 ? '' : 's'}
+                        </p>
+                      </div>
+                    </div>
+                    {canManage && (
+                      <div onClick={(ev) => ev.stopPropagation()}>
+                        <ActionMenu
+                          align="right"
+                          actions={[
+                            { label: 'Edit', onClick: () => openEditPlan(p) },
+                            { divider: true },
+                            { label: 'Delete', destructive: true, onClick: () => setDeletePlan(p) },
+                          ]}
+                        />
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ---- New Hires tab ---- */}
+      {activeTab === 'new-hires' && (
+        <section className="tt-card tt-list-card">
+          <div className="tt-list-head">
+            <div>
+              <h3 className="tt-list-title">New Hires</h3>
+              <p className="tt-list-sub">Members added in the last 30 days</p>
+            </div>
+            <span className="tt-list-head-icon"><IconSearchPlus size={20} /></span>
+          </div>
+          <div className="tt-list-body">
+            {newHires.length === 0 ? (
+              <div className="tt-empty-mini">
+                <IconSearchPlus size={28} />
+                <p>No new hires in the last 30 days.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 10 }}>
+                {newHires.map((m) => {
+                  const initials = (m.name || m.email || '?')
+                    .split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
+                  const hiredDate = m.created_at
+                    ? new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : '—';
+                  return (
+                    <div key={m.id} className="tt-trainee">
+                      <div className="tt-trainee-left">
+                        <span className="tt-avatar">{initials}</span>
+                        <div className="tt-trainee-body">
+                          <h4 className="tt-trainee-name">{m.name || m.email}</h4>
+                          <p className="tt-trainee-role">Hired {hiredDate} · {m.role || 'team_member'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ---- Assessments / Community: deferred ---- */}
+      {(activeTab === 'assessments' || activeTab === 'community') && (
+        <section className="tt-card tt-list-card">
+          <div className="tt-list-body">
+            <div className="tt-empty-mini">
+              {activeTab === 'assessments' ? <IconFileCheck size={32} /> : <IconGlobe size={32} />}
+              <p style={{ fontWeight: 600, color: '#0f172a' }}>
+                {activeTab === 'assessments' ? 'Assessments' : 'Community'} — coming soon
+              </p>
+              <p style={{ fontSize: 13, color: '#64748b', maxWidth: 460, textAlign: 'center' }}>
+                {activeTab === 'assessments'
+                  ? 'Per-step assessments and quiz results will live here.'
+                  : 'A shared community feed for trainers and trainees is on the roadmap.'}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ---- Assign Training modal ---- */}
+      <FormModal
+        isOpen={!!assignModal}
+        title="Assign Training"
+        submitLabel="Assign"
+        size="sm"
+        onClose={() => setAssignModal(null)}
+        onSubmit={submitAssign}
+        submitDisabled={!assignModal?.user || !assignModal?.plan}
+        errorMessage={assignError}
+      >
+        <SelectField
+          label="Team Member"
+          value={assignModal?.user || ''}
+          onChange={(v) => setAssignModal((m) => m && ({ ...m, user: v }))}
+          required
+          options={[
+            { value: '', label: '-- Select a team member --' },
+            ...teamMembers.map((m) => ({
+              value: String(m.id),
+              label: m.name || m.email,
+            })),
+          ]}
+        />
+        <SelectField
+          label="Training Plan"
+          value={assignModal?.plan || ''}
+          onChange={(v) => setAssignModal((m) => m && ({ ...m, plan: v }))}
+          required
+          options={[
+            { value: '', label: '-- Select a plan --' },
+            ...plans.map((p) => ({ value: String(p.id), label: p.name })),
+          ]}
+        />
+      </FormModal>
+
+      {/* ---- Create / Edit Training Plan modal ---- */}
+      <FormModal
+        isOpen={!!planModal}
+        title={planModal?.id ? 'Edit Training Plan' : 'Create Training Plan'}
+        submitLabel={planModal?.id ? 'Save Plan' : 'Create Plan'}
+        size="sm"
+        onClose={() => setPlanModal(null)}
+        onSubmit={submitPlan}
+        submitDisabled={!planModal?.name?.trim()}
+        errorMessage={planError}
+      >
+        <TextField
+          label="Plan Name"
+          value={planModal?.name || ''}
+          onChange={(v) => setPlanModal((m) => m && ({ ...m, name: v }))}
+          placeholder="e.g. Foundations FOH"
+          required
+          autoFocus
+        />
+        <TextArea
+          label="Description"
+          value={planModal?.description || ''}
+          onChange={(v) => setPlanModal((m) => m && ({ ...m, description: v }))}
+          placeholder="What does this plan cover?"
+          rows={3}
+        />
+        <NumberField
+          label="Total Steps"
+          value={planModal?.total_steps ?? ''}
+          onChange={(v) => setPlanModal((m) => m && ({ ...m, total_steps: v }))}
+          placeholder="e.g. 5"
+          step="1"
+        />
+      </FormModal>
+
+      {/* ---- Delete confirms ---- */}
+      <ConfirmDialog
+        isOpen={!!deleteTrainee}
+        title="Remove this trainee assignment?"
+        message={deleteTrainee
+          ? `${deleteTrainee.name}’s progress on “${deleteTrainee.plan}” will be deleted.`
+          : ''}
+        confirmLabel="Remove"
+        destructive
+        onConfirm={performDeleteTrainee}
+        onClose={() => setDeleteTrainee(null)}
+      />
+      <ConfirmDialog
+        isOpen={!!deletePlan}
+        title="Delete this training plan?"
+        message={deletePlan
+          ? `“${deletePlan.name}” will be archived. Existing trainee assignments stay intact.`
+          : ''}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={performDeletePlan}
+        onClose={() => setDeletePlan(null)}
+      />
+      <ConfirmDialog
+        isOpen={!!traineeSentinel}
+        title={traineeSentinel?.title || ''}
+        message={traineeSentinel?.message || ''}
+        confirmLabel="Got it"
+        cancelLabel="Close"
+        onConfirm={() => setTraineeSentinel(null)}
+        onClose={() => setTraineeSentinel(null)}
+      />
     </div>
   );
 };

@@ -1,6 +1,11 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import leadershipService from '../services/leadership';
 import './Leadership360Evaluations.css';
+import { isManagerOrAbove } from '../utils/access';
+import {
+  ActionMenu, ConfirmDialog, FormModal,
+  TextField, TextArea, NumberField,
+} from './ui';
 
 // Normalize a backend Evaluation360 to the row shape this UI uses.
 const normalizeEval = (raw) => ({
@@ -62,12 +67,21 @@ const formatToday = () =>
   new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
 const Leadership360Evaluations = ({ user, onNavigate }) => {
+  const canManage = isManagerOrAbove(user);
   const [activeTab, setActiveTab] = useState('evaluations');
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [evaluations, setEvaluations] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [stats, setStats] = useState({ total: 0, in_progress: 0, completed: 0, reviewed: 0 });
+
+  // ---- Modal state ----
+  // templateModal: { id?, name, description, sections_count } | null
+  const [templateModal, setTemplateModal] = useState(null);
+  const [templateError, setTemplateError] = useState('');
+  const [deleteTemplate, setDeleteTemplate] = useState(null); // template record
+  // evalSentinel: { title, message } | null — for not-implemented Take/View Evaluation flow.
+  const [evalSentinel, setEvalSentinel] = useState(null);
 
   const displayName = user?.firstName || user?.name || 'Demo User';
 
@@ -101,54 +115,86 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
     { key: 'reviewed',   label: 'Reviewed',      value: stats.reviewed || 0,    tone: 'purple',  Icon: IconEye },
   ]), [stats]);
 
-  const handleCreateTemplate = async () => {
-    const name = window.prompt('Template name');
-    if (!name?.trim()) return;
-    const description = window.prompt('Template description', '') || '';
-    const sectionsCount = window.prompt('Sections count', '1');
-    if (sectionsCount == null) return;
+  const buildErrorDetail = (err) =>
+    err?.data
+      ? Object.entries(err.data)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+          .join(' \u2022 ')
+      : (err?.message || 'Save failed.');
+
+  // ---- Create/Edit Template modal ----
+  const openCreateTemplate = () => {
+    if (!canManage) return;
+    setTemplateError('');
+    setTemplateModal({
+      name: '',
+      description: '',
+      sections_count: 6,
+    });
+  };
+
+  const openEditTemplate = (template) => {
+    if (!canManage) return;
+    setTemplateError('');
+    setTemplateModal({
+      id: template.id,
+      name: template.name || '',
+      description: template.description || '',
+      sections_count: template.sections_count ?? 0,
+    });
+  };
+
+  const submitTemplate = async () => {
+    if (!templateModal) return;
+    const { id, name, description, sections_count } = templateModal;
+    if (!name.trim()) {
+      setTemplateError('Template name is required.');
+      throw new Error('Missing name');
+    }
     try {
-      await leadershipService.createTemplate({
+      const payload = {
         name: name.trim(),
-        description,
-        sections_count: Number(sectionsCount) || 0,
-        is_active: true,
-      });
+        description: (description || '').trim(),
+        sections_count: Number(sections_count) || 0,
+      };
+      if (id) {
+        await leadershipService.updateTemplate(id, payload);
+      } else {
+        await leadershipService.createTemplate({ ...payload, is_active: true });
+      }
+      setTemplateModal(null);
       await refresh();
     } catch (err) {
-      console.error('Failed to create 360 template:', err);
+      setTemplateError(buildErrorDetail(err));
+      throw err;
     }
   };
 
-  const handleTemplateAction = async (template) => {
-    const action = window.prompt(`Type "edit" or "delete" for "${template.name}"`, 'edit');
-    if (!action) return;
-    const choice = action.trim().toLowerCase();
-
+  // ---- Delete template ----
+  const performDeleteTemplate = async () => {
+    if (!deleteTemplate) return;
     try {
-      if (choice === 'delete') {
-        const confirmed = window.confirm(`Delete "${template.name}"?`);
-        if (!confirmed) return;
-        await leadershipService.deleteTemplate(template.id);
-        await refresh();
-        return;
-      }
-
-      if (choice !== 'edit') return;
-      const name = window.prompt('Template name', template.name);
-      if (!name?.trim()) return;
-      const description = window.prompt('Template description', template.description || '') || '';
-      const sectionsCount = window.prompt('Sections count', String(template.sections_count || 0));
-      if (sectionsCount == null) return;
-      await leadershipService.updateTemplate(template.id, {
-        name: name.trim(),
-        description,
-        sections_count: Number(sectionsCount) || 0,
-      });
+      await leadershipService.deleteTemplate(deleteTemplate.id);
+      setDeleteTemplate(null);
       await refresh();
     } catch (err) {
-      console.error('Failed to update 360 template:', err);
+      console.error('Failed to delete 360 template:', err);
+      setDeleteTemplate(null);
     }
+  };
+
+  // ---- Evaluation card click (not yet implemented) ----
+  // The full take/view-evaluation UI is significant work and is tracked
+  // separately on the wiring plan; surface a sentinel so users see why
+  // nothing happens on click.
+  const handleEvaluationClick = (evaluation) => {
+    setEvalSentinel({
+      title: 'Take / View Evaluation — coming soon',
+      message:
+        `“${evaluation.name}”’s 360° review opens here. The full take-evaluation flow `
+        + `(rating form, evaluator selection, results dashboard) is on the roadmap. `
+        + `Backend endpoints ("respondToEvaluation", "getEvaluation") are already live.`,
+    });
   };
 
   return (
@@ -252,7 +298,20 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
               </div>
             ) : (
               filtered.map((e) => (
-                <article key={e.id} className="l360-card">
+                <article
+                  key={e.id}
+                  className="l360-card"
+                  onClick={() => handleEvaluationClick(e)}
+                  style={{ cursor: 'pointer' }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(ev) => {
+                    if (ev.key === 'Enter' || ev.key === ' ') {
+                      ev.preventDefault();
+                      handleEvaluationClick(e);
+                    }
+                  }}
+                >
                   <span className={`l360-card-stripe stripe-${e.status}`} />
                   <div className="l360-card-body">
                     <div className="l360-card-left">
@@ -306,10 +365,12 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
         <>
           <section className="l360-toolbar">
             <div />
-            <button className="l360-cta" type="button" onClick={handleCreateTemplate}>
-              <IconPlus size={16} />
-              <span>New Template</span>
-            </button>
+            {canManage && (
+              <button className="l360-cta" type="button" onClick={openCreateTemplate}>
+                <IconPlus size={16} />
+                <span>New Template</span>
+              </button>
+            )}
           </section>
 
           <section className="l360-list">
@@ -324,8 +385,8 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
                 <article
                   key={template.id}
                   className="l360-card"
-                  onClick={() => handleTemplateAction(template)}
-                  style={{ cursor: 'pointer' }}
+                  onClick={() => canManage && openEditTemplate(template)}
+                  style={canManage ? { cursor: 'pointer' } : undefined}
                 >
                   <span className="l360-card-stripe stripe-completed" />
                   <div className="l360-card-body">
@@ -352,9 +413,33 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
                       </div>
                     </div>
 
-                    <span className="l360-chevron" aria-hidden>
-                      <IconChevronRight size={18} />
-                    </span>
+                    {canManage ? (
+                      <div onClick={(ev) => ev.stopPropagation()}>
+                        <ActionMenu
+                          align="right"
+                          actions={[
+                            { label: 'Edit', onClick: () => openEditTemplate(template) },
+                            { divider: true },
+                            { label: 'Delete', destructive: true,
+                              onClick: () => setDeleteTemplate(template) },
+                          ]}
+                          trigger={(
+                            <button
+                              type="button"
+                              className="l360-chevron"
+                              aria-label={`More actions for ${template.name}`}
+                              style={{ background: 'transparent', border: 0, padding: 6, cursor: 'pointer', color: 'inherit' }}
+                            >
+                              ⋮
+                            </button>
+                          )}
+                        />
+                      </div>
+                    ) : (
+                      <span className="l360-chevron" aria-hidden>
+                        <IconChevronRight size={18} />
+                      </span>
+                    )}
                   </div>
                 </article>
               ))
@@ -362,6 +447,66 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
           </section>
         </>
       )}
+
+      {/* ---- Create/Edit Template modal ---- */}
+      <FormModal
+        isOpen={!!templateModal}
+        title={templateModal?.id ? 'Edit 360° Template' : 'Create 360° Template'}
+        submitLabel={templateModal?.id ? 'Save Template' : 'Create Template'}
+        size="sm"
+        onClose={() => setTemplateModal(null)}
+        onSubmit={submitTemplate}
+        submitDisabled={!templateModal?.name?.trim()}
+        errorMessage={templateError}
+      >
+        <TextField
+          label="Template Name"
+          value={templateModal?.name || ''}
+          onChange={(v) => setTemplateModal((m) => m && ({ ...m, name: v }))}
+          placeholder="e.g. Director Leadership Review"
+          required
+          autoFocus
+        />
+        <TextArea
+          label="Description"
+          value={templateModal?.description || ''}
+          onChange={(v) => setTemplateModal((m) => m && ({ ...m, description: v }))}
+          placeholder="Briefly describe when this template should be used."
+          rows={3}
+        />
+        <NumberField
+          label="Sections Count"
+          value={templateModal?.sections_count ?? ''}
+          onChange={(v) => setTemplateModal((m) => m && ({ ...m, sections_count: v }))}
+          placeholder="e.g. 6"
+          step="1"
+          required
+        />
+      </FormModal>
+
+      {/* ---- Delete template confirm ---- */}
+      <ConfirmDialog
+        isOpen={!!deleteTemplate}
+        title="Delete this template?"
+        message={deleteTemplate
+          ? `“${deleteTemplate.name}” will be archived. Existing evaluations using it stay intact.`
+          : ''}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={performDeleteTemplate}
+        onClose={() => setDeleteTemplate(null)}
+      />
+
+      {/* ---- Evaluation card sentinel ---- */}
+      <ConfirmDialog
+        isOpen={!!evalSentinel}
+        title={evalSentinel?.title || ''}
+        message={evalSentinel?.message || ''}
+        confirmLabel="Got it"
+        cancelLabel="Close"
+        onConfirm={() => setEvalSentinel(null)}
+        onClose={() => setEvalSentinel(null)}
+      />
     </div>
   );
 };

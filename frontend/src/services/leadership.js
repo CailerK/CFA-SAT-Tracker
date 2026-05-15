@@ -127,6 +127,12 @@ const leadershipService = {
       body: JSON.stringify({ text }),
     });
   },
+
+  async deleteNote(id) {
+    return apiService.request(`/leadership/notes/${id}/`, {
+      method: "DELETE",
+    });
+  },
 };
 
 export default leadershipService;

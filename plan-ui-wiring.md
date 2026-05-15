@@ -153,35 +153,36 @@ This whole page is prompt-driven. Build modals for:
 
 ---
 
-### Phase 15 — Leadership + Training
+### Phase 15 — Leadership + Training ✅ DONE (2026-05-15)
 **Why**: high-value but lower-frequency than kitchen.
 
 #### Leadership360Evaluations.js
-- [ ] **Evaluation card click** → open a Take/View Evaluation page (loads via `getEvaluation`, submits via `respondToEvaluation`). (a + c for the full take-eval UI)
-- [ ] **Template card actions** (replace `window.prompt('Type edit or delete')`) with `<ActionMenu>`: Edit, Delete, Duplicate. (a)
-- [ ] **Create Template flow** — replace prompts with a Create Template wizard or modal. (a + c)
+- [x] **Evaluation card click** → sentinel ConfirmDialog. *Full take-eval UI (rating form, results dashboard) deferred to a future phase — backend `respondToEvaluation`/`getEvaluation` are live.*
+- [x] **Template card actions** (replace `window.prompt('Type edit or delete')`) with `<ActionMenu>`: Edit + Delete (Duplicate deferred — not on backend yet).
+- [x] **Create Template flow** — new Create/Edit Template `<FormModal>` (TextField + TextArea + NumberField), manager-gated.
 
 #### New360Evaluation.js
-- [ ] **"+ Create Additional Template" button** → opens template create flow inline. (a + c)
+- [x] **"+ Create Additional Template" button** → opens inline Create Template `<FormModal>` that auto-selects the newly created template. Manager-gated. Dashboard now passes `user` prop.
 
 #### TeamTraining.js
-- [ ] **Plans tab** — currently empty. Show list from `listPlans`. Add create-plan modal. (a + c)
-- [ ] **New Hires tab** — currently empty. Filter users with `created_at` in last 30 days. (a)
-- [ ] **Assessments + Community tabs** — decide scope. Either ship MVP or hide tabs. (c — needs design)
-- [ ] **Trainee row click** → Trainee Detail drawer with progress bar + update controls (Mark Complete, Pause). Calls `updateTrainee`. (a + c)
-- [ ] **Assign Training button** — replace `window.prompt` with proper assignment modal (user picker + plan picker). (a + c)
+- [x] **Plans tab** — renders `plans` list with create/edit (FormModal) + delete (ConfirmDialog) per row via `<ActionMenu>`. Service methods `createPlan`/`updatePlan`/`deletePlan` added.
+- [x] **New Hires tab** — filters `teamMembers` by `created_at` >= now − 30d. *Required backend change: `TeamMemberSerializer` now exposes `created_at`.*
+- [x] **Assessments + Community tabs** — "coming soon" placeholder cards (deferred MVP).
+- [x] **Trainee row click** → "Trainee detail coming soon" sentinel. *Full progress drawer with Mark Complete/Pause deferred — backend `updateTrainee` is live.*
+- [x] **Assign Training button** — Assign Training `<FormModal>` with 2x `<SelectField>` (member + plan), manager-gated. Replaces 2-prompt chain.
+- [x] **Delete trainee** — `<ConfirmDialog>` replaces `window.confirm`.
 
 #### LeadershipDevelopment.js
-- [ ] **Settings gear** (top right) — define purpose or remove. (b)
-- [ ] **"See all" in notes** → notes detail page or scroll-to. (a + c)
-- [ ] **Development card progress** is hardcoded `0%` — compute from 360 evaluations completed for the user. (b)
-- [ ] **Per-note delete button** (currently missing) — add UI + DELETE endpoint. (b)
+- [x] **Settings gear** — wired to "coming soon" `<ConfirmDialog>` sentinel describing future per-area customization.
+- [x] **"See all" in notes** → opens `<HistoryDrawer>` listing every note with timestamp.
+- [x] **Development card progress** — now computed as `mean(progress_percent)` across the current user's 360 evaluations where they're the evaluatee. Replaces hardcoded `0%`.
+- [x] **Per-note delete button** — hover-trash icon on each note → `<ConfirmDialog>`. Service `deleteNote` added; backend already supports DELETE via `LeadershipNoteViewSet` (no backend change).
 
 #### TeamDevelopment.js
-- [ ] **Manage Tracks button** (handler exists but no button visible) — render it and wire. (a)
-- [ ] **Member row click** → update-progress drawer. Calls `updateProgress`. (a + c)
+- [x] **Edit Tracks button** — opens Manage Tracks `<FormModal>` listing all tracks with per-row `<ActionMenu>` (Edit/Delete) wired to Create/Edit Track `<FormModal>` and delete `<ConfirmDialog>`. Replaces 5-prompt chain.
+- [x] **Member row click** → Update Progress `<FormModal>` with `<SelectField>` (status) + two `<NumberField>`s (current_step, completed_steps) calling `updateProgress`. Manager-gated.
 
-**Estimate**: 2 sessions.
+**Net change**: 5 components fully wired, 1 service method added (`deleteNote`), 3 service methods added (`createPlan/updatePlan/deletePlan`), 1 backend field exposed (`User.created_at` on `TeamMemberSerializer`). 8 `window.prompt`/`window.confirm` chains eliminated.
 
 ---
 

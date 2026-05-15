@@ -914,8 +914,9 @@ class TeamMemberSerializer(serializers.ModelSerializer):
             "manager", "manager_name",
             "departments", "department_slugs",
             "avatar",
+            "created_at",
         ]
-        read_only_fields = ["id", "name", "initials", "manager_name", "departments"]
+        read_only_fields = ["id", "name", "initials", "manager_name", "departments", "created_at"]
 
     def get_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip() or obj.email
