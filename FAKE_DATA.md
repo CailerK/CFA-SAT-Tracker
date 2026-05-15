@@ -365,4 +365,4 @@ time to replace demo data with live API calls / database reads / persisted state
 
 ---
 
-_Last updated: 2026-05-15 — after Phase 17 FOH + Cleaning polish (FOHTasks "Require Initials" toggle persisted to `StoreSettings.foh_require_initials` + Initials FormModal before completion; TaskHistory custom date-range FormModal + backend `start`/`end` query params on `GET /api/foh/tasks/history/`; CleaningMaintenance dropped dead duplicate header button, clock → HistoryDrawer of last 30 days, gear → coming-soon sentinel ConfirmDialog)._
+_Last updated: 2026-05-15 — after Phase 18 Settings + Misc polish (Settings "Reset to Default" buttons on General + Store Info panels now reload that panel from the server via a destructive ConfirmDialog; NotificationDropdown per-row dismiss "X" only marks-read in-place — no navigation/close; TeamChat manager-only "+ New Channel" sidebar button + FormModal with auto-slug and auto-select). **All 18 UI-wiring phases complete.**_

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './UserManagement.css';
 import api from '../services/api';
+import { ConfirmDialog } from './ui';
 
 const UserManagement = ({ currentUser }) => {
   const [users, setUsers] = useState([]);
@@ -16,6 +17,9 @@ const UserManagement = ({ currentUser }) => {
   const [tempPassword, setTempPassword] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+  // resetPwTarget: user | null — ConfirmDialog opens when set; replaces the
+  // legacy window.confirm() prompt that asked "Reset password for X?".
+  const [resetPwTarget, setResetPwTarget] = useState(null);
 
   const isSuperuser = currentUser?.isSuperuser;
   const isAdmin = currentUser?.isAdmin;
@@ -196,16 +200,25 @@ const UserManagement = ({ currentUser }) => {
     }
   };
 
-  const handleResetPassword = async (user) => {
-    if (window.confirm(`Reset password for ${user.fullName || user.email}?`)) {
-      try {
-        const res = await api.request(`/users/${user.id}/reset_password/`, { method: 'POST' });
-        setTempPassword(res.temporary_password);
-        setShowPasswordModal(true);
-      } catch (err) {
-        console.error('Failed to reset password:', err);
-        alert(err.message || 'Failed to reset password');
-      }
+  // Step 1: stash the target user; the ConfirmDialog below renders when set.
+  const handleResetPassword = (user) => {
+    setResetPwTarget(user);
+  };
+
+  // Step 2: ConfirmDialog confirmed — hit the backend, show the temp-password
+  // modal on success. Errors keep falling back to the existing alert() since
+  // there is no inline-error surface in this component yet.
+  const performResetPassword = async () => {
+    if (!resetPwTarget) return;
+    const target = resetPwTarget;
+    setResetPwTarget(null);
+    try {
+      const res = await api.request(`/users/${target.id}/reset_password/`, { method: 'POST' });
+      setTempPassword(res.temporary_password);
+      setShowPasswordModal(true);
+    } catch (err) {
+      console.error('Failed to reset password:', err);
+      alert(err.message || 'Failed to reset password');
     }
   };
 
@@ -632,6 +645,19 @@ const UserManagement = ({ currentUser }) => {
           </div>
         </div>
       )}
+
+      {/* Reset Password confirmation (replaces legacy window.confirm) */}
+      <ConfirmDialog
+        isOpen={!!resetPwTarget}
+        title="Reset password?"
+        message={resetPwTarget
+          ? `A new temporary password will be generated for ${resetPwTarget.fullName || resetPwTarget.email}. They'll need to use it on their next sign-in.`
+          : ''}
+        confirmLabel="Reset Password"
+        destructive
+        onConfirm={performResetPassword}
+        onClose={() => setResetPwTarget(null)}
+      />
     </div>
   );
 };

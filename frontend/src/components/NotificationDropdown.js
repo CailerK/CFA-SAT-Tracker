@@ -61,6 +61,26 @@ const NotificationDropdown = ({ isOpen, onClose, onNavigate }) => {
     }
   };
 
+  // Just mark a notification as read in-place — do NOT navigate or close
+  // the dropdown. Wired to the per-row dismiss "X" button so users can
+  // silence noisy notifications without losing their place.
+  const handleDismiss = async (notification) => {
+    if (notification.is_read) return;
+    // Optimistic UI flip first.
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n))
+    );
+    try {
+      await notificationService.markAsRead(notification.id);
+    } catch (error) {
+      console.error('Failed to dismiss notification:', error);
+      // Roll back on failure.
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notification.id ? { ...n, is_read: false } : n))
+      );
+    }
+  };
+
   const handleMarkAllRead = async () => {
     try {
       await notificationService.markAllAsRead();
@@ -183,9 +203,10 @@ const NotificationDropdown = ({ isOpen, onClose, onNavigate }) => {
               </div>
               <button
                 className="notification-dismiss"
+                aria-label="Mark as read"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleNotificationClick(notification);
+                  handleDismiss(notification);
                 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

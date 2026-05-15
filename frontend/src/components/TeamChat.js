@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './TeamChat.css';
 import chatService from '../services/chat';
+import { isManagerOrAbove } from '../utils/access';
+import { FormModal, TextField, TextArea } from './ui';
 
 const formatTime = (iso) => {
   if (!iso) return '';
@@ -9,36 +11,69 @@ const formatTime = (iso) => {
   } catch { return ''; }
 };
 
+// Build the channel slug from the channel name (lower-case, dash-separated).
+const slugifyChannelName = (name) => (name || '')
+  .toLowerCase()
+  .trim()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '')
+  .slice(0, 40);
+
 const TeamChat = ({ onBack, user }) => {
+  const canManage = isManagerOrAbove(user);
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [messageText, setMessageText] = useState('');
   const [messages, setMessages] = useState([]);
+  // newChannelModal: { name, description } | null — New Channel FormModal.
+  const [newChannelModal, setNewChannelModal] = useState(null);
+  const [newChannelError, setNewChannelError] = useState('');
 
-  // Load channels on mount.
+  // Load channels and slot them into the sidebar. Extracted out of the
+  // mount effect so the New Channel flow can call it after a successful POST.
+  const loadChannels = useCallback(async ({ preferSlug } = {}) => {
+    try {
+      const res = await chatService.listChannels();
+      const rows = res.results || res || [];
+      const mapped = rows.map((c) => ({
+        id: c.id,
+        slug: c.slug,
+        name: c.name || (c.slug ? c.slug[0].toUpperCase() + c.slug.slice(1) : 'Channel'),
+        unread: c.unread_count || 0,
+        lastMessage: c.last_message_preview || '',
+        lastTime: formatTime(c.last_message_at),
+      }));
+      setChats(mapped);
+      // Selection priority:
+      //   1) the channel we just created (preferSlug)
+      //   2) the currently-selected channel if it still exists
+      //   3) the first channel in the list
+      if (mapped.length) {
+        let next = null;
+        if (preferSlug) next = mapped.find((m) => m.slug === preferSlug)?.id;
+        if (!next) {
+          setSelectedChat((current) =>
+            current && mapped.some((m) => m.id === current) ? current : mapped[0].id
+          );
+        } else {
+          setSelectedChat(next);
+        }
+      }
+      return mapped;
+    } catch (err) {
+      console.error('Failed to load chat channels:', err);
+      return [];
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await chatService.listChannels();
-        const rows = res.results || res || [];
-        if (cancelled) return;
-        const mapped = rows.map((c) => ({
-          id: c.id,
-          slug: c.slug,
-          name: c.name || (c.slug ? c.slug[0].toUpperCase() + c.slug.slice(1) : 'Channel'),
-          unread: c.unread_count || 0,
-          lastMessage: c.last_message_preview || '',
-          lastTime: formatTime(c.last_message_at),
-        }));
-        setChats(mapped);
-        if (mapped.length && !selectedChat) setSelectedChat(mapped[0].id);
-      } catch (err) {
-        console.error('Failed to load chat channels:', err);
-      }
+      if (cancelled) return;
+      await loadChannels();
     })();
     return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadChannels]);
 
   // Poll messages for the selected channel every 5s while open.
   const loadMessages = useCallback(async () => {
@@ -82,6 +117,46 @@ const TeamChat = ({ onBack, user }) => {
     }
   };
 
+  // ---- New Channel flow (manager-only) ----
+  const openNewChannel = () => {
+    if (!canManage) return;
+    setNewChannelError('');
+    setNewChannelModal({ name: '', description: '' });
+  };
+
+  const submitNewChannel = async () => {
+    if (!newChannelModal) return;
+    const name = (newChannelModal.name || '').trim();
+    if (!name) {
+      setNewChannelError('Channel name is required.');
+      throw new Error('Missing name');
+    }
+    const slug = slugifyChannelName(name);
+    if (!slug) {
+      setNewChannelError('Channel name must contain at least one letter or number.');
+      throw new Error('Bad slug');
+    }
+    try {
+      const created = await chatService.createChannel({
+        name,
+        slug,
+        description: (newChannelModal.description || '').trim(),
+      });
+      setNewChannelModal(null);
+      // Reload channels and prefer-select the new one.
+      await loadChannels({ preferSlug: created?.slug || slug });
+    } catch (err) {
+      console.error('Create channel failed:', err);
+      const detail = err?.data
+        ? Object.entries(err.data)
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+            .join(' \u2022 ')
+        : (err?.message || 'Could not create channel — manager role required.');
+      setNewChannelError(detail);
+      throw err;
+    }
+  };
+
   return (
     <div className="team-chat-page">
       {/* Header */}
@@ -101,6 +176,36 @@ const TeamChat = ({ onBack, user }) => {
       <div className="chat-container">
         {/* Sidebar - Chat List */}
         <aside className="chat-sidebar">
+          {canManage && (
+            <div style={{ padding: '12px 12px 0' }}>
+              <button
+                type="button"
+                className="chat-new-channel-btn"
+                onClick={openNewChannel}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  background: '#E51636',
+                  color: '#fff',
+                  border: 0,
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                New Channel
+              </button>
+            </div>
+          )}
           <div className="chat-list">
             {chats.map(chat => (
               <button
@@ -181,6 +286,37 @@ const TeamChat = ({ onBack, user }) => {
           </div>
         </main>
       </div>
+
+      {/* ---- New Channel FormModal (manager-only) ---- */}
+      <FormModal
+        isOpen={!!newChannelModal}
+        title="New Channel"
+        submitLabel="Create Channel"
+        size="sm"
+        onClose={() => setNewChannelModal(null)}
+        onSubmit={submitNewChannel}
+        submitDisabled={!newChannelModal?.name?.trim()}
+        errorMessage={newChannelError}
+      >
+        <TextField
+          label="Channel Name"
+          value={newChannelModal?.name || ''}
+          onChange={(v) => setNewChannelModal((m) => m && ({ ...m, name: v }))}
+          placeholder="e.g. Morning Crew"
+          required
+          autoFocus
+          help={newChannelModal?.name
+            ? `URL slug: #${slugifyChannelName(newChannelModal.name) || '…'}`
+            : undefined}
+        />
+        <TextArea
+          label="Description (optional)"
+          value={newChannelModal?.description || ''}
+          onChange={(v) => setNewChannelModal((m) => m && ({ ...m, description: v }))}
+          placeholder="What is this channel for?"
+          rows={3}
+        />
+      </FormModal>
     </div>
   );
 };

@@ -1006,6 +1006,47 @@ Walk through these one by one — each card on the Quick Actions grid should nav
 
 ---
 
+## UI Phase 18 — Settings + Misc polish _(2026-05-15)_
+
+> Final cleanup phase. Wires 3 dead controls (Settings Reset buttons, NotificationDropdown dismiss X, TeamChat + New Channel) and fixes one prop-passing bug. No backend changes.
+
+### `/settings` (Settings)
+
+#### As any user:
+- [ ] **General** panel → "Reset to Default" opens a destructive ConfirmDialog: "Reset General Settings?".
+- [ ] Confirming reloads language + timezone from the server and shows the "Saved ✓" badge briefly.
+- [ ] Cancelling leaves any in-progress edits untouched.
+- [ ] **Store Info** panel → "Reset to Default" opens the same dialog with copy "Reset Store Info?".
+- [ ] Confirming reloads store name / number / address / phone / email / vision / mission.
+- [ ] Both Reset buttons are disabled while a save is in flight.
+
+### `/team-chat` (TeamChat)
+
+#### As `admin@gmail.com / admin` (manager):
+- [ ] A **+ New Channel** button is visible at the top of the sidebar.
+- [ ] Clicking it opens a **New Channel** FormModal with Name + Description fields.
+- [ ] Typing into Name shows the auto-derived slug (e.g. "Morning Crew" → `#morning-crew`).
+- [ ] Submitting POSTs to `/api/chat/channels/`; the new channel appears in the sidebar and is auto-selected.
+- [ ] Submitting an empty/non-alphanumeric name shows an inline error.
+
+#### As `demouser@gmail.com / demouser` (team member):
+- [ ] **+ New Channel** button is hidden.
+- [ ] All existing channel functionality (read messages, send messages) still works.
+
+### Notifications dropdown (`NotificationDropdown`)
+
+#### As any user with at least one unread notification:
+- [ ] Click on a notification row → marks read AND navigates AND closes dropdown (unchanged behaviour).
+- [ ] Click the per-row "X" dismiss button → marks read in-place, leaves the dropdown open, does NOT navigate.
+- [ ] After dismiss, the unread dot disappears and the row dims (no longer 'unread' style).
+- [ ] If the server returns an error, the optimistic 'is_read' flip rolls back.
+
+### Backend regression
+- [ ] `POST /api/chat/channels/` with a unique slug creates a channel (manager-only — team members get 403).
+- [ ] `POST /api/chat/channels/` with a duplicate slug returns a validation error surfaced in the FormModal.
+
+---
+
 ## Bugs / oddities log
 
 > Use this section as you test. Format:

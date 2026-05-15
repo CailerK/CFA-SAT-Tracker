@@ -366,7 +366,7 @@ const Dashboard = ({ user, onLogout }) => {
         ) : currentPage === 'weekly-digest' ? (
           <WeeklyDigest onBack={() => setCurrentPage('dashboard')} />
         ) : currentPage === 'team-chat' ? (
-          <TeamChat onBack={() => setCurrentPage('dashboard')} />
+          <TeamChat user={user} onBack={() => setCurrentPage('dashboard')} />
         ) : currentPage === 'calendar' ? (
           <Calendar user={user} onBack={() => setCurrentPage('dashboard')} />
         ) : currentPage === 'guest-recovery' ? (

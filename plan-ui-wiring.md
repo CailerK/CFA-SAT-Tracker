@@ -247,19 +247,26 @@ This whole page is prompt-driven. Build modals for:
 
 ---
 
-### Phase 18 — Settings + Misc polish
+### Phase 18 — Settings + Misc polish ✅ _(done 2026-05-15)_
 **Why**: cleanup pass at the end.
 
-#### Settings.js
-- [ ] **Two "Reset to Default" buttons** — handlers exist but no onClick wiring. (a, 5 minutes)
-- [ ] Audit per-panel gear/icon buttons.
+#### Settings.js ✅
+- [x] **Two "Reset to Default" buttons** (General + Store Info panels) now open a destructive ConfirmDialog and, on confirm, reload that panel's fields from the server — discarding unsaved edits.
+- [x] Refactored mount load into a reusable `loadFromServer(panel)` callback so initial mount and reset share one code path.
+- [x] Reset is disabled while saving/loading; reuses the existing `saveStatus` badge so the user sees "Saving… → Saved ✓" feedback.
 
-#### NotificationDropdown.js
-- [ ] **Per-row dismiss "X"** currently both marks-read AND navigates — should just mark-read. (a)
+#### NotificationDropdown.js ✅
+- [x] **Per-row dismiss "X"** now calls a dedicated `handleDismiss(notification)` that only PATCHes `is_read=true` (optimistic with rollback) — no longer triggers navigation or closes the dropdown. The row body still navigates+closes on click.
 
-#### TeamChat.js
-- [ ] **"+ New channel" button** doesn't exist in the UI. Add it. `createChannel` endpoint exists. (a)
-- [ ] **Channel-creation gating** to managers? (a, decision)
+#### TeamChat.js ✅
+- [x] **"+ New Channel" button** added to the top of the sidebar (manager-only via `isManagerOrAbove`); opens a FormModal (Name + Description). Auto-derives the slug from the name and shows it inline. On success, refreshes the channel list and auto-selects the new channel.
+- [x] Dashboard now passes `user` prop to TeamChat so the gate works.
+
+**Backend additions**: none required. `POST /api/chat/channels/` already exists with manager-only `IsManagerOrAbove` permissions.
+
+**Service additions**: none.
+
+**Net change**: 3 components fully wired, 3 dead controls removed, 1 prop-passing bug fixed (Dashboard → TeamChat).
 
 **Estimate**: half a session.
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import './Settings.css';
 import settingsService from '../services/settings';
 import UserManagement from './UserManagement';
+import { ConfirmDialog } from './ui';
 
 const TABS = [
   { id: 'general',      label: 'General',       icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
@@ -56,6 +57,9 @@ const Settings = ({ onBack, currentUser }) => {
   const [activeTab, setActiveTab] = useState('general');
   const [isLoading, setIsLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState(null); // 'saving' | 'saved' | 'error' | null
+  // resetDialog: 'general' | 'store' | null — ConfirmDialog opens when set,
+  // confirming reloads that panel's fields from the server (discards edits).
+  const [resetDialog, setResetDialog] = useState(null);
   
   // Check if user has admin access for user management tab
   const canManageUsers = currentUser?.isSuperuser || currentUser?.isAdmin;
@@ -94,18 +98,22 @@ const Settings = ({ onBack, currentUser }) => {
   const [notifComplaint,setNotifComplaint]= useState(true);
   const [emailDigest,   setEmailDigest]   = useState(false);
 
-  // ---------- Load from backend on mount ----------
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [store, storeSettings, prefs] = await Promise.all([
-          settingsService.getStore(),
-          settingsService.getStoreSettings(),
-          settingsService.getPreferences(),
-        ]);
-        if (cancelled) return;
-        // Store info
+  // ---------- Load from backend ----------
+  // Single fetch path so the initial mount and the Reset-to-Default flows
+  // share the same source of truth. Each `panel` value reloads only that
+  // panel's fields; passing nothing (or 'all') reloads everything.
+  const loadFromServer = useCallback(async (panel = 'all') => {
+    try {
+      const [store, storeSettings, prefs] = await Promise.all([
+        settingsService.getStore(),
+        settingsService.getStoreSettings(),
+        settingsService.getPreferences(),
+      ]);
+      if (panel === 'all' || panel === 'general') {
+        setLanguage(prefs.language || 'english');
+        setTimezone(store.timezone_name || 'America/Chicago');
+      }
+      if (panel === 'all' || panel === 'store') {
         setStoreName(store.name || '');
         setStoreNum(store.store_number || '');
         setStoreAddr(store.address || '');
@@ -113,8 +121,8 @@ const Settings = ({ onBack, currentUser }) => {
         setStoreEmail(store.email || '');
         setVision(store.vision || '');
         setMission(store.mission || '');
-        setTimezone(store.timezone_name || 'America/Chicago');
-        // Feature flags + access toggles
+      }
+      if (panel === 'all') {
         setFeatures(featuresFromBackend(storeSettings.features));
         const access = storeSettings.access || {};
         setSetupViewLeadersOnly(Boolean(access.setup_view_leaders_only));
@@ -122,22 +130,45 @@ const Settings = ({ onBack, currentUser }) => {
         setRequireDirectorAppr(Boolean(access.require_director_approval));
         setDeptRestriction(Boolean(access.department_restriction));
         setTeamMemberCompletion(Boolean(access.team_member_completion));
-        // User preferences
-        setLanguage(prefs.language || 'english');
         const notif = prefs.notifications || {};
         setNotifEval(Boolean(notif.eval_due));
         setNotifTask(Boolean(notif.task_reminder));
         setNotifChat(Boolean(notif.chat));
         setNotifComplaint(Boolean(notif.complaint));
         setEmailDigest(Boolean(notif.email_digest));
-      } catch (err) {
-        console.error('Failed to load settings:', err);
-      } finally {
-        if (!cancelled) setIsLoading(false);
       }
+    } catch (err) {
+      console.error('Failed to load settings:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await loadFromServer('all');
+      if (!cancelled) setIsLoading(false);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [loadFromServer]);
+
+  // ---------- Reset to Default ----------
+  // Confirms with the user, then reloads the panel's fields from the server
+  // — effectively discarding any unsaved edits in that panel.
+  const performReset = async () => {
+    const panel = resetDialog;
+    setResetDialog(null);
+    if (!panel) return;
+    setSaveStatus('saving');
+    try {
+      await loadFromServer(panel);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(null), 1500);
+    } catch (err) {
+      console.error('Reset failed:', err);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(null), 2500);
+    }
+  };
 
   // ---------- Save helpers ----------
   const withSaveStatus = useCallback(async (fn) => {
@@ -307,7 +338,14 @@ const Settings = ({ onBack, currentUser }) => {
               </div>
 
               <div className="stg-footer">
-                <button className="stg-btn-secondary">Reset to Default</button>
+                <button
+                  type="button"
+                  className="stg-btn-secondary"
+                  onClick={() => setResetDialog('general')}
+                  disabled={saveStatus === 'saving' || isLoading}
+                >
+                  Reset to Default
+                </button>
                 <button
                   className="stg-btn-primary"
                   onClick={saveCurrentTab}
@@ -363,7 +401,14 @@ const Settings = ({ onBack, currentUser }) => {
               </div>
 
               <div className="stg-footer">
-                <button className="stg-btn-secondary">Reset to Default</button>
+                <button
+                  type="button"
+                  className="stg-btn-secondary"
+                  onClick={() => setResetDialog('store')}
+                  disabled={saveStatus === 'saving' || isLoading}
+                >
+                  Reset to Default
+                </button>
                 <button
                   className="stg-btn-primary"
                   onClick={saveCurrentTab}
@@ -533,6 +578,21 @@ const Settings = ({ onBack, currentUser }) => {
 
         </div>
       </div>
+
+      {/* ---- Reset to Default ConfirmDialog ---- */}
+      <ConfirmDialog
+        isOpen={!!resetDialog}
+        title={resetDialog === 'store'
+          ? 'Reset Store Info?'
+          : 'Reset General Settings?'}
+        message={resetDialog === 'store'
+          ? 'Any unsaved changes in this panel will be discarded and the fields will be reloaded from the server.'
+          : 'Any unsaved changes to your language or timezone will be discarded and reloaded from the server.'}
+        confirmLabel="Reset"
+        destructive
+        onConfirm={performReset}
+        onClose={() => setResetDialog(null)}
+      />
     </div>
   );
 };

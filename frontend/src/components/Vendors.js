@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './Vendors.css';
 import vendorsService from '../services/vendors';
+import { ConfirmDialog } from './ui';
 
 // Backend category slug ↔ UI label.
 const CATEGORY_FROM_API = {
@@ -48,6 +49,9 @@ const Vendors = ({ onBack }) => {
   const [searchQuery, setSearchQuery]       = useState('');
   const [showAddModal, setShowAddModal]     = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
+  // deleteVendorTarget: vendor | null — ConfirmDialog opens when set;
+  // replaces the legacy window.confirm() prompt.
+  const [deleteVendorTarget, setDeleteVendorTarget] = useState(null);
   const [form, setForm]                     = useState(initForm);
   const [vendors, setVendors] = useState([]);
   const [detailForm, setDetailForm] = useState(initForm);
@@ -140,17 +144,24 @@ const Vendors = ({ onBack }) => {
     }
   };
 
-  const handleDeleteVendor = async () => {
+  // Footer Delete button — open the ConfirmDialog instead of native confirm.
+  const handleDeleteVendor = () => {
     if (!selectedVendor) return;
-    const confirmed = window.confirm(`Delete ${selectedVendor.name}?`);
-    if (!confirmed) return;
+    setDeleteVendorTarget(selectedVendor);
+  };
+
+  // ConfirmDialog confirmed — perform the soft-delete.
+  const performDeleteVendor = async () => {
+    if (!deleteVendorTarget) return;
     try {
       setIsSaving(true);
-      await vendorsService.remove(selectedVendor.id);
+      await vendorsService.remove(deleteVendorTarget.id);
+      setDeleteVendorTarget(null);
       setSelectedVendor(null);
       await refresh();
     } catch (err) {
       console.error('Delete vendor failed:', err);
+      setDeleteVendorTarget(null);
     } finally {
       setIsSaving(false);
     }
@@ -425,6 +436,19 @@ const Vendors = ({ onBack }) => {
           </div>
         </div>
       )}
+
+      {/* Delete Vendor confirmation (replaces legacy window.confirm) */}
+      <ConfirmDialog
+        isOpen={!!deleteVendorTarget}
+        title="Delete this vendor?"
+        message={deleteVendorTarget
+          ? `“${deleteVendorTarget.name}” will be removed from the directory. Existing references in other records keep the snapshot but no longer link to a live row.`
+          : ''}
+        confirmLabel="Delete Vendor"
+        destructive
+        onConfirm={performDeleteVendor}
+        onClose={() => setDeleteVendorTarget(null)}
+      />
     </div>
   );
 };
