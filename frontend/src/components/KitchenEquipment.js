@@ -3,6 +3,37 @@ import equipmentService from '../services/equipment';
 import './SetupSheetTemplates.css'; // banner
 import './KitchenDashboard.css';     // kitchen nav
 import './KitchenEquipment.css';
+import { isManagerOrAbove } from '../utils/access';
+import {
+  ActionMenu, ConfirmDialog, FormModal, HistoryDrawer,
+  TextField, TextArea, SelectField,
+} from './ui';
+
+// ---- shared dropdown option sets (used in every Add/Edit modal) ----
+const STATUS_OPTIONS = [
+  { value: 'ok',              label: 'OK' },
+  { value: 'needs_attention', label: 'Needs Attention' },
+  { value: 'down',            label: 'Down' },
+];
+
+const ICON_OPTIONS = [
+  { value: 'flame', label: '🔥 Flame' },
+  { value: 'beef',  label: '🥩 Beef' },
+];
+
+const CADENCE_OPTIONS = [
+  { value: 'daily',     label: 'Daily' },
+  { value: 'weekly',    label: 'Weekly' },
+  { value: 'monthly',   label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'yearly',    label: 'Yearly' },
+];
+
+const LOG_KIND_OPTIONS = [
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'cleaning',    label: 'Cleaning' },
+  { value: 'issue',       label: 'Issue' },
+];
 
 // ===== Icons =====
 const IconLayoutDashboard = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>);
@@ -50,9 +81,28 @@ const EquipIcon = ({ type, className }) => {
 };
 
 const KitchenEquipment = ({ onNavigate, user }) => {
+  const canManage = isManagerOrAbove(user);
   const [activeCategory, setActiveCategory] = useState('cooking');
   const [categoriesRaw, setCategoriesRaw] = useState([]);
   const [equipmentRaw, setEquipmentRaw] = useState([]);
+
+  // ---- Modal state ----
+  // Each *Modal holds either null (closed) or a draft object the form binds to.
+  const [categoryModal, setCategoryModal] = useState(null);  // { id?, label, slug, emoji }
+  const [categoryError, setCategoryError] = useState('');
+  const [equipmentModal, setEquipmentModal] = useState(null);// { id?, name, status, icon, category }
+  const [equipmentError, setEquipmentError] = useState('');
+  const [scheduleModal, setScheduleModal] = useState(null);  // { equipmentId, scheduleId?, equipmentName, task_name, cadence, next_due }
+  const [scheduleError, setScheduleError] = useState('');
+  const [logModal, setLogModal] = useState(null);            // { equipmentId, equipmentName, kind, notes }
+  const [logError, setLogError] = useState('');
+
+  // Delete confirms (one shared sentinel keeps the JSX simple).
+  const [deleteTarget, setDeleteTarget] = useState(null);    // { kind: 'equipment'|'schedule'|'category', record }
+
+  // History + upcoming drawers.
+  const [historyDrawer, setHistoryDrawer] = useState(null);  // { title, subtitle, rows, loading }
+  const [upcomingOpen, setUpcomingOpen] = useState(false);
 
   const refreshCategories = useCallback(async () => {
     try {
@@ -134,171 +184,286 @@ const KitchenEquipment = ({ onNavigate, user }) => {
     }
   };
 
-  const handleLogAction = async (equipment, kind) => {
-    const notes = window.prompt(`Notes for ${equipment.name} (${kind})`, '');
-    if (notes == null) return;
+  // ---- Build error detail string for backend ValidationError payloads. ----
+  const buildErrorDetail = (err) =>
+    err?.data
+      ? Object.entries(err.data)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+          .join(' \u2022 ')
+      : (err?.message || 'Save failed.');
+
+  // ---- Log Action (kind + notes) ----
+  const handleLogAction = (equipment, kind) => {
+    setLogError('');
+    setLogModal({
+      equipmentId: equipment.id,
+      equipmentName: equipment.name,
+      kind,
+      notes: '',
+    });
+  };
+
+  const submitLog = async () => {
+    if (!logModal) return;
     try {
-      await equipmentService.addEquipmentLog(equipment.id, { kind, notes });
+      await equipmentService.addEquipmentLog(logModal.equipmentId, {
+        kind: logModal.kind,
+        notes: logModal.notes || '',
+      });
+      setLogModal(null);
       await refreshEquipment();
     } catch (err) {
-      console.error(`Failed to log ${kind} event:`, err);
+      setLogError(buildErrorDetail(err));
+      throw err;
     }
   };
 
-  const handleViewHistory = async (equipment) => {
+  // ---- Equipment History drawer ----
+  const handleViewHistory = async (eq) => {
+    setHistoryDrawer({
+      title: 'Maintenance History',
+      subtitle: eq.name,
+      rows: [],
+      loading: true,
+    });
     try {
-      const res = await equipmentService.getEquipmentLogs(equipment.id);
-      const rows = res.results || res || [];
-      const preview = rows.slice(0, 10).map((log) => {
-        const when = log.performed_at ? new Date(log.performed_at).toLocaleString('en-US') : 'Unknown time';
-        return `${log.kind}: ${log.notes || 'No notes'} (${when})`;
+      const res = await equipmentService.getEquipmentLogs(eq.id);
+      const rows = (res.results || res || []).slice(0, 50).map((log) => ({
+        id: log.id ?? `${log.kind}-${log.performed_at}`,
+        primary: (log.kind || 'event').charAt(0).toUpperCase() + (log.kind || 'event').slice(1),
+        secondary: log.notes || 'No notes',
+        timestamp: log.performed_at
+          ? new Date(log.performed_at).toLocaleString('en-US', {
+              month: 'short', day: 'numeric',
+              hour: 'numeric', minute: '2-digit',
+            })
+          : '',
+        kind: log.kind || 'history',
+      }));
+      setHistoryDrawer({
+        title: 'Maintenance History',
+        subtitle: eq.name,
+        rows,
+        loading: false,
       });
-      window.alert(preview.length ? preview.join('\n') : 'No maintenance history yet.');
     } catch (err) {
       console.error('Failed to load maintenance history:', err);
+      setHistoryDrawer({
+        title: 'Maintenance History',
+        subtitle: eq.name,
+        rows: [],
+        loading: false,
+      });
     }
   };
 
-  const handleViewUpcomingTasks = () => {
-    const preview = equipment
+  // Upcoming tasks across this category — read-only drawer.
+  const upcomingRows = useMemo(
+    () => equipment
       .filter((item) => item.schedule)
-      .slice(0, 10)
-      .map((item) => `${item.name}: ${item.schedule.task} (${item.schedule.cadence}) due ${item.schedule.date}`);
-    window.alert(preview.length ? preview.join('\n') : 'No upcoming maintenance schedules in this category.');
+      .map((item) => ({
+        id: item.schedule.id,
+        primary: item.name,
+        secondary: `${item.schedule.task} (${item.schedule.cadence})`,
+        timestamp: item.schedule.date,
+        kind: item.schedule.urgency === 'overdue' ? 'critical' : 'maintenance',
+      })),
+    [equipment]
+  );
+
+  // ---- Category modal (add OR edit) ----
+  const openAddCategory = () => {
+    setCategoryError('');
+    setCategoryModal({ label: '', slug: '', emoji: '🔧' });
   };
 
-  const handleAddCategory = async () => {
-    const label = window.prompt('Category label');
-    if (!label?.trim()) return;
-    const slugDefault = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
-    const slug = window.prompt('Category slug', slugDefault);
-    if (!slug?.trim()) return;
-    const emoji = window.prompt('Category emoji', '🔧') || '🔧';
+  const submitCategory = async () => {
+    if (!categoryModal) return;
+    const { id, label, slug, emoji } = categoryModal;
+    if (!label.trim() || !slug.trim()) {
+      setCategoryError('Label and slug are required.');
+      throw new Error('Missing fields');
+    }
     try {
-      await equipmentService.createCategory({
-        label: label.trim(),
-        slug: slug.trim().toLowerCase(),
-        emoji: emoji.trim(),
-        order: categoriesRaw.length,
-      });
+      if (id) {
+        await equipmentService.updateCategory(id, {
+          label: label.trim(),
+          slug: slug.trim().toLowerCase(),
+          emoji: emoji?.trim() || '🔧',
+        });
+      } else {
+        await equipmentService.createCategory({
+          label: label.trim(),
+          slug: slug.trim().toLowerCase(),
+          emoji: emoji?.trim() || '🔧',
+          order: categoriesRaw.length,
+        });
+        setActiveCategory(slug.trim().toLowerCase());
+      }
+      setCategoryModal(null);
       await refreshCategories();
-      setActiveCategory(slug.trim().toLowerCase());
     } catch (err) {
-      console.error('Failed to create equipment category:', err);
+      setCategoryError(buildErrorDetail(err));
+      throw err;
     }
   };
 
-  const handleAddEquipment = async () => {
+  // Auto-derive slug from label while it's blank or matches the previous derived slug.
+  const onCategoryLabelChange = (v) => {
+    setCategoryModal((m) => {
+      if (!m) return m;
+      const derived = v.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+      const slugWasDerived = !m.slug || m.slug === m.label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+      return { ...m, label: v, slug: slugWasDerived ? derived : m.slug };
+    });
+  };
+
+  // ---- Equipment modal (add OR edit) ----
+  const openAddEquipment = () => {
     if (!activeCategoryRow) return;
-    const name = window.prompt(`Equipment name for ${activeCategoryRow.label}`);
-    if (!name?.trim()) return;
-    const status = window.prompt('Status (ok, needs_attention, down)', 'ok');
-    if (!status?.trim()) return;
-    const icon = window.prompt('Icon key (flame or beef)', 'flame') || 'flame';
+    setEquipmentError('');
+    setEquipmentModal({
+      name: '',
+      status: 'ok',
+      icon: 'flame',
+      category: activeCategoryRow.id,
+    });
+  };
+
+  const openEditEquipment = (eq) => {
+    setEquipmentError('');
+    setEquipmentModal({
+      id: eq.id,
+      name: eq.name,
+      // eq.status from the mapped UI shape is uppercase with spaces; convert back to slug.
+      status: (eq.status || 'OK').toLowerCase().replace(/ /g, '_'),
+      icon: eq.icon || 'flame',
+      category: activeCategoryRow?.id,
+    });
+  };
+
+  const submitEquipment = async () => {
+    if (!equipmentModal) return;
+    const { id, name, status, icon, category } = equipmentModal;
+    if (!name.trim()) {
+      setEquipmentError('Equipment name is required.');
+      throw new Error('Missing name');
+    }
     try {
-      await equipmentService.createEquipment({
-        category: activeCategoryRow.id,
-        name: name.trim(),
-        status: status.trim().toLowerCase(),
-        icon: icon.trim().toLowerCase(),
-      });
+      if (id) {
+        await equipmentService.updateEquipment(id, {
+          name: name.trim(), status, icon,
+        });
+      } else {
+        await equipmentService.createEquipment({
+          category, name: name.trim(), status, icon,
+        });
+      }
+      setEquipmentModal(null);
       await Promise.all([refreshCategories(), refreshEquipment()]);
     } catch (err) {
-      console.error('Failed to create equipment:', err);
+      setEquipmentError(buildErrorDetail(err));
+      throw err;
     }
   };
 
-  const handleManageEquipment = async () => {
-    const action = window.prompt('Type add, edit, or delete equipment', 'add');
-    if (!action) return;
-    const choice = action.trim().toLowerCase();
-    if (choice === 'add') {
-      await handleAddEquipment();
-      return;
+  // ---- Schedule modal (add OR edit) ----
+  const openAddSchedule = (eq) => {
+    setScheduleError('');
+    setScheduleModal({
+      equipmentId: eq.id,
+      equipmentName: eq.name,
+      task_name: '',
+      cadence: 'weekly',
+      next_due: '',
+    });
+  };
+
+  const openEditSchedule = (eq) => {
+    if (!eq.schedule) return;
+    setScheduleError('');
+    setScheduleModal({
+      equipmentId: eq.id,
+      equipmentName: eq.name,
+      scheduleId: eq.schedule.id,
+      task_name: eq.schedule.task || '',
+      cadence: eq.schedule.cadence || 'weekly',
+      next_due: eq.schedule.next_due || eq.schedule.date || '',
+    });
+  };
+
+  const submitSchedule = async () => {
+    if (!scheduleModal) return;
+    const { equipmentId, scheduleId, task_name, cadence, next_due } = scheduleModal;
+    if (!task_name.trim() || !next_due.trim()) {
+      setScheduleError('Task and next-due date are required.');
+      throw new Error('Missing fields');
     }
-    if (!equipment.length) return;
-
-    const name = window.prompt(
-      `Which equipment?\n${equipment.map((item) => item.name).join('\n')}`,
-      equipment[0]?.name || ''
-    );
-    if (!name?.trim()) return;
-    const target = equipment.find((item) => item.name.toLowerCase() === name.trim().toLowerCase());
-    if (!target) return;
-
     try {
-      if (choice === 'delete') {
-        const confirmed = window.confirm(`Delete "${target.name}"?`);
-        if (!confirmed) return;
-        await equipmentService.removeEquipment(target.id);
-        await Promise.all([refreshCategories(), refreshEquipment()]);
-        return;
+      if (scheduleId) {
+        await equipmentService.updateEquipmentSchedule(scheduleId, {
+          task_name: task_name.trim(), cadence, next_due,
+        });
+      } else {
+        await equipmentService.createEquipmentSchedule(equipmentId, {
+          task_name: task_name.trim(), cadence, next_due,
+        });
       }
-
-      if (choice !== 'edit') return;
-      const nextName = window.prompt('Equipment name', target.name);
-      if (!nextName?.trim()) return;
-      const nextStatus = window.prompt('Status (ok, needs_attention, down)', target.status.toLowerCase().replace(/ /g, '_'));
-      if (!nextStatus?.trim()) return;
-      await equipmentService.updateEquipment(target.id, {
-        name: nextName.trim(),
-        status: nextStatus.trim().toLowerCase(),
-      });
+      setScheduleModal(null);
       await refreshEquipment();
     } catch (err) {
-      console.error('Failed to manage equipment:', err);
+      setScheduleError(buildErrorDetail(err));
+      throw err;
     }
   };
 
-  const handleAddSchedule = async (equipmentItem) => {
-    const taskName = window.prompt(`Maintenance task for ${equipmentItem.name}`);
-    if (!taskName?.trim()) return;
-    const cadence = window.prompt('Cadence (daily, weekly, monthly, quarterly, yearly)', 'weekly');
-    if (!cadence?.trim()) return;
-    const nextDue = window.prompt('Next due date (YYYY-MM-DD)');
-    if (!nextDue?.trim()) return;
+  // ---- Delete confirms (equipment + schedule) ----
+  const performDelete = async () => {
+    if (!deleteTarget) return;
+    const { kind, record } = deleteTarget;
     try {
-      await equipmentService.createEquipmentSchedule(equipmentItem.id, {
-        task_name: taskName.trim(),
-        cadence: cadence.trim().toLowerCase(),
-        next_due: nextDue.trim(),
-      });
-      await refreshEquipment();
+      if (kind === 'equipment') {
+        await equipmentService.removeEquipment(record.id);
+        await Promise.all([refreshCategories(), refreshEquipment()]);
+      } else if (kind === 'schedule') {
+        await equipmentService.deleteEquipmentSchedule(record.schedule.id);
+        await refreshEquipment();
+      }
     } catch (err) {
-      console.error('Failed to create equipment schedule:', err);
+      console.error('Delete failed:', err);
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
-  const handleEditSchedule = async (equipmentItem) => {
-    if (!equipmentItem.schedule) return;
-    const taskName = window.prompt('Maintenance task', equipmentItem.schedule.task);
-    if (!taskName?.trim()) return;
-    const cadence = window.prompt('Cadence', equipmentItem.schedule.cadence);
-    if (!cadence?.trim()) return;
-    const nextDue = window.prompt('Next due date (YYYY-MM-DD)', equipmentItem.schedule.next_due || '');
-    if (!nextDue?.trim()) return;
-    try {
-      await equipmentService.updateEquipmentSchedule(equipmentItem.schedule.id, {
-        task_name: taskName.trim(),
-        cadence: cadence.trim().toLowerCase(),
-        next_due: nextDue.trim(),
+  // Build the per-card ActionMenu items.
+  const cardActions = (eq) => {
+    const items = [
+      { label: 'View History', onClick: () => handleViewHistory(eq) },
+      { label: 'Log Maintenance', onClick: () => handleLogAction(eq, 'maintenance') },
+      { label: 'Log Cleaning',    onClick: () => handleLogAction(eq, 'cleaning') },
+      { label: 'Log Issue',       onClick: () => handleLogAction(eq, 'issue') },
+    ];
+    if (canManage) {
+      items.push({ divider: true });
+      items.push({ label: 'Edit Equipment', onClick: () => openEditEquipment(eq) });
+      if (eq.schedule) {
+        items.push({ label: 'Edit Schedule', onClick: () => openEditSchedule(eq) });
+        items.push({
+          label: 'Delete Schedule',
+          destructive: true,
+          onClick: () => setDeleteTarget({ kind: 'schedule', record: eq }),
+        });
+      } else {
+        items.push({ label: 'Add Schedule', onClick: () => openAddSchedule(eq) });
+      }
+      items.push({
+        label: 'Delete Equipment',
+        destructive: true,
+        onClick: () => setDeleteTarget({ kind: 'equipment', record: eq }),
       });
-      await refreshEquipment();
-    } catch (err) {
-      console.error('Failed to update equipment schedule:', err);
     }
-  };
-
-  const handleDeleteSchedule = async (equipmentItem) => {
-    if (!equipmentItem.schedule) return;
-    const confirmed = window.confirm(`Delete the maintenance schedule for ${equipmentItem.name}?`);
-    if (!confirmed) return;
-    try {
-      await equipmentService.deleteEquipmentSchedule(equipmentItem.schedule.id);
-      await refreshEquipment();
-    } catch (err) {
-      console.error('Failed to delete equipment schedule:', err);
-    }
+    return items;
   };
 
   return (
@@ -363,13 +528,15 @@ const KitchenEquipment = ({ onNavigate, user }) => {
             </div>
           </div>
           <div className="ke-toolbar-actions">
-            <button type="button" className="ke-toolbar-btn" aria-label="Upcoming tasks" onClick={handleViewUpcomingTasks}>
+            <button type="button" className="ke-toolbar-btn" aria-label="Upcoming tasks" onClick={() => setUpcomingOpen(true)}>
               <IconCalendarDays className="ke-toolbar-btn-icon" />
               <span className="ke-badge">{upcomingCount}</span>
             </button>
-            <button type="button" className="ke-toolbar-btn" aria-label="Manage equipment" onClick={handleManageEquipment}>
-              <IconSettings className="ke-toolbar-btn-icon" />
-            </button>
+            {canManage && (
+              <button type="button" className="ke-toolbar-btn" aria-label="Add equipment" onClick={openAddEquipment} disabled={!activeCategoryRow}>
+                <IconPlus className="ke-toolbar-btn-icon" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -388,10 +555,12 @@ const KitchenEquipment = ({ onNavigate, user }) => {
                 <span className="ke-cat-count">{c.count}</span>
               </button>
             ))}
-            <button type="button" className="ke-cat ke-cat-add" onClick={handleAddCategory}>
-              <IconPlus className="ke-cat-add-icon" />
-              <span>Add</span>
-            </button>
+            {canManage && (
+              <button type="button" className="ke-cat ke-cat-add" onClick={openAddCategory}>
+                <IconPlus className="ke-cat-add-icon" />
+                <span>Add</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -401,9 +570,11 @@ const KitchenEquipment = ({ onNavigate, user }) => {
             <div className="ke-empty">
               <p className="ke-empty-title">No equipment in this category yet</p>
               <p className="ke-empty-sub">Add equipment to start tracking maintenance and cleaning.</p>
-              <button type="button" className="ke-action ke-action-amber" onClick={handleAddEquipment}>
-                <IconPlus className="ke-action-icon" /> <span>Add Equipment</span>
-              </button>
+              {canManage && (
+                <button type="button" className="ke-action ke-action-amber" onClick={openAddEquipment}>
+                  <IconPlus className="ke-action-icon" /> <span>Add Equipment</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="ke-grid">
@@ -417,6 +588,21 @@ const KitchenEquipment = ({ onNavigate, user }) => {
                       <h3 className="ke-card-name">{eq.name}</h3>
                     </div>
                     <span className="ke-status-pill">{eq.status}</span>
+                    <div onClick={(e) => e.stopPropagation()} style={{ marginLeft: 4 }}>
+                      <ActionMenu
+                        align="right"
+                        actions={cardActions(eq)}
+                        trigger={(
+                          <button
+                            type="button"
+                            className="ke-schedule-mini"
+                            aria-label={`More actions for ${eq.name}`}
+                          >
+                            <IconSettings className="ke-schedule-mini-icon" />
+                          </button>
+                        )}
+                      />
+                    </div>
                   </div>
 
                   {eq.schedule ? (
@@ -432,19 +618,28 @@ const KitchenEquipment = ({ onNavigate, user }) => {
                           <span className="ke-schedule-urgency">{eq.schedule.urgency}</span>
                         </div>
                         <div className="ke-schedule-actions">
-                          <button className="ke-schedule-mini" type="button" aria-label="Edit" onClick={() => handleEditSchedule(eq)}>
-                            <IconPencil className="ke-schedule-mini-icon" />
-                          </button>
-                          <button className="ke-schedule-mini ke-schedule-mini-delete" type="button" aria-label="Delete" onClick={() => handleDeleteSchedule(eq)}>
-                            <IconTrash className="ke-schedule-mini-icon" />
-                          </button>
+                          {canManage && (
+                            <>
+                              <button className="ke-schedule-mini" type="button" aria-label="Edit" onClick={() => openEditSchedule(eq)}>
+                                <IconPencil className="ke-schedule-mini-icon" />
+                              </button>
+                              <button
+                                className="ke-schedule-mini ke-schedule-mini-delete"
+                                type="button"
+                                aria-label="Delete"
+                                onClick={() => setDeleteTarget({ kind: 'schedule', record: eq })}
+                              >
+                                <IconTrash className="ke-schedule-mini-icon" />
+                              </button>
+                            </>
+                          )}
                           <button className="ke-schedule-done" type="button" onClick={() => handleCompleteSchedule(eq.schedule.id)}>Done</button>
                         </div>
                       </div>
                     </div>
-                  ) : (
-                    <button type="button" className="ke-no-schedule" onClick={() => handleAddSchedule(eq)}>Add maintenance schedule</button>
-                  )}
+                  ) : canManage ? (
+                    <button type="button" className="ke-no-schedule" onClick={() => openAddSchedule(eq)}>Add maintenance schedule</button>
+                  ) : null}
 
                   <div className="ke-card-actions">
                     <button type="button" className="ke-action ke-action-gray" aria-label="View history" onClick={() => handleViewHistory(eq)}>
@@ -466,6 +661,180 @@ const KitchenEquipment = ({ onNavigate, user }) => {
           )}
         </div>
       </div>
+
+      {/* ---- Add/Edit Category modal ---- */}
+      <FormModal
+        isOpen={!!categoryModal}
+        title={categoryModal?.id ? 'Edit Category' : 'Add Category'}
+        submitLabel={categoryModal?.id ? 'Save' : 'Add Category'}
+        size="sm"
+        onClose={() => setCategoryModal(null)}
+        onSubmit={submitCategory}
+        submitDisabled={!categoryModal?.label?.trim() || !categoryModal?.slug?.trim()}
+        errorMessage={categoryError}
+      >
+        <TextField
+          label="Label"
+          value={categoryModal?.label || ''}
+          onChange={onCategoryLabelChange}
+          placeholder="e.g. Cooking"
+          required
+          autoFocus
+        />
+        <TextField
+          label="Slug"
+          value={categoryModal?.slug || ''}
+          onChange={(v) => setCategoryModal((m) => m && ({ ...m, slug: v.toLowerCase().replace(/[^a-z0-9]+/g, '_') }))}
+          placeholder="e.g. cooking"
+          required
+          help="Lowercase, underscores only. Auto-derived from the label."
+        />
+        <TextField
+          label="Emoji"
+          value={categoryModal?.emoji || ''}
+          onChange={(v) => setCategoryModal((m) => m && ({ ...m, emoji: v }))}
+          placeholder="🔧"
+        />
+      </FormModal>
+
+      {/* ---- Add/Edit Equipment modal ---- */}
+      <FormModal
+        isOpen={!!equipmentModal}
+        title={equipmentModal?.id ? 'Edit Equipment' : 'Add Equipment'}
+        submitLabel={equipmentModal?.id ? 'Save' : 'Add Equipment'}
+        size="sm"
+        onClose={() => setEquipmentModal(null)}
+        onSubmit={submitEquipment}
+        submitDisabled={!equipmentModal?.name?.trim()}
+        errorMessage={equipmentError}
+      >
+        <TextField
+          label="Name"
+          value={equipmentModal?.name || ''}
+          onChange={(v) => setEquipmentModal((m) => m && ({ ...m, name: v }))}
+          placeholder="e.g. Pizza Oven 1"
+          required
+          autoFocus
+        />
+        <SelectField
+          label="Status"
+          value={equipmentModal?.status || 'ok'}
+          onChange={(v) => setEquipmentModal((m) => m && ({ ...m, status: v }))}
+          options={STATUS_OPTIONS}
+          required
+        />
+        <SelectField
+          label="Icon"
+          value={equipmentModal?.icon || 'flame'}
+          onChange={(v) => setEquipmentModal((m) => m && ({ ...m, icon: v }))}
+          options={ICON_OPTIONS}
+        />
+      </FormModal>
+
+      {/* ---- Add/Edit Schedule modal ---- */}
+      <FormModal
+        isOpen={!!scheduleModal}
+        title={scheduleModal?.scheduleId ? 'Edit Maintenance Schedule' : 'Add Maintenance Schedule'}
+        submitLabel={scheduleModal?.scheduleId ? 'Save' : 'Add Schedule'}
+        size="sm"
+        onClose={() => setScheduleModal(null)}
+        onSubmit={submitSchedule}
+        submitDisabled={!scheduleModal?.task_name?.trim() || !scheduleModal?.next_due}
+        errorMessage={scheduleError}
+      >
+        {scheduleModal?.equipmentName && (
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280' }}>
+            For <strong>{scheduleModal.equipmentName}</strong>
+          </p>
+        )}
+        <TextField
+          label="Task Name"
+          value={scheduleModal?.task_name || ''}
+          onChange={(v) => setScheduleModal((m) => m && ({ ...m, task_name: v }))}
+          placeholder="e.g. Replace filter"
+          required
+          autoFocus
+        />
+        <SelectField
+          label="Cadence"
+          value={scheduleModal?.cadence || 'weekly'}
+          onChange={(v) => setScheduleModal((m) => m && ({ ...m, cadence: v }))}
+          options={CADENCE_OPTIONS}
+          required
+        />
+        <TextField
+          label="Next Due"
+          value={scheduleModal?.next_due || ''}
+          onChange={(v) => setScheduleModal((m) => m && ({ ...m, next_due: v }))}
+          placeholder="YYYY-MM-DD"
+          required
+          help="ISO date, e.g. 2026-05-20"
+        />
+      </FormModal>
+
+      {/* ---- Log Action modal ---- */}
+      <FormModal
+        isOpen={!!logModal}
+        title={logModal ? `Log ${logModal.kind.charAt(0).toUpperCase() + logModal.kind.slice(1)}` : ''}
+        submitLabel="Save Log"
+        size="sm"
+        onClose={() => setLogModal(null)}
+        onSubmit={submitLog}
+        errorMessage={logError}
+      >
+        {logModal?.equipmentName && (
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280' }}>
+            For <strong>{logModal.equipmentName}</strong>
+          </p>
+        )}
+        <SelectField
+          label="Kind"
+          value={logModal?.kind || 'maintenance'}
+          onChange={(v) => setLogModal((m) => m && ({ ...m, kind: v }))}
+          options={LOG_KIND_OPTIONS}
+          required
+        />
+        <TextArea
+          label="Notes"
+          value={logModal?.notes || ''}
+          onChange={(v) => setLogModal((m) => m && ({ ...m, notes: v }))}
+          placeholder="What did you do? (optional)"
+          rows={4}
+        />
+      </FormModal>
+
+      {/* ---- Delete confirm (shared for equipment + schedule) ---- */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title={deleteTarget?.kind === 'schedule' ? 'Delete maintenance schedule?' : 'Delete this equipment?'}
+        message={deleteTarget?.kind === 'schedule'
+          ? `The maintenance schedule for “${deleteTarget?.record?.name || ''}” will be permanently removed.`
+          : `“${deleteTarget?.record?.name || ''}” and all its history will be archived. This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={performDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
+
+      {/* ---- History drawer ---- */}
+      <HistoryDrawer
+        isOpen={!!historyDrawer}
+        title={historyDrawer?.title || 'History'}
+        subtitle={historyDrawer?.subtitle || ''}
+        rows={historyDrawer?.loading ? [] : (historyDrawer?.rows || [])}
+        emptyMessage={historyDrawer?.loading ? 'Loading history…' : 'No maintenance history yet.'}
+        onClose={() => setHistoryDrawer(null)}
+      />
+
+      {/* ---- Upcoming tasks drawer ---- */}
+      <HistoryDrawer
+        isOpen={upcomingOpen}
+        title="Upcoming Maintenance"
+        subtitle={`${activeCategoryRow?.label || 'All'} — ${upcomingRows.length} scheduled`}
+        rows={upcomingRows}
+        emptyMessage="No upcoming maintenance schedules in this category."
+        onClose={() => setUpcomingOpen(false)}
+      />
     </div>
   );
 };

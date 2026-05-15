@@ -3,6 +3,8 @@ import './SetupSheetTemplates.css'; // banner
 import './KitchenDashboard.css';     // kitchen tabs (kd-nav*)
 import './KitchenAnalytics.css';
 import kitchenService from '../services/kitchen';
+import { isManagerOrAbove } from '../utils/access';
+import { FormModal, NumberField } from './ui';
 
 // Map the UI range label to the backend's range string (e.g. "Last 30 Days" → "30d").
 const rangeToDays = (label) => {
@@ -113,6 +115,7 @@ const LineChart = ({ data, width = 472, height = 280, padL = 50, padR = 5, padT 
 };
 
 const KitchenAnalytics = ({ onNavigate, user }) => {
+  const canManage = isManagerOrAbove(user);
   const [activeSubTab, setActiveSubTab] = useState('overview');
   const [range, setRange] = useState('Last 30 Days');
   const [kpisData, setKpisData] = useState(null);   // {today, this_week, yesterday, top_item}
@@ -120,6 +123,9 @@ const KitchenAnalytics = ({ onNavigate, user }) => {
   const [topItems, setTopItems] = useState([]);
   const [goalsData, setGoalsData] = useState({ daily: 100, weekly: 600, monthly: 2500 });
   const [isLoading, setIsLoading] = useState(true);
+  // Edit Goals FormModal state.
+  const [goalsModal, setGoalsModal] = useState(null); // { daily, weekly, monthly }
+  const [goalsError, setGoalsError] = useState('');
 
   // Load all analytics endpoints whenever the range changes.
   useEffect(() => {
@@ -209,22 +215,35 @@ const KitchenAnalytics = ({ onNavigate, user }) => {
 
   const trendTotal = useMemo(() => trendPoints.reduce((s, p) => s + (p.y || 0), 0), [trendPoints]);
 
-  const handleEditGoals = async () => {
-    const daily = window.prompt('Daily waste goal', String(goalsData.daily || 0));
-    if (daily == null) return;
-    const weekly = window.prompt('Weekly waste goal', String(goalsData.weekly || 0));
-    if (weekly == null) return;
-    const monthly = window.prompt('Monthly waste goal', String(goalsData.monthly || 0));
-    if (monthly == null) return;
+  // Open the Edit Goals FormModal (replaces chained window.prompt calls).
+  const handleEditGoals = () => {
+    if (!canManage) return;
+    setGoalsError('');
+    setGoalsModal({
+      daily: goalsData.daily ?? 0,
+      weekly: goalsData.weekly ?? 0,
+      monthly: goalsData.monthly ?? 0,
+    });
+  };
+
+  const submitGoals = async () => {
+    if (!goalsModal) return;
     try {
       const updated = await kitchenService.updateGoals({
-        daily: Number(daily),
-        weekly: Number(weekly),
-        monthly: Number(monthly),
+        daily: Number(goalsModal.daily),
+        weekly: Number(goalsModal.weekly),
+        monthly: Number(goalsModal.monthly),
       });
       setGoalsData(updated);
+      setGoalsModal(null);
     } catch (err) {
-      console.error('Failed to update waste goals:', err);
+      const detail = err?.data
+        ? Object.entries(err.data)
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+            .join(' \u2022 ')
+        : (err?.message || 'Save failed.');
+      setGoalsError(detail);
+      throw err;
     }
   };
 
@@ -305,9 +324,11 @@ const KitchenAnalytics = ({ onNavigate, user }) => {
               </div>
               <h3 className="ka-goals-title">Waste Reduction Goals</h3>
             </div>
-            <button className="ka-goals-edit" type="button" aria-label="Edit goals" onClick={handleEditGoals}>
-              <IconPenLine className="ka-goals-edit-icon" />
-            </button>
+            {canManage && (
+              <button className="ka-goals-edit" type="button" aria-label="Edit goals" onClick={handleEditGoals}>
+                <IconPenLine className="ka-goals-edit-icon" />
+              </button>
+            )}
           </div>
 
           <div className="ka-goals-body">
@@ -437,6 +458,43 @@ const KitchenAnalytics = ({ onNavigate, user }) => {
           )}
         </section>
       </div>
+
+      {/* ---- Edit Goals modal ---- */}
+      <FormModal
+        isOpen={!!goalsModal}
+        title="Edit Waste Reduction Goals"
+        submitLabel="Save Goals"
+        size="sm"
+        onClose={() => setGoalsModal(null)}
+        onSubmit={submitGoals}
+        errorMessage={goalsError}
+      >
+        <NumberField
+          label="Daily Goal ($)"
+          value={goalsModal?.daily ?? ''}
+          onChange={(v) => setGoalsModal((m) => m && ({ ...m, daily: v }))}
+          placeholder="e.g. 100"
+          step="1"
+          required
+          autoFocus
+        />
+        <NumberField
+          label="Weekly Goal ($)"
+          value={goalsModal?.weekly ?? ''}
+          onChange={(v) => setGoalsModal((m) => m && ({ ...m, weekly: v }))}
+          placeholder="e.g. 600"
+          step="1"
+          required
+        />
+        <NumberField
+          label="Monthly Goal ($)"
+          value={goalsModal?.monthly ?? ''}
+          onChange={(v) => setGoalsModal((m) => m && ({ ...m, monthly: v }))}
+          placeholder="e.g. 2500"
+          step="1"
+          required
+        />
+      </FormModal>
     </div>
   );
 };

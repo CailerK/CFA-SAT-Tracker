@@ -3,6 +3,11 @@ import kitchenService from '../services/kitchen';
 import './SetupSheetTemplates.css'; // banner
 import './KitchenDashboard.css';     // kitchen nav
 import './KitchenWasteTracker.css';
+import { isManagerOrAbove } from '../utils/access';
+import {
+  ActionMenu, ConfirmDialog, FormModal,
+  TextField, NumberField, SelectField, DatePicker,
+} from './ui';
 
 // ===== Icons =====
 const IconLayoutDashboard = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>);
@@ -50,11 +55,27 @@ const normalizeEntry = (raw) => ({
   menuItemId: raw.menu_item,
 });
 
+// Format a yyyy-mm-dd string into 'Today' / 'Yesterday' / 'Apr 18'.
+const formatDateChip = (iso) => {
+  if (!iso) return 'Today';
+  const today = new Date();
+  const todayIso = today.toISOString().slice(0, 10);
+  if (iso === todayIso) return 'Today';
+  const y = new Date(today); y.setDate(y.getDate() - 1);
+  if (iso === y.toISOString().slice(0, 10)) return 'Yesterday';
+  try {
+    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch { return iso; }
+};
+
 const KitchenWasteTracker = ({ onNavigate, user }) => {
+  const canManage = isManagerOrAbove(user);
   const [mode, setMode] = useState('waste'); // waste | donations
   const [activeMeal, setActiveMeal] = useState('lunch');
   const [selectedReason, setSelectedReason] = useState(null);
   const [entries, setEntries] = useState([]);
+  // ISO yyyy-mm-dd — controls which day's entries we show.
+  const [entriesDate, setEntriesDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [customName, setCustomName] = useState('');
   const [customQty, setCustomQty] = useState('');
   const [customPrice, setCustomPrice] = useState('');
@@ -64,30 +85,43 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
   const [mealPeriodsRaw, setMealPeriodsRaw] = useState([]);
   const [reasonsRaw, setReasonsRaw] = useState([]);
 
+  // ---- Modal state ----
+  const [itemsManagerOpen, setItemsManagerOpen] = useState(false);
+  const [itemModal, setItemModal] = useState(null);   // { id?, meal_period, name, emoji, unit_price }
+  const [itemError, setItemError] = useState('');
+  const [bulkModal, setBulkModal] = useState(null);   // { rows: [{ menu_item, qty }] }
+  const [bulkError, setBulkError] = useState('');
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [deleteItem, setDeleteItem] = useState(null); // menu item record
+  const [notImplemented, setNotImplemented] = useState(null);
+
   // Load menu items for the active meal whenever it changes.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await kitchenService.listMenuItems({ meal: activeMeal });
-        if (!cancelled) setMenuItemsRaw(res.results || res || []);
-      } catch (err) {
-        console.error('Failed to load menu items:', err);
-      }
-    })();
-    return () => { cancelled = true; };
+  const refreshMenuItems = useCallback(async () => {
+    try {
+      const res = await kitchenService.listMenuItems({ meal: activeMeal });
+      setMenuItemsRaw(res.results || res || []);
+    } catch (err) {
+      console.error('Failed to load menu items:', err);
+    }
   }, [activeMeal]);
 
-  // Load reasons + today's entries on mount.
+  useEffect(() => { refreshMenuItems(); }, [refreshMenuItems]);
+
+  // Load entries for the selected date.
+  const todayIso = new Date().toISOString().slice(0, 10);
   const refreshEntries = useCallback(async () => {
     try {
-      const res = await kitchenService.listEntries({ date: 'today' });
+      // Backend accepts 'today' or an ISO yyyy-mm-dd string.
+      const dateParam = entriesDate === todayIso ? 'today' : entriesDate;
+      const res = await kitchenService.listEntries({ date: dateParam });
       const rows = res.results || res || [];
       setEntries(rows.map(normalizeEntry));
     } catch (err) {
       console.error('Failed to load waste entries:', err);
     }
-  }, []);
+  }, [entriesDate, todayIso]);
+
+  useEffect(() => { refreshEntries(); }, [refreshEntries]);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,12 +137,10 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
         }
       } catch (err) {
         console.error('Failed to load waste reasons:', err);
-      } finally {
-        await refreshEntries();
       }
     })();
     return () => { cancelled = true; };
-  }, [refreshEntries]);
+  }, []);
 
   const tabs = [
     { id: 'home', label: 'Home', Icon: IconLayoutDashboard },
@@ -144,6 +176,25 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
     [menuItemsRaw]
   );
   const totalWaste = useMemo(() => entries.reduce((s, e) => s + e.qty * e.price, 0), [entries]);
+
+  // Top item across the currently-displayed day's entries (replaces hardcoded
+  // "Filet / 12:15 PM"). Sums dollars by item name and keeps the latest time.
+  const mostWasted = useMemo(() => {
+    if (!entries.length) return null;
+    const byName = new Map();
+    for (const e of entries) {
+      const prev = byName.get(e.name) || { name: e.name, total: 0, time: e.time };
+      prev.total += e.qty * e.price;
+      // entries come back newest-first from the backend, so the first time we
+      // see a name has the most recent timestamp.
+      byName.set(e.name, prev);
+    }
+    let best = null;
+    for (const row of byName.values()) {
+      if (!best || row.total > best.total) best = row;
+    }
+    return best;
+  }, [entries]);
 
   // Tap a menu tile → POST a new waste entry with qty 1 and the selected reason.
   const handleItemTap = async (item) => {
@@ -209,10 +260,109 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
       setCustomQty('');
       setCustomPrice('');
       await refreshEntries();
-      const res = await kitchenService.listMenuItems({ meal: activeMeal });
-      setMenuItemsRaw(res.results || res || []);
+      await refreshMenuItems();
     } catch (err) {
       console.error('Failed to create custom waste entry:', err);
+    }
+  };
+
+  const buildErrorDetail = (err) =>
+    err?.data
+      ? Object.entries(err.data)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+          .join(' \u2022 ')
+      : (err?.message || 'Save failed.');
+
+  // ---- Items Manager (⚙️ Items + 💲 Prices both open this) ----
+  const openAddItem = () => {
+    setItemError('');
+    const meal = mealPeriodsRaw.find((m) => m.slug === activeMeal);
+    setItemModal({
+      meal_period: meal?.id || mealPeriodsRaw[0]?.id || null,
+      name: '',
+      emoji: '📝',
+      unit_price: '',
+    });
+  };
+
+  const openEditItem = (item) => {
+    setItemError('');
+    setItemModal({
+      id: item.id,
+      meal_period: item.meal_period,
+      name: item.name,
+      emoji: item.emoji || '',
+      unit_price: item.unit_price ?? '',
+    });
+  };
+
+  const submitItem = async () => {
+    if (!itemModal) return;
+    const { id, meal_period, name, emoji, unit_price } = itemModal;
+    if (!name.trim() || unit_price === '' || unit_price == null) {
+      setItemError('Name and price are required.');
+      throw new Error('Missing fields');
+    }
+    try {
+      const payload = {
+        meal_period, name: name.trim(),
+        emoji: emoji || '📝',
+        unit_price: Number(unit_price),
+      };
+      if (id) {
+        await kitchenService.updateMenuItem(id, payload);
+      } else {
+        await kitchenService.createMenuItem(payload);
+      }
+      setItemModal(null);
+      await refreshMenuItems();
+    } catch (err) {
+      setItemError(buildErrorDetail(err));
+      throw err;
+    }
+  };
+
+  const performDeleteItem = async () => {
+    if (!deleteItem) return;
+    try {
+      await kitchenService.deleteMenuItem(deleteItem.id);
+      setDeleteItem(null);
+      await refreshMenuItems();
+    } catch (err) {
+      console.error('Failed to delete menu item:', err);
+      setDeleteItem(null);
+    }
+  };
+
+  // ---- Bulk Entry ----
+  const openBulkEntry = () => {
+    setBulkError('');
+    setBulkModal({
+      rows: menuItems.slice(0, 8).map((m) => ({ menu_item: m.id, qty: '' })),
+    });
+  };
+
+  const submitBulk = async () => {
+    if (!bulkModal) return;
+    const valid = bulkModal.rows.filter((r) => Number(r.qty) > 0);
+    if (!valid.length) {
+      setBulkError('Enter a quantity for at least one item.');
+      throw new Error('No qty');
+    }
+    try {
+      for (const row of valid) {
+        await kitchenService.logEntry({
+          menu_item: row.menu_item,
+          qty: Number(row.qty),
+          unit: 'pieces',
+          reason: selectedReason || null,
+        });
+      }
+      setBulkModal(null);
+      await refreshEntries();
+    } catch (err) {
+      setBulkError(buildErrorDetail(err));
+      throw err;
     }
   };
 
@@ -289,7 +439,7 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
           <div className="kwt-kpi">
             <div className="kwt-kpi-head">
               <span className="kwt-kpi-emoji">💵</span>
-              <span className="kwt-kpi-label">Today's Waste</span>
+              <span className="kwt-kpi-label">{formatDateChip(entriesDate) === 'Today' ? "Today's Waste" : `${formatDateChip(entriesDate)}'s Waste`}</span>
             </div>
             <p className="kwt-kpi-value">${totalWaste.toFixed(2)}</p>
             <p className="kwt-kpi-sub">{entries.length} items logged</p>
@@ -299,19 +449,23 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
               <span className="kwt-kpi-emoji">📦</span>
               <span className="kwt-kpi-label">Most Wasted</span>
             </div>
-            <p className="kwt-kpi-value kwt-kpi-value-sm">Filet</p>
-            <p className="kwt-kpi-sub">Last: 12:15 PM</p>
+            <p className="kwt-kpi-value kwt-kpi-value-sm">{mostWasted?.name || '—'}</p>
+            <p className="kwt-kpi-sub">{mostWasted ? `Last: ${mostWasted.time}` : 'No entries yet'}</p>
           </div>
         </div>
 
         {/* Items / Prices quick actions */}
         <div className="kwt-quick-actions">
-          <button type="button" className="kwt-quick-btn">⚙️ Items</button>
-          <button type="button" className="kwt-quick-btn">💲 Prices</button>
+          {canManage && (
+            <>
+              <button type="button" className="kwt-quick-btn" onClick={() => setItemsManagerOpen(true)}>⚙️ Items</button>
+              <button type="button" className="kwt-quick-btn" onClick={() => setItemsManagerOpen(true)}>💲 Prices</button>
+            </>
+          )}
         </div>
 
         {/* Bulk Entry */}
-        <button type="button" className="kwt-bulk-btn">📝 Bulk Entry</button>
+        <button type="button" className="kwt-bulk-btn" onClick={openBulkEntry} disabled={!menuItems.length}>📝 Bulk Entry</button>
 
         {/* Menu items card */}
         <section className="kwt-items-card">
@@ -367,12 +521,21 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
         <section className="kwt-entries-card">
           <div className="kwt-entries-head">
             <div className="kwt-entries-title-wrap">
-              <p className="kwt-section-label kwt-section-label-inline">Today's Entries</p>
-              <button type="button" className="kwt-date-chip">
-                <IconCalendar className="kwt-date-chip-icon" /> Today
+              <p className="kwt-section-label kwt-section-label-inline">
+                {formatDateChip(entriesDate) === 'Today' ? "Today's Entries" : `Entries for ${formatDateChip(entriesDate)}`}
+              </p>
+              <button type="button" className="kwt-date-chip" onClick={() => setDatePickerOpen(true)}>
+                <IconCalendar className="kwt-date-chip-icon" /> {formatDateChip(entriesDate)}
               </button>
             </div>
-            <button type="button" className="kwt-notes-btn">📝 Notes</button>
+            <button
+              type="button"
+              className="kwt-notes-btn"
+              onClick={() => setNotImplemented({
+                title: 'Notes — coming soon',
+                message: 'Per-day waste notes are on the roadmap. For now, capture context in your shift summary.',
+              })}
+            >📝 Notes</button>
           </div>
           <div className="kwt-entries-list">
             {entries.map((e) => (
@@ -437,6 +600,207 @@ const KitchenWasteTracker = ({ onNavigate, user }) => {
           </div>
         </section>
       </div>
+
+      {/* ---- Items Manager modal ---- */}
+      <FormModal
+        isOpen={itemsManagerOpen}
+        title={`Manage ${activeMeal.charAt(0).toUpperCase() + activeMeal.slice(1)} Menu Items`}
+        submitLabel="Done"
+        size="md"
+        onClose={() => setItemsManagerOpen(false)}
+        onSubmit={async () => { setItemsManagerOpen(false); }}
+      >
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280' }}>
+          Add, rename, or re-price items used to log waste. Switch meal periods with the pills at the top of the page.
+        </p>
+        <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px', maxHeight: 320, overflowY: 'auto' }}>
+          {menuItems.length === 0 ? (
+            <li style={{ padding: 16, textAlign: 'center', color: '#6b7280' }}>
+              No items yet for {activeMeal}.
+            </li>
+          ) : menuItems.map((item) => (
+            <li
+              key={item.id}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '8px 4px', borderBottom: '1px solid #f3f4f6',
+              }}
+            >
+              <span style={{ fontSize: 20 }}>{item.emoji || '📝'}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>{item.name}</div>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>${item.price.toFixed(2)}</div>
+              </div>
+              <ActionMenu
+                align="right"
+                actions={[
+                  { label: 'Edit', onClick: () => openEditItem(menuItemsRaw.find((m) => m.id === item.id)) },
+                  { divider: true },
+                  { label: 'Delete', destructive: true, onClick: () => setDeleteItem(menuItemsRaw.find((m) => m.id === item.id)) },
+                ]}
+                trigger={(
+                  <button
+                    type="button"
+                    style={{ background: 'transparent', border: 0, padding: 6, cursor: 'pointer', color: '#6b7280' }}
+                    aria-label={`More actions for ${item.name}`}
+                  >
+                    ⋮
+                  </button>
+                )}
+              />
+            </li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          onClick={openAddItem}
+          style={{
+            width: '100%', padding: '10px 12px', borderRadius: 8,
+            border: '1px dashed #d1d5db', background: '#fff',
+            color: '#374151', fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          + Add new item
+        </button>
+      </FormModal>
+
+      {/* ---- Add/Edit Item modal ---- */}
+      <FormModal
+        isOpen={!!itemModal}
+        title={itemModal?.id ? 'Edit Menu Item' : 'Add Menu Item'}
+        submitLabel={itemModal?.id ? 'Save' : 'Add Item'}
+        size="sm"
+        onClose={() => setItemModal(null)}
+        onSubmit={submitItem}
+        submitDisabled={!itemModal?.name?.trim() || itemModal?.unit_price === '' || itemModal?.unit_price == null}
+        errorMessage={itemError}
+      >
+        <SelectField
+          label="Meal Period"
+          value={itemModal?.meal_period || ''}
+          onChange={(v) => setItemModal((m) => m && ({ ...m, meal_period: Number(v) }))}
+          options={mealPeriodsRaw.map((m) => ({ value: m.id, label: m.label }))}
+          required
+        />
+        <TextField
+          label="Name"
+          value={itemModal?.name || ''}
+          onChange={(v) => setItemModal((m) => m && ({ ...m, name: v }))}
+          placeholder="e.g. Spicy Filet"
+          required
+          autoFocus
+        />
+        <TextField
+          label="Emoji"
+          value={itemModal?.emoji || ''}
+          onChange={(v) => setItemModal((m) => m && ({ ...m, emoji: v }))}
+          placeholder="📝"
+        />
+        <NumberField
+          label="Unit Price ($)"
+          value={itemModal?.unit_price ?? ''}
+          onChange={(v) => setItemModal((m) => m && ({ ...m, unit_price: v }))}
+          placeholder="e.g. 4.99"
+          step="0.01"
+          required
+        />
+      </FormModal>
+
+      {/* ---- Bulk Entry modal ---- */}
+      <FormModal
+        isOpen={!!bulkModal}
+        title={`Bulk ${mode === 'donations' ? 'Donation' : 'Waste'} Entry`}
+        submitLabel="Log All"
+        size="md"
+        onClose={() => setBulkModal(null)}
+        onSubmit={submitBulk}
+        errorMessage={bulkError}
+      >
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280' }}>
+          Enter quantities for multiple items at once. Leave blank to skip.
+        </p>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 360, overflowY: 'auto' }}>
+          {(bulkModal?.rows || []).map((row, idx) => {
+            const item = menuItems.find((m) => m.id === row.menu_item);
+            if (!item) return null;
+            return (
+              <li
+                key={item.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '8px 4px', borderBottom: '1px solid #f3f4f6',
+                }}
+              >
+                <span style={{ fontSize: 20 }}>{item.emoji || '📝'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>${item.price.toFixed(2)} each</div>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  value={row.qty}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setBulkModal((m) => m && ({
+                      ...m,
+                      rows: m.rows.map((r, i) => i === idx ? { ...r, qty: v } : r),
+                    }));
+                  }}
+                  placeholder="qty"
+                  style={{
+                    width: 80, padding: '6px 8px',
+                    border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14,
+                  }}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      </FormModal>
+
+      {/* ---- Date picker modal ---- */}
+      <FormModal
+        isOpen={datePickerOpen}
+        title="Pick a Date"
+        submitLabel="View Entries"
+        size="sm"
+        onClose={() => setDatePickerOpen(false)}
+        onSubmit={async () => { setDatePickerOpen(false); }}
+      >
+        <DatePicker
+          label="Entries Date"
+          value={entriesDate}
+          onChange={(v) => setEntriesDate(v || todayIso)}
+        />
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#6b7280' }}>
+          Showing waste entries logged on the selected day.
+        </p>
+      </FormModal>
+
+      {/* ---- Delete confirm ---- */}
+      <ConfirmDialog
+        isOpen={!!deleteItem}
+        title="Delete this menu item?"
+        message={deleteItem
+          ? `“${deleteItem.name}” will be archived. Past waste entries for it stay in history.`
+          : ''}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={performDeleteItem}
+        onClose={() => setDeleteItem(null)}
+      />
+
+      {/* ---- Not-implemented sentinel ---- */}
+      <ConfirmDialog
+        isOpen={!!notImplemented}
+        title={notImplemented?.title || ''}
+        message={notImplemented?.message || ''}
+        confirmLabel="Got it"
+        cancelLabel="Close"
+        onConfirm={() => setNotImplemented(null)}
+        onClose={() => setNotImplemented(null)}
+      />
     </div>
   );
 };

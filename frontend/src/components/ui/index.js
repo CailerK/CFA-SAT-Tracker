@@ -8,6 +8,7 @@
 export { default as ActionMenu } from './ActionMenu';
 export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as FormModal } from './FormModal';
+export { default as HistoryDrawer } from './HistoryDrawer';
 export { default as ChipMultiSelect } from './ChipMultiSelect';
 export { default as UserPicker } from './UserPicker';
 export {

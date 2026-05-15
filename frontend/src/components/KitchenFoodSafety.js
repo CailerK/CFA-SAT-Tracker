@@ -1,6 +1,27 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './KitchenFoodSafety.css';
 import equipmentService from '../services/equipment';
+import { isManagerOrAbove } from '../utils/access';
+import {
+  ActionMenu, ConfirmDialog, FormModal, HistoryDrawer,
+  TextField, SelectField, NumberField,
+} from './ui';
+
+const DAYPART_OPTIONS = [
+  { value: 'morning', label: '🌅 Morning' },
+  { value: 'lunch',   label: '☀️ Lunch' },
+  { value: 'dinner',  label: '🌙 Dinner' },
+];
+
+const TEMP_KIND_OPTIONS = [
+  { value: 'equipment', label: 'Equipment' },
+  { value: 'product',   label: 'Product' },
+];
+
+const TEMP_UNIT_OPTIONS = [
+  { value: 'F', label: '°F' },
+  { value: 'C', label: '°C' },
+];
 
 // Normalize backend FoodSafetyTask to {id, text, completed, user, time}.
 const normalizeTask = (raw) => {
@@ -45,11 +66,24 @@ const normalizeTempRow = (raw) => {
 };
 
 const KitchenFoodSafety = ({ onNavigate, user }) => {
+  const canManage = isManagerOrAbove(user);
   const [activeTab, setActiveTab] = useState('safety');
   const [activeTaskTab, setActiveTaskTab] = useState('morning');
   const [activeTempTab, setActiveTempTab] = useState('equipment');
   const [tasksByDaypart, setTasksByDaypart] = useState({ morning: [], lunch: [], dinner: [] });
   const [tempsByKind, setTempsByKind] = useState({ equipment: [], product: [] });
+
+  // ---- Modal state ----
+  const [recordModal, setRecordModal] = useState(null);     // { target, value, unit }
+  const [recordError, setRecordError] = useState('');
+  const [taskModal, setTaskModal] = useState(null);         // { id?, daypart, text }
+  const [taskError, setTaskError] = useState('');
+  const [targetModal, setTargetModal] = useState(null);     // { id?, kind, name, expected_min, expected_max }
+  const [targetError, setTargetError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);   // { kind: 'task'|'target', record }
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyRows, setHistoryRows] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -151,41 +185,201 @@ const KitchenFoodSafety = ({ onNavigate, user }) => {
     }
   };
 
-  const handleRecordTemp = async () => {
-    const targets = temperatureLog[activeTempTab];
+  const buildErrorDetail = (err) =>
+    err?.data
+      ? Object.entries(err.data)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+          .join(' \u2022 ')
+      : (err?.message || 'Save failed.');
+
+  // ---- Record Temperature modal ----
+  const handleRecordTemp = () => {
+    const targets = tempsByKind[activeTempTab];
     if (!targets.length) return;
-    const targetName = window.prompt(
-      `Record a temperature for which ${activeTempTab} item?\n${targets.map((item) => item.name).join('\n')}`
-    );
-    if (!targetName?.trim()) return;
-    const target = targets.find((item) => item.name.toLowerCase() === targetName.trim().toLowerCase());
-    if (!target) return;
-    const value = window.prompt(`Temperature for ${target.name}`);
-    if (value == null || value === '') return;
+    setRecordError('');
+    setRecordModal({
+      target: targets[0].id,
+      value: '',
+      unit: 'F',
+    });
+  };
+
+  const submitRecord = async () => {
+    if (!recordModal) return;
+    const { target, value, unit } = recordModal;
+    if (!target || value === '' || value == null) {
+      setRecordError('Pick a target and enter a value.');
+      throw new Error('Missing fields');
+    }
     try {
-      await equipmentService.logReading({ target: target.id, value: Number(value), unit: 'F' });
+      await equipmentService.logReading({
+        target,
+        value: Number(value),
+        unit: unit || 'F',
+      });
+      setRecordModal(null);
       await refresh();
     } catch (err) {
-      console.error('Failed to record temperature:', err);
+      setRecordError(buildErrorDetail(err));
+      throw err;
     }
   };
 
+  // ---- History drawer (recent temperature readings) ----
   const handleViewHistory = async () => {
+    setHistoryOpen(true);
+    setHistoryLoading(true);
     try {
-      const readings = await equipmentService.listRecentReadings({ kind: activeTempTab, range: '7d' });
-      const rows = readings.results || readings || [];
-      const preview = rows.slice(0, 10).map((reading) => {
-        const targetName = reading.target_name || 'Unknown';
-        const recordedAt = reading.recorded_at
-          ? new Date(reading.recorded_at).toLocaleString('en-US')
-          : 'Unknown time';
-        return `${targetName}: ${reading.value}${reading.unit || 'F'} at ${recordedAt}`;
+      const readings = await equipmentService.listRecentReadings({
+        kind: activeTempTab, range: '7d',
       });
-      window.alert(preview.length ? preview.join('\n') : 'No recent temperature readings.');
+      const rows = (readings.results || readings || []).slice(0, 50).map((reading) => ({
+        id: reading.id ?? `${reading.target_name}-${reading.recorded_at}`,
+        primary: reading.target_name || 'Unknown',
+        secondary: `${reading.value}°${reading.unit || 'F'}`,
+        timestamp: reading.recorded_at
+          ? new Date(reading.recorded_at).toLocaleString('en-US', {
+              month: 'short', day: 'numeric',
+              hour: 'numeric', minute: '2-digit',
+            })
+          : '',
+        kind: reading.status || 'good',
+      }));
+      setHistoryRows(rows);
     } catch (err) {
       console.error('Failed to load temperature history:', err);
+      setHistoryRows([]);
+    } finally {
+      setHistoryLoading(false);
     }
   };
+
+  // ---- Manage Safety Tasks (gear over the left column) ----
+  const openAddTask = () => {
+    setTaskError('');
+    setTaskModal({ daypart: activeTaskTab, text: '', order: 0 });
+  };
+
+  const openEditTask = (task) => {
+    setTaskError('');
+    setTaskModal({
+      id: task.id,
+      daypart: activeTaskTab,
+      text: task.text || '',
+    });
+  };
+
+  const submitTask = async () => {
+    if (!taskModal) return;
+    const { id, daypart, text } = taskModal;
+    if (!text.trim()) {
+      setTaskError('Text is required.');
+      throw new Error('Missing text');
+    }
+    try {
+      if (id) {
+        await equipmentService.updateSafetyTask(id, {
+          daypart, text: text.trim(),
+        });
+      } else {
+        await equipmentService.createSafetyTask({
+          daypart, text: text.trim(),
+          order: (tasksByDaypart[daypart] || []).length,
+        });
+      }
+      setTaskModal(null);
+      if (daypart !== activeTaskTab) setActiveTaskTab(daypart);
+      await refresh();
+    } catch (err) {
+      setTaskError(buildErrorDetail(err));
+      throw err;
+    }
+  };
+
+  // ---- Manage Temperature Targets (gear over the right column) ----
+  const openAddTarget = () => {
+    setTargetError('');
+    setTargetModal({
+      kind: activeTempTab,
+      name: '',
+      expected_min: '',
+      expected_max: '',
+    });
+  };
+
+  const openEditTarget = (target) => {
+    setTargetError('');
+    setTargetModal({
+      id: target.id,
+      kind: activeTempTab,
+      name: target.name || '',
+      // The normalized row only carries strings; pull min/max from the raw row text.
+      expected_min: (target.range || '').split(' - ')[0]?.replace('°F', '') || '',
+      expected_max: (target.range || '').split(' - ')[1]?.replace('°F', '') || '',
+    });
+  };
+
+  const submitTarget = async () => {
+    if (!targetModal) return;
+    const { id, kind, name, expected_min, expected_max } = targetModal;
+    if (!name.trim() || expected_min === '' || expected_max === '') {
+      setTargetError('Name and both expected temperatures are required.');
+      throw new Error('Missing fields');
+    }
+    try {
+      const payload = {
+        kind, name: name.trim(),
+        expected_min: Number(expected_min),
+        expected_max: Number(expected_max),
+      };
+      if (id) {
+        await equipmentService.updateTemperatureTarget(id, payload);
+      } else {
+        await equipmentService.createTemperatureTarget({
+          ...payload,
+          order: (tempsByKind[kind] || []).length,
+        });
+      }
+      setTargetModal(null);
+      if (kind !== activeTempTab) setActiveTempTab(kind);
+      await refresh();
+    } catch (err) {
+      setTargetError(buildErrorDetail(err));
+      throw err;
+    }
+  };
+
+  // ---- Delete confirm (shared) ----
+  const performDelete = async () => {
+    if (!deleteTarget) return;
+    const { kind, record } = deleteTarget;
+    try {
+      if (kind === 'task') {
+        await equipmentService.deleteSafetyTask(record.id);
+      } else if (kind === 'target') {
+        await equipmentService.deleteTemperatureTarget(record.id);
+      }
+      await refresh();
+    } catch (err) {
+      console.error('Delete failed:', err);
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  // Derived subtitles — these used to be hardcoded strings ("0 remaining for morning" /
+  // "14/17 for morning") which lied about real state.
+  const activeTaskSubtitle = useMemo(() => {
+    const list = safetyTasks[activeTaskTab] || [];
+    const remaining = list.filter((t) => !t.completed).length;
+    return `${remaining} remaining for ${activeTaskTab}`;
+  }, [safetyTasks, activeTaskTab]);
+
+  const activeTempSubtitle = useMemo(() => {
+    const list = temperatureLog[activeTempTab] || [];
+    const withReadings = list.filter((t) => t.temp && t.temp !== '—').length;
+    return `${withReadings}/${list.length} ${activeTempTab} items logged`;
+  }, [temperatureLog, activeTempTab]);
 
   return (
     <div className="kitchen-safety-page">
@@ -251,14 +445,32 @@ const KitchenFoodSafety = ({ onNavigate, user }) => {
           <div className="column-header">
             <div>
               <h3 className="column-title">DAILY SAFETY TASKS</h3>
-              <p className="column-subtitle">0 remaining for morning</p>
+              <p className="column-subtitle">{activeTaskSubtitle}</p>
             </div>
-            <button className="column-settings-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-            </button>
+            {canManage && (
+              <div onClick={(e) => e.stopPropagation()}>
+                <ActionMenu
+                  align="right"
+                  actions={[
+                    { label: `Add ${activeTaskTab} task`, onClick: openAddTask },
+                    ...((safetyTasks[activeTaskTab] || []).map((task) => ([
+                      { divider: true },
+                      { label: `Edit “${task.text}”`, onClick: () => openEditTask(task) },
+                      { label: `Delete “${task.text}”`, destructive: true,
+                        onClick: () => setDeleteTarget({ kind: 'task', record: task }) },
+                    ])).flat()),
+                  ]}
+                  trigger={(
+                    <button className="column-settings-btn" type="button" aria-label="Manage safety tasks">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                      </svg>
+                    </button>
+                  )}
+                />
+              </div>
+            )}
           </div>
 
           {/* Task Tabs */}
@@ -315,14 +527,32 @@ const KitchenFoodSafety = ({ onNavigate, user }) => {
           <div className="column-header">
             <div>
               <h3 className="column-title">TEMPERATURE LOG</h3>
-              <p className="column-subtitle">14/17 for morning</p>
+              <p className="column-subtitle">{activeTempSubtitle}</p>
             </div>
-            <button className="column-settings-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-            </button>
+            {canManage && (
+              <div onClick={(e) => e.stopPropagation()}>
+                <ActionMenu
+                  align="right"
+                  actions={[
+                    { label: `Add ${activeTempTab} target`, onClick: openAddTarget },
+                    ...((tempsByKind[activeTempTab] || []).map((target) => ([
+                      { divider: true },
+                      { label: `Edit “${target.name}”`, onClick: () => openEditTarget(target) },
+                      { label: `Delete “${target.name}”`, destructive: true,
+                        onClick: () => setDeleteTarget({ kind: 'target', record: target }) },
+                    ])).flat()),
+                  ]}
+                  trigger={(
+                    <button className="column-settings-btn" type="button" aria-label="Manage temperature targets">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                      </svg>
+                    </button>
+                  )}
+                />
+              </div>
+            )}
           </div>
 
           {/* Temp Tabs */}
@@ -365,6 +595,136 @@ const KitchenFoodSafety = ({ onNavigate, user }) => {
           </div>
         </div>
       </div>
+
+      {/* ---- Record Temperature modal ---- */}
+      <FormModal
+        isOpen={!!recordModal}
+        title={`Record ${activeTempTab.charAt(0).toUpperCase() + activeTempTab.slice(1)} Temperature`}
+        submitLabel="Save Reading"
+        size="sm"
+        onClose={() => setRecordModal(null)}
+        onSubmit={submitRecord}
+        submitDisabled={!recordModal?.target || recordModal?.value === '' || recordModal?.value == null}
+        errorMessage={recordError}
+      >
+        <SelectField
+          label="Target"
+          value={recordModal?.target || ''}
+          onChange={(v) => setRecordModal((m) => m && ({ ...m, target: Number(v) }))}
+          options={(tempsByKind[activeTempTab] || []).map((t) => ({
+            value: t.id, label: `${t.name} (${t.range})`,
+          }))}
+          required
+        />
+        <NumberField
+          label="Temperature"
+          value={recordModal?.value ?? ''}
+          onChange={(v) => setRecordModal((m) => m && ({ ...m, value: v }))}
+          placeholder="e.g. 38"
+          step="0.1"
+          required
+          autoFocus
+        />
+        <SelectField
+          label="Unit"
+          value={recordModal?.unit || 'F'}
+          onChange={(v) => setRecordModal((m) => m && ({ ...m, unit: v }))}
+          options={TEMP_UNIT_OPTIONS}
+        />
+      </FormModal>
+
+      {/* ---- Add/Edit Safety Task modal ---- */}
+      <FormModal
+        isOpen={!!taskModal}
+        title={taskModal?.id ? 'Edit Safety Task' : 'Add Safety Task'}
+        submitLabel={taskModal?.id ? 'Save' : 'Add Task'}
+        size="sm"
+        onClose={() => setTaskModal(null)}
+        onSubmit={submitTask}
+        submitDisabled={!taskModal?.text?.trim()}
+        errorMessage={taskError}
+      >
+        <SelectField
+          label="Daypart"
+          value={taskModal?.daypart || 'morning'}
+          onChange={(v) => setTaskModal((m) => m && ({ ...m, daypart: v }))}
+          options={DAYPART_OPTIONS}
+          required
+        />
+        <TextField
+          label="Task Text"
+          value={taskModal?.text || ''}
+          onChange={(v) => setTaskModal((m) => m && ({ ...m, text: v }))}
+          placeholder="e.g. Verify hand-wash station soap"
+          required
+          autoFocus
+        />
+      </FormModal>
+
+      {/* ---- Add/Edit Temperature Target modal ---- */}
+      <FormModal
+        isOpen={!!targetModal}
+        title={targetModal?.id ? 'Edit Temperature Target' : 'Add Temperature Target'}
+        submitLabel={targetModal?.id ? 'Save' : 'Add Target'}
+        size="sm"
+        onClose={() => setTargetModal(null)}
+        onSubmit={submitTarget}
+        submitDisabled={!targetModal?.name?.trim() || targetModal?.expected_min === '' || targetModal?.expected_max === ''}
+        errorMessage={targetError}
+      >
+        <SelectField
+          label="Kind"
+          value={targetModal?.kind || 'equipment'}
+          onChange={(v) => setTargetModal((m) => m && ({ ...m, kind: v }))}
+          options={TEMP_KIND_OPTIONS}
+          required
+        />
+        <TextField
+          label="Name"
+          value={targetModal?.name || ''}
+          onChange={(v) => setTargetModal((m) => m && ({ ...m, name: v }))}
+          placeholder="e.g. Walk-in Cooler"
+          required
+          autoFocus
+        />
+        <NumberField
+          label="Expected Min (°F)"
+          value={targetModal?.expected_min ?? ''}
+          onChange={(v) => setTargetModal((m) => m && ({ ...m, expected_min: v }))}
+          placeholder="e.g. 35"
+          required
+        />
+        <NumberField
+          label="Expected Max (°F)"
+          value={targetModal?.expected_max ?? ''}
+          onChange={(v) => setTargetModal((m) => m && ({ ...m, expected_max: v }))}
+          placeholder="e.g. 41"
+          required
+        />
+      </FormModal>
+
+      {/* ---- Delete confirm (shared) ---- */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title={deleteTarget?.kind === 'target' ? 'Delete temperature target?' : 'Delete safety task?'}
+        message={deleteTarget?.kind === 'target'
+          ? `“${deleteTarget?.record?.name || ''}” will be archived. Existing readings stay in history.`
+          : `“${deleteTarget?.record?.text || ''}” will be archived from the safety checklist.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={performDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
+
+      {/* ---- History drawer ---- */}
+      <HistoryDrawer
+        isOpen={historyOpen}
+        title="Recent Temperature Readings"
+        subtitle={`${activeTempTab.charAt(0).toUpperCase() + activeTempTab.slice(1)} — last 7 days`}
+        rows={historyLoading ? [] : historyRows}
+        emptyMessage={historyLoading ? 'Loading history…' : 'No recent temperature readings.'}
+        onClose={() => setHistoryOpen(false)}
+      />
     </div>
   );
 };

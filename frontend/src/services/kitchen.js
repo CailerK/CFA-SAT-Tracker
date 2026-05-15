@@ -86,6 +86,19 @@ const kitchenService = {
     });
   },
 
+  async updateMenuItem(id, patch) {
+    return apiService.request(`/kitchen/waste/menu-items/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  async deleteMenuItem(id) {
+    return apiService.request(`/kitchen/waste/menu-items/${id}/`, {
+      method: "DELETE",
+    });
+  },
+
   async listReasons() {
     return apiService.request("/kitchen/waste/reasons/");
   },

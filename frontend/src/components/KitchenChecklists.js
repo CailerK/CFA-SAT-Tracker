@@ -5,6 +5,10 @@ import './KitchenDashboard.css';     // kitchen nav
 import './KitchenChecklists.css';
 import useCentralDayRefresh from '../hooks/useCentralDayRefresh';
 import { isManagerOrAbove } from '../utils/access';
+import {
+  ActionMenu, ConfirmDialog, FormModal, HistoryDrawer,
+  TextField, SelectField,
+} from './ui';
 
 // ===== Icons =====
 const IconLayoutDashboard = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>);
@@ -15,7 +19,6 @@ const IconSparkles = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 
 const IconClipboardList = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>);
 const IconTrash = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>);
 const IconHistory = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>);
-const IconUsers = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>);
 const IconPlus = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M5 12h14"/><path d="M12 5v14"/></svg>);
 const IconCheck = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" {...p}><polyline points="20 6 9 17 4 12"/></svg>);
 
@@ -84,6 +87,14 @@ const KitchenChecklists = ({ onNavigate, user }) => {
   const [isLoading, setIsLoading] = useState(true);
   const canManageTasks = isManagerOrAbove(user);
 
+  // Modal state.
+  const [addModal, setAddModal] = useState(null);     // { shift, text } | null
+  const [addError, setAddError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null); // task row
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyRows, setHistoryRows] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const refresh = useCallback(async () => {
     try {
       const grouped = await kitchenService.listChecklistGrouped();
@@ -126,56 +137,82 @@ const KitchenChecklists = ({ onNavigate, user }) => {
   };
 
   const handleViewHistory = async () => {
+    setHistoryOpen(true);
+    setHistoryLoading(true);
     try {
       const res = await kitchenService.getChecklistHistory({ range: '7d' });
-      const rows = res.days || [];
-      const preview = rows.slice(0, 7).map((day) => {
+      const days = res.days || [];
+      const rows = days.slice(0, 14).map((day) => {
         const date = parseDateOnly(day.date).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
+          weekday: 'short', month: 'short', day: 'numeric',
         });
-        return `${date}: ${day.total?.done || 0}/${day.total?.total || 0}`;
+        const done = day.total?.done || 0;
+        const total = day.total?.total || 0;
+        const pct = total ? Math.round((done / total) * 100) : 0;
+        return {
+          id: day.date,
+          primary: date,
+          secondary: `${done} of ${total} tasks completed (${pct}%)`,
+          timestamp: '',
+          kind: total > 0 && done === total ? 'good' : 'history',
+        };
       });
-      window.alert(preview.length ? preview.join('\n') : 'No checklist history yet.');
+      setHistoryRows(rows);
     } catch (err) {
       console.error('Failed to load kitchen checklist history:', err);
+      setHistoryRows([]);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
-  const handleAddTask = async () => {
+  // Open Add Task FormModal (replaces window.prompt).
+  const handleAddTask = () => {
     if (!canManageTasks) return;
-    const text = window.prompt(`New ${activeShift} checklist task`);
-    if (!text?.trim()) return;
+    setAddError('');
+    setAddModal({ shift: activeShift, text: '' });
+  };
+
+  const submitAddTask = async () => {
+    if (!addModal) return;
+    const text = addModal.text.trim();
+    if (!text) {
+      setAddError('Task description is required.');
+      throw new Error('Missing text');
+    }
     try {
+      const order = (shiftState[addModal.shift] || []).length;
       await kitchenService.createChecklistTask({
-        shift: activeShift,
-        text: text.trim(),
-        order: activeTasks.length,
+        shift: addModal.shift, text, order,
       });
+      setAddModal(null);
+      // If the new task lives on a different shift, switch to it so the user sees it.
+      if (addModal.shift !== activeShift) setActiveShift(addModal.shift);
       await refresh();
     } catch (err) {
-      console.error('Failed to create kitchen checklist task:', err);
+      const detail = err?.data
+        ? Object.entries(err.data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' \u2022 ')
+        : (err?.message || 'Save failed.');
+      setAddError(detail);
+      throw err;
     }
   };
 
-  const handleDeleteTask = async () => {
+  // Open ConfirmDialog (replaces window.prompt chain).
+  const handleDeleteTask = (task) => {
     if (!canManageTasks) return;
-    if (!activeTasks.length) return;
-    const taskName = window.prompt(
-      `Delete which ${activeShift} task?\n${activeTasks.map((task) => task.text).join('\n')}`
-    );
-    if (!taskName?.trim()) return;
-    const target = activeTasks.find(
-      (task) => task.text.toLowerCase() === taskName.trim().toLowerCase()
-    );
-    if (!target) return;
-    const confirmed = window.confirm(`Delete "${target.text}"?`);
-    if (!confirmed) return;
+    setDeleteTarget(task);
+  };
+
+  const performDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await kitchenService.deleteChecklistTask(target.id);
+      await kitchenService.deleteChecklistTask(deleteTarget.id);
+      setDeleteTarget(null);
       await refresh();
     } catch (err) {
       console.error('Failed to delete kitchen checklist task:', err);
+      setDeleteTarget(null);
     }
   };
 
@@ -270,11 +307,6 @@ const KitchenChecklists = ({ onNavigate, user }) => {
               <IconHistory className="kch-header-btn-icon" />
             </button>
             {canManageTasks && (
-              <button type="button" className="kch-header-btn" aria-label="Delete task" onClick={handleDeleteTask}>
-                <IconUsers className="kch-header-btn-icon" />
-              </button>
-            )}
-            {canManageTasks && (
               <button type="button" className="kch-header-btn kch-header-btn-primary" aria-label="Add task" onClick={handleAddTask}>
                 <IconPlus className="kch-header-btn-icon" />
               </button>
@@ -339,6 +371,29 @@ const KitchenChecklists = ({ onNavigate, user }) => {
                   <div className="kch-task-text-wrap">
                     <span className={`kch-task-text ${task.completed ? 'completed' : ''}`}>{task.text}</span>
                   </div>
+                  {canManageTasks && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <ActionMenu
+                        align="right"
+                        actions={[
+                          { label: 'Delete', destructive: true, onClick: () => handleDeleteTask(task) },
+                        ]}
+                        trigger={(
+                          <button
+                            type="button"
+                            className="kch-task-trash"
+                            aria-label={`More options for ${task.text}`}
+                            style={{
+                              background: 'transparent', border: 0, padding: 6,
+                              color: '#9ca3af', cursor: 'pointer',
+                            }}
+                          >
+                            <IconTrash style={{ width: 16, height: 16 }} />
+                          </button>
+                        )}
+                      />
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -350,6 +405,55 @@ const KitchenChecklists = ({ onNavigate, user }) => {
           </div>
         </div>
       </div>
+
+      {/* Add Task modal */}
+      <FormModal
+        isOpen={!!addModal}
+        title="Add Kitchen Task"
+        submitLabel="Add Task"
+        size="sm"
+        onClose={() => setAddModal(null)}
+        onSubmit={submitAddTask}
+        submitDisabled={!addModal?.text?.trim()}
+        errorMessage={addError}
+      >
+        <SelectField
+          label="Shift"
+          value={addModal?.shift || 'transition'}
+          onChange={(v) => setAddModal((m) => m && ({ ...m, shift: v }))}
+          options={SHIFT_TABS.map((s) => ({ value: s.id, label: s.label }))}
+          required
+        />
+        <TextField
+          label="Task Description"
+          value={addModal?.text || ''}
+          onChange={(v) => setAddModal((m) => m && ({ ...m, text: v }))}
+          placeholder="e.g. Wipe down grill"
+          required
+          autoFocus
+        />
+      </FormModal>
+
+      {/* Delete confirm */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="Delete this kitchen task?"
+        message={deleteTarget ? `“${deleteTarget.text}” will be removed from the ${activeShift} checklist.` : ''}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={performDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
+
+      {/* History drawer */}
+      <HistoryDrawer
+        isOpen={historyOpen}
+        title="Kitchen Checklist History"
+        subtitle="Last 14 days of daily completions"
+        rows={historyLoading ? [] : historyRows}
+        emptyMessage={historyLoading ? 'Loading history…' : 'No checklist history yet.'}
+        onClose={() => setHistoryOpen(false)}
+      />
     </div>
   );
 };

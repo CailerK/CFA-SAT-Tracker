@@ -103,6 +103,26 @@ const equipmentService = {
     return apiService.request(`/kitchen/food-safety/tasks/${qs}`);
   },
 
+  async createSafetyTask(payload) {
+    return apiService.request("/kitchen/food-safety/tasks/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateSafetyTask(id, patch) {
+    return apiService.request(`/kitchen/food-safety/tasks/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  async deleteSafetyTask(id) {
+    return apiService.request(`/kitchen/food-safety/tasks/${id}/`, {
+      method: "DELETE",
+    });
+  },
+
   async completeSafetyTask(id) {
     return apiService.request(`/kitchen/food-safety/tasks/${id}/complete/`, {
       method: "POST",
@@ -119,6 +139,27 @@ const equipmentService = {
     const qs = kind ? `?kind=${encodeURIComponent(kind)}` : "";
     return apiService.request(
       `/kitchen/food-safety/temperature-targets/${qs}`
+    );
+  },
+
+  async createTemperatureTarget(payload) {
+    return apiService.request("/kitchen/food-safety/temperature-targets/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateTemperatureTarget(id, patch) {
+    return apiService.request(
+      `/kitchen/food-safety/temperature-targets/${id}/`,
+      { method: "PATCH", body: JSON.stringify(patch) }
+    );
+  },
+
+  async deleteTemperatureTarget(id) {
+    return apiService.request(
+      `/kitchen/food-safety/temperature-targets/${id}/`,
+      { method: "DELETE" }
     );
   },
 

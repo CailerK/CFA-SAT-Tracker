@@ -5,6 +5,7 @@ import './KitchenCleaning.css';
 import cleaningService from '../services/cleaning';
 import useCentralDayRefresh from '../hooks/useCentralDayRefresh';
 import { isManagerOrAbove } from '../utils/access';
+import { FormModal, HistoryDrawer, TextField, SelectField } from './ui';
 
 // ===== Icons =====
 const IconLayoutDashboard = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>);
@@ -35,6 +36,13 @@ const KitchenCleaning = ({ onNavigate, user }) => {
   const [tasksByFreq, setTasksByFreq] = useState({ daily: [], weekly: [], monthly: [] });
   const [isLoading, setIsLoading] = useState(true);
   const canManageTasks = isManagerOrAbove(user);
+
+  // Modal state.
+  const [addModal, setAddModal] = useState(null); // { name, frequency } | null
+  const [addError, setAddError] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyRows, setHistoryRows] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -101,36 +109,65 @@ const KitchenCleaning = ({ onNavigate, user }) => {
   };
 
   const handleViewHistory = async () => {
+    setHistoryOpen(true);
+    setHistoryLoading(true);
     try {
       const res = await cleaningService.getHistory({ scope: 'kitchen' });
-      const rows = res.completions || [];
-      const preview = rows.slice(0, 10).map((entry) => {
+      const rows = (res.completions || []).slice(0, 30).map((entry) => {
         const when = entry.completed_at
-          ? new Date(entry.completed_at).toLocaleString('en-US')
-          : entry.date;
-        return `${entry.task_name} (${entry.frequency}) - ${entry.completed_by_name || 'Unknown'} - ${when}`;
+          ? new Date(entry.completed_at).toLocaleString('en-US', {
+              month: 'short', day: 'numeric',
+              hour: 'numeric', minute: '2-digit',
+            })
+          : entry.date || '';
+        return {
+          id: entry.id ?? `${entry.task_name}-${when}`,
+          primary: entry.task_name || 'Unnamed task',
+          secondary: `${entry.frequency || 'task'} — ${entry.completed_by_name || 'Unknown'}`,
+          timestamp: when,
+          kind: 'good',
+        };
       });
-      window.alert(preview.length ? preview.join('\n') : 'No recent kitchen cleaning history yet.');
+      setHistoryRows(rows);
     } catch (err) {
       console.error('Failed to load kitchen cleaning history:', err);
+      setHistoryRows([]);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
-  const handleAddTask = async () => {
+  // Open Add Task FormModal (replaces chained window.prompt).
+  const handleAddTask = () => {
     if (!canManageTasks) return;
-    const name = window.prompt('Task name');
-    if (!name?.trim()) return;
-    const frequency = window.prompt('Frequency (daily, weekly, monthly)', activeFrequency) || activeFrequency;
+    setAddError('');
+    setAddModal({ name: '', frequency: activeFrequency });
+  };
+
+  const submitAddTask = async () => {
+    if (!addModal) return;
+    const name = addModal.name.trim();
+    if (!name) {
+      setAddError('Task name is required.');
+      throw new Error('Missing name');
+    }
     try {
+      const order = (tasksByFreq[addModal.frequency] || []).length;
       await cleaningService.create({
         scope: 'kitchen',
-        name: name.trim(),
-        frequency: frequency.trim().toLowerCase(),
-        order: tasks.length,
+        name,
+        frequency: addModal.frequency,
+        order,
       });
+      setAddModal(null);
+      if (addModal.frequency !== activeFrequency) setActiveFrequency(addModal.frequency);
       await refresh();
     } catch (err) {
-      console.error('Failed to create kitchen cleaning task:', err);
+      const detail = err?.data
+        ? Object.entries(err.data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' \u2022 ')
+        : (err?.message || 'Save failed.');
+      setAddError(detail);
+      throw err;
     }
   };
 
@@ -275,6 +312,44 @@ const KitchenCleaning = ({ onNavigate, user }) => {
           )}
         </div>
       </div>
+
+      {/* Add Task modal */}
+      <FormModal
+        isOpen={!!addModal}
+        title="Add Cleaning Task"
+        submitLabel="Add Task"
+        size="sm"
+        onClose={() => setAddModal(null)}
+        onSubmit={submitAddTask}
+        submitDisabled={!addModal?.name?.trim()}
+        errorMessage={addError}
+      >
+        <TextField
+          label="Task Name"
+          value={addModal?.name || ''}
+          onChange={(v) => setAddModal((m) => m && ({ ...m, name: v }))}
+          placeholder="e.g. Wipe down ice machine"
+          required
+          autoFocus
+        />
+        <SelectField
+          label="Frequency"
+          value={addModal?.frequency || 'daily'}
+          onChange={(v) => setAddModal((m) => m && ({ ...m, frequency: v }))}
+          options={FREQUENCIES.map((f) => ({ value: f.id, label: f.label }))}
+          required
+        />
+      </FormModal>
+
+      {/* History drawer */}
+      <HistoryDrawer
+        isOpen={historyOpen}
+        title="Kitchen Cleaning History"
+        subtitle="Last 30 days of completions"
+        rows={historyLoading ? [] : historyRows}
+        emptyMessage={historyLoading ? 'Loading history…' : 'No recent kitchen cleaning history yet.'}
+        onClose={() => setHistoryOpen(false)}
+      />
     </div>
   );
 };

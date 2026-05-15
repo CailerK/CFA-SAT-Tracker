@@ -151,75 +151,76 @@ time to replace demo data with live API calls / database reads / persisted state
 
 | Status | What | Notes |
 |---|---|---|
-| 🔴 | `TREND_POINTS` — 30 hardcoded daily waste values (Mar 23 → Apr 21) used to draw the line chart | `GET /api/kitchen/waste/trend?range={7d\|14d\|30d\|90d\|month}`. |
-| 🔴 | `TOP_ITEMS` — hardcoded top 5 wasted items (Nuggets $120 / Mac & Cheese $59.59 / Strips $49.29 / Filet $32.64 / Spicy Filet $31.25) with item counts, pct, color | `GET /api/kitchen/waste/top-items?range=...`. |
-| 🔴 | `kpis` — hardcoded 4 KPI cards: Today $7.18 (-45%), This Week $20.32 (204 items), Yesterday $13.14, Top Item Filet $4.08 | `GET /api/kitchen/waste/kpis`. |
-| 🔴 | `goals` — hardcoded targets: Daily $100, Weekly $600, Monthly $2500; values drawn from `kpis` numbers | `GET /api/kitchen/waste/goals` + `PATCH` when edit pen button is wired. |
-| 🟠 | Pen/edit button on goals header is visual-only | Open edit modal → persist. |
-| 🟠 | `range` selector (Last 7/14/30/90 Days, This Month, Last Month) only updates local state; data doesn't change | Wire to query param + re-fetch. |
-| 🟠 | Sub-tabs By Day / By Meal / By Hour / Top Items / Timeline show empty placeholder panel | Each tab needs its own endpoint + chart/view. |
-| 🟡 | Top item rows each have a "chevron-down" hinting expandable detail; no expand logic yet | Expand to show item-level breakdown. |
+| ✅ | ~~`TREND_POINTS` hardcoded~~ — **resolved**: loads from `GET /api/kitchen/waste/trend/?range=...`. | |
+| ✅ | ~~`TOP_ITEMS` hardcoded~~ — **resolved**: loads from `GET /api/kitchen/waste/top-items/?range=...`. | |
+| ✅ | ~~`kpis` hardcoded~~ — **resolved**: loads from `GET /api/kitchen/waste/kpis/`. | |
+| ✅ | ~~`goals` hardcoded~~ — **resolved**: loads from `GET /api/kitchen/waste/goals/` and Phase 14 wires the pencil button to an Edit Goals `<FormModal>` that PATCHes them. | |
+| ✅ | ~~Pen/edit button visual-only~~ — **resolved (Phase 14)**: opens Edit Goals `<FormModal>` (manager-tier gated). | |
+| ✅ | ~~`range` selector visual-only~~ — **resolved**: every range change re-fetches `trend` and `top-items`. | |
+| 🟠 | Sub-tabs By Day / By Meal / By Hour / Top Items / Timeline still show an empty placeholder panel | Each tab needs its own backend breakdown endpoint + chart/view. Deferred from Phase 14. |
+| 🟡 | Top item rows have a chevron-down hinting expandable detail; no expand logic yet | Drill-down view; deferred. |
 
 ### `frontend/src/components/KitchenEquipment.js`
 
 | Status | What | Notes |
 |---|---|---|
-| 🔴 | `CATEGORIES` — 8 hardcoded equipment categories with emojis + counts (hvac 4, cleaning 4, pos_tech 4, safety 4, cooking 4, refrigeration 4, preparation 0, beverage 0) | `GET /api/kitchen/equipment/categories`. |
-| 🔴 | `EQUIPMENT_BY_CATEGORY` — only `cooking` has 4 seed items (Primary Fryers, Secondary Fryers, Grills, Pressure Fryers); all others are empty arrays | `GET /api/kitchen/equipment?category=...`. |
-| 🔴 | Primary Fryers schedule hardcoded: `{ task: 'boil out', cadence: 'weekly', date: 'Apr 21', urgency: 'Soon' }` — the only maintenance row on the page | `GET /api/kitchen/equipment/:id/schedules`. |
-| 🔴 | All cards show "OK" status pill — always green | `GET /api/kitchen/equipment` should return `status: OK \| needs_attention \| down`. |
-| 🔴 | `runningTotal = 24`, `runningOf = 24` in toolbar hardcoded | `GET /api/kitchen/equipment/running-summary`. |
-| 🔴 | Calendar-days button shows a red "1" badge — hardcoded | `GET /api/kitchen/upcoming-tasks/count`. |
-| 🔴 | History / Maint. / Clean / Issue action buttons on each card are visual-only | Each opens a modal / logs an action; endpoints TBD. |
-| 🔴 | Schedule-row Done / Edit / Delete mini buttons are visual-only | `POST /api/kitchen/schedules/:id/complete`, `PATCH`, `DELETE`. |
-| 🟠 | Category drag/reorder + delete (X on hover) + "Add Category" button are visual-only | `PATCH /api/kitchen/equipment/categories/order` + `POST` / `DELETE`. |
-| 🟠 | Upcoming tasks button and Settings button have no click handlers | Open respective modals/pages. |
+| ✅ | ~~`CATEGORIES` hardcoded~~ — **resolved**: loads from `GET /api/kitchen/equipment/categories/`. | |
+| ✅ | ~~`EQUIPMENT_BY_CATEGORY` hardcoded~~ — **resolved**: loads from `GET /api/kitchen/equipment/?category=...`. | |
+| ✅ | ~~Hardcoded schedule and status~~ — **resolved**: each card's schedule and status come from the equipment serializer. | |
+| ✅ | ~~Running totals + upcoming badge hardcoded~~ — **resolved**: derived from real equipment + schedule data. | |
+| ✅ | ~~History / Maint. / Clean / Issue buttons visual-only~~ — **resolved (Phase 14)**: History opens `<HistoryDrawer>` with real `GET /api/kitchen/equipment/:id/logs/`; Maint./Clean/Issue open a Log Action `<FormModal>` that POSTs to the logs endpoint. | |
+| ✅ | ~~Schedule Done/Edit/Delete mini buttons visual-only~~ — **resolved (Phase 14)**: Done calls `complete/`, Edit opens the Schedule `<FormModal>`, Delete opens `<ConfirmDialog>`. | |
+| ✅ | ~~Add Category button used `window.prompt`~~ — **resolved (Phase 14)**: opens an Add/Edit Category `<FormModal>` with auto-slug derivation. | |
+| ✅ | ~~Manage Equipment / Settings buttons used chained `window.prompt`~~ — **resolved (Phase 14)**: top-right gear is now a per-category `+ Add Equipment` button; per-card 3-dot `<ActionMenu>` exposes Edit / Add Schedule / Delete. | |
+| ✅ | ~~Upcoming tasks button used `window.alert`~~ — **resolved (Phase 14)**: opens a read-only `<HistoryDrawer>` titled "Upcoming Maintenance". | |
+| 🟡 | Category drag/reorder + per-category delete not yet exposed in UI | Backend supports it; add Edit Category to a chip 3-dot menu if needed later. |
 
 ### `frontend/src/components/KitchenCleaning.js`
 
 | Status | What | Notes |
 |---|---|---|
-| 🔴 | `tasks = []` hardcoded empty array; page shows the `🧹 No tasks` empty state regardless of data | `GET /api/kitchen/cleaning/tasks?frequency={daily\|weekly\|monthly}`. |
-| 🔴 | `doneToday = 0`, `totalToday = 0` in subtitle `"0 of 0 done today"` hardcoded | Derived from tasks endpoint. |
-| 🔴 | `FREQUENCIES` (Daily / Weekly / Monthly) hardcoded; active chip only updates local state, does not refetch | Wire selection to query param + re-fetch. |
-| 🟠 | `History` button has no click handler | Navigate to history / open modal. |
-| 🔴 | `Add Task` button has no click handler | Open create-task modal → `POST /api/kitchen/cleaning/tasks`. |
+| ✅ | ~~`tasks` hardcoded empty array~~ — **resolved**: loads from `cleaningService.listGroupedByFrequency({ scope: 'kitchen' })`. | |
+| ✅ | ~~`doneToday` / `totalToday` hardcoded~~ — **resolved**: derived from `today_completion` on each task. | |
+| ✅ | ~~Frequency chips visual-only~~ — **resolved**: switching frequencies re-renders the list against grouped state. | |
+| ✅ | ~~`History` button no-op~~ — **resolved (Phase 14)**: opens `<HistoryDrawer>` with `cleaningService.getHistory({ scope: 'kitchen' })`. | |
+| ✅ | ~~`Add Task` button no-op + `window.prompt` chain~~ — **resolved (Phase 14)**: opens an Add Task `<FormModal>` with name + frequency dropdown. | |
 
 ### `frontend/src/components/KitchenChecklists.js`
 
 | Status | What | Notes |
 |---|---|---|
-| 🔴 | `TRANSITION_TASKS` — hardcoded list of 25 transition-shift task names copied verbatim from LD Growth (Dishes, Needs to have enough wraps, Prep chicken, …, Clean lowboy) | `GET /api/kitchen/checklists/:shift` returning `[{id, text, completed}]`. |
-| 🔴 | Opening shift seeded with 24 placeholder tasks all `completed: true` (to reproduce the "✓ Done" pill) | Fetch real task defs + completion state per shift. |
-| 🔴 | Closing shift seeded with 35 placeholder tasks all `completed: false` | Fetch real task defs + completion state per shift. |
-| 🔴 | `toggleTask()` mutates local state only; `completed` flag is not persisted | `POST /api/kitchen/checklists/:shift/:taskId/toggle` with user + timestamp. |
-| 🟠 | Sticky header "History" button has no handler | Navigate to history page. |
-| 🟠 | Sticky header "Manage Positions" (users) button has no handler | Open positions modal / page. |
-| 🟠 | Sticky header red "+" button has no handler | Open add/edit-tasks modal → `POST /api/kitchen/checklists/:shift`. |
-| 🟡 | Shift subtitle logic shows "✓ Done" when all complete, else `done/total` — derived from `shiftState` | Keep client-side once tasks come from API. |
+| ✅ | ~~Hardcoded `TRANSITION_TASKS` / opening / closing seed lists~~ — **resolved**: loads real tasks via `kitchenService.listChecklistGrouped()`. | |
+| ✅ | ~~`toggleTask()` was local-only~~ — **resolved**: calls `kitchenService.completeChecklistTask` / `uncompleteChecklistTask` with optimistic update. | |
+| ✅ | ~~Sticky header History button no-op~~ — **resolved (Phase 14)**: opens `<HistoryDrawer>` with `getChecklistHistory({ range: '7d' })`. | |
+| ✅ | ~~"Manage Positions" gear / "+" button used `window.prompt` chain~~ — **resolved (Phase 14)**: gear button removed; "+" opens an Add Task `<FormModal>` (shift dropdown + text). Per-row trash via `<ActionMenu>` + `<ConfirmDialog>`. | |
+| 🟡 | Shift subtitle logic shows "✓ Done" when all complete, else `done/total` — derived from `shiftState` | Fine as-is. |
 
 ### `frontend/src/components/KitchenWasteTracker.js`
 
 | Status | What | Notes |
 |---|---|---|
-| 🔴 | `MENU_ITEMS_BY_PERIOD` — hardcoded menu with 11 lunch items (Spicy Filet $1.25, Filet $1.02, Grilled Filet $1.12, Nuggets $0.15, Grilled Nuggets $0.17, Strips $0.53, Mac & Cheese $1.01, White Bun $0.16, Multigrain Bun $0.33, Gluten Free Bun $0.85, sandwich $1.00), plus 4 breakfast + 4 dinner placeholders | `GET /api/kitchen/waste/menu-items?meal={breakfast\|lunch\|dinner}`. |
-| 🔴 | `TODAY_ENTRIES` — 16 hardcoded waste log entries (Filet, Strips x7, CFA Chicken Biscuit x2, Egg Whites, Spicy Filet, etc.) with times from 9:40 AM to 12:15 PM | `GET /api/kitchen/waste/entries?date=today`. |
-| 🔴 | Tapping a menu tile adds an entry with `qty: 1`, `unit: 'pieces'`, client-side `new Date()` time — not persisted | `POST /api/kitchen/waste/entries`. |
-| 🔴 | X delete button only mutates local state | `DELETE /api/kitchen/waste/entries/:id`. |
-| 🔴 | Custom Entry `Add Entry` writes to local state, no API call | `POST /api/kitchen/waste/entries`. |
-| 🔴 | "Most Wasted: Filet / Last: 12:15 PM" KPI is hardcoded string (not derived from entries) | `GET /api/kitchen/waste/kpis`. |
-| 🔴 | "Today's Waste" KPI total is derived from `entries`, but `entries` themselves are fake | Once entries are real, this calc stays client-side. |
-| 🟠 | `WASTE_REASONS` (Overproduction / Quality Issues / Expired / Dropped) hardcoded; selected reason is never sent when adding an entry | Include `reason` in POST body; `GET /api/kitchen/waste/reasons` for admin-managed list. |
-| 🟠 | `Waste` / `Donations` mode toggle is visual only — Donations view is not implemented | `GET /api/kitchen/donations/*` + Donations UI. |
-| 🟠 | `📝 Bulk Entry` button has no click handler | Open bulk-entry modal. |
-| 🟠 | `⚙️ Items` and `💲 Prices` buttons have no click handlers | Navigate to items / prices management. |
-| 🟠 | `📝 Notes` button (top-right of entries) has no handler | Open notes modal. |
-| 🟠 | `📅 Today` date chip has no handler — cannot change date filter | Open date picker. |
+| ✅ | ~~`MENU_ITEMS_BY_PERIOD` hardcoded~~ — **resolved**: loads from `GET /api/kitchen/waste/menu-items/?meal=...`. | |
+| ✅ | ~~`TODAY_ENTRIES` hardcoded~~ — **resolved**: loads from `GET /api/kitchen/waste/entries/?date=...`. | |
+| ✅ | ~~Menu tile tap + Custom Entry not persisted~~ — **resolved**: both POST to `/api/kitchen/waste/entries/` with reason. | |
+| ✅ | ~~X delete only mutates state~~ — **resolved**: calls `DELETE /api/kitchen/waste/entries/:id` with optimistic rollback. | |
+| ✅ | ~~"Most Wasted: Filet / 12:15 PM" hardcoded~~ — **resolved (Phase 14)**: computed from `entries` (sum cost by item, latest timestamp wins). | |
+| ✅ | ~~`WASTE_REASONS` hardcoded~~ — **resolved**: loads from `GET /api/kitchen/waste/reasons/` and the selected reason is POSTed with each entry. | |
+| ✅ | ~~`⚙️ Items` and `💲 Prices` buttons no-op~~ — **resolved (Phase 14)**: both open the same Manage Menu Items `<FormModal>` with per-row Edit/Delete and `+ Add new item`. | |
+| ✅ | ~~`📝 Bulk Entry` button no-op~~ — **resolved (Phase 14)**: opens a Bulk Entry `<FormModal>` with a qty input per item; submits one POST per non-blank row. | |
+| ✅ | ~~`📅 Today` date chip no-op~~ — **resolved (Phase 14)**: opens a `<DatePicker>` modal and refetches entries for the chosen ISO date. | |
+| ✅ | ~~`📝 Notes` button no-op~~ — **resolved (Phase 14)**: opens a "Coming soon" `<ConfirmDialog>` sentinel pointing users to Shift Summary. | |
+| 🟠 | `Waste` / `Donations` mode toggle is visual only — Donations view is not implemented | Needs `GET /api/kitchen/donations/*` + UI. |
 
-### Kitchen sub-pages (not yet updated)
-- `KitchenFoodSafety.js`
+### `frontend/src/components/KitchenFoodSafety.js`
 
-> All likely contain hardcoded data. Audit when each gets redesigned.
+| Status | What | Notes |
+|---|---|---|
+| ✅ | ~~Hardcoded daypart tasks and temperature targets~~ — **resolved**: loads from `equipmentService.listSafetyTasks` and `listTemperatureTargets`. | |
+| ✅ | ~~Record Temperature button used `window.prompt` chain~~ — **resolved (Phase 14)**: opens a Record Temperature `<FormModal>` (target picker + value + unit). | |
+| ✅ | ~~History button used `window.alert(JSON.stringify())`~~ — **resolved (Phase 14)**: opens `<HistoryDrawer>` with `listRecentReadings`. | |
+| ✅ | ~~Two column gear icons visual-only~~ — **resolved (Phase 14)**: each gear is now an `<ActionMenu>` with Add / Edit-per-row / Delete-per-row, backed by FoodSafetyTask + TemperatureTarget POST/PATCH/DELETE endpoints. Add/Edit open a `<FormModal>`. | |
+| ✅ | ~~Hardcoded subtitles "0 remaining for morning" / "14/17 for morning"~~ — **resolved (Phase 14)**: derived from real loaded data (`activeTaskSubtitle`, `activeTempSubtitle`). | |
+| 🟡 | Banner date is still a hardcoded "Monday, April 20" | Should use `getCurrentDate()` like the other kitchen pages — quick polish. |
 
 ---
 
@@ -363,4 +364,4 @@ time to replace demo data with live API calls / database reads / persisted state
 
 ---
 
-_Last updated: 2026-05-15 — after Phase 13 Setup Sheets + Shift Summary History wiring (template ActionMenu/Rename/Duplicate, SavedSetups ActionMenu/Share UserPicker/Sort, ShiftSummaryHistory real filter dropdowns + Print + PDF sentinel + ShiftSummaryDetailModal, read-only Shift Lead, backend duplicate-template + start_date/end_date/follow_up filters)._
+_Last updated: 2026-05-15 — after Phase 14 Kitchen domain wiring (shared `<HistoryDrawer>`; KitchenChecklists Add Task modal + per-row delete; KitchenCleaning Add Task modal + History drawer; KitchenEquipment 4 reusable FormModals replacing 7 prompt chains + per-card `<ActionMenu>` + Upcoming Maintenance drawer; KitchenFoodSafety Record Temperature modal + Manage Tasks/Targets `<ActionMenu>`s + computed column subtitles; KitchenWasteTracker Items Manager + Bulk Entry + `<DatePicker>` + computed Most-Wasted KPI; KitchenAnalytics Edit Goals `<FormModal>`; new equipment + kitchen service methods for SafetyTask / TemperatureTarget / MenuItem CRUD)._
