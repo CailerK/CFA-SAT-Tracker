@@ -202,13 +202,17 @@
 
 .lpd-lesson {
   background: #ffffff;
-  border: 1px solid #000000;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
   overflow: hidden;
-  transition: background-color 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.15s ease;
 }
+.lpd-lesson:hover { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); }
 .lpd-lesson.is-completed { background: #ffffff; }
-.lpd-lesson:hover { background: #fafafa; }
 
+/* Header row — no longer a button (the lesson is always expanded). It still
+   uses flex so the icon + title block lay out side-by-side. */
 .lpd-lesson-row {
   width: 100%;
   display: flex;
@@ -218,30 +222,31 @@
   text-align: left;
   background: transparent;
   border: 0;
-  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: default;
 }
 
-/* ---- Type icon (small square, black outline) ---- */
+/* ---- Type icon — circular pastel tile, per-type tint ----
+   Matches the LD Growth screenshot: 36×36 round, soft tinted background,
+   icon ink in the matching darker shade. Sized at 16px since the SVGs use
+   width/height="16" inline. */
 .lpd-type-icon {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border: 1px solid #000000;
-  background: #ffffff;
-  color: #000000;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6b7280;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
-.lpd-type--emerald,
-.lpd-type--blue,
-.lpd-type--amber,
-.lpd-type--purple,
-.lpd-type--red,
-.lpd-type--gray {
-  color: #000000;
-  background: #ffffff;
-}
+.lpd-type--emerald { background: #ecfdf5; color: #059669; }
+.lpd-type--blue    { background: #eff6ff; color: #2563eb; }
+.lpd-type--amber   { background: #fffbeb; color: #b45309; }
+.lpd-type--purple  { background: #f5f3ff; color: #7c3aed; }
+.lpd-type--red     { background: #fff1f2; color: #E51636; }
+.lpd-type--gray    { background: #f3f4f6; color: #6b7280; }
 
 .lpd-lesson-titles {
   flex: 1;
@@ -253,40 +258,30 @@
 .lpd-lesson-title {
   font-size: 14px;
   font-weight: 600;
-  color: #000000;
+  color: #111827;
   line-height: 1.3;
 }
 .lpd-lesson.is-completed .lpd-lesson-title {
   text-decoration: line-through;
-  color: #6b7280;
+  color: #9ca3af;
 }
 .lpd-lesson-meta {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #4b5563;
+  color: #6b7280;
 }
-.lpd-meta-dot { color: #000000; }
+.lpd-meta-dot { color: #9ca3af; }
 .lpd-meta-time {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-/* ---- Row chevron ---- */
-.lpd-row-chevron {
-  flex-shrink: 0;
-  color: #000000;
-  transition: transform 0.2s ease;
-}
-.lpd-row-chevron.is-open { transform: rotate(180deg); }
-
-/* ---- Expanded body ---- */
+/* ---- Lesson body (always visible, sits below the header divider) ---- */
 .lpd-lesson-body {
-  padding: 4px 16px 16px;
-  border-top: 1px solid #000000;
-  margin-top: 0;
+  padding: 12px 16px 14px;
   background: #ffffff;
 }
 .lpd-md-p {
@@ -328,7 +323,10 @@
   white-space: pre-wrap;
 }
 
-/* ---- In-body action row (Open Resource + Complete) ---- */
+/* ---- In-body action row (Open Resource + Complete) ----
+   Matches the LD Growth screenshot: side-by-side buttons at the bottom-left
+   of the body, NOT stretched full-width. Open Resource is a blue outlined
+   pill; Complete is a solid red pill. */
 .lpd-lesson-actions {
   display: flex;
   align-items: center;
@@ -336,50 +334,48 @@
   margin-top: 14px;
   flex-wrap: wrap;
 }
-.lpd-resource-placeholder { flex: 1; }
 
 .lpd-resource-btn,
 .lpd-complete-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   padding: 7px 14px;
+  border-radius: 8px;
   cursor: pointer;
   text-decoration: none;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease,
+              border-color 0.15s ease, opacity 0.15s ease;
 }
 
-/* "Open Resource" — black outline, white fill */
+/* "Open Resource" — blue outlined, white fill (matches LD Growth) */
 .lpd-resource-btn {
   background: #ffffff;
-  color: #000000;
-  border: 1px solid #000000;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
 }
 .lpd-resource-btn:hover {
-  background: #000000;
-  color: #ffffff;
+  background: #eff6ff;
+  border-color: #2563eb;
 }
 
-/* "Complete" — solid red. Becomes outlined when done. */
+/* "Complete" — solid red. Becomes a clean white-with-check when done. */
 .lpd-complete-btn {
   background: #E51636;
   color: #ffffff;
   border: 1px solid #E51636;
-  margin-left: auto;
 }
-.lpd-complete-btn:hover {
-  background: #E51636;
-  border-color: #E51636;
-}
+.lpd-complete-btn:hover { background: #c4112d; border-color: #c4112d; }
 .lpd-complete-btn.is-done {
   background: #ffffff;
-  color: #000000;
-  border-color: #000000;
+  color: #059669;
+  border-color: #a7f3d0;
 }
 .lpd-complete-btn.is-done:hover {
-  background: #f3f4f6;
+  background: #ecfdf5;
+  border-color: #059669;
 }
 .lpd-complete-btn.is-pending { opacity: 0.7; cursor: progress; }
 .lpd-complete-btn:disabled {
@@ -392,7 +388,7 @@
 }
 .lpd-complete-btn.is-done:disabled:hover {
   background: #ffffff;
-  border-color: #000000;
+  border-color: #a7f3d0;
 }
 
 /* ============================================================================
@@ -576,4 +572,52 @@
 /* ---- Responsive ---- */
 @media (min-width: 640px) {
   .lpd-title { font-size: 22px; }
+}
+
+/* ============================================================================
+   Gentle radius pass — softens the otherwise 90° aesthetic just enough that
+   the page doesn't feel rigid. Keep this LAST so it overrides any earlier
+   "sharp corners" rules without rewriting the original cascade.
+
+   Radius scale (matches LeadershipDevPlans.css and the rest of the app):
+     6px  — chips, badges, small pills
+     8px  — buttons, inputs, lesson cards
+    10px  — panels, paused banner, toast
+    12px  — modals
+   ============================================================================ */
+
+/* Panels + banners (lesson cards now have their own radius in the main rule) */
+.lpd-paused-banner,
+.lpd-toast,
+.lpd-loading,
+.lpd-error,
+.lpd-lesson-notes {
+  border-radius: 10px;
+}
+
+/* Modal surface and overlay */
+.lpd-modal { border-radius: 12px; }
+.lpd-modal-textarea { border-radius: 8px; }
+
+/* Buttons (lesson action buttons set their own radius inline above) */
+.lpd-back-btn,
+.lpd-pause-btn,
+.lpd-unenroll,
+.lpd-modal-cancel,
+.lpd-modal-submit,
+.lpd-modal-close,
+.lpd-toast-close {
+  border-radius: 8px;
+}
+
+/* Small pills / badges */
+.lpd-deadline-pill,
+.lpd-assigned-pill {
+  border-radius: 6px;
+}
+
+/* Progress bar — capsule fill */
+.lpd-progress-track,
+.lpd-progress-fill {
+  border-radius: 999px;
 }

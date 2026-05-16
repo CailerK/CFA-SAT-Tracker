@@ -426,9 +426,20 @@ class LessonCompletionViewSet(StoreScopedViewSet):
     serializer_class = LessonCompletionSerializer
 
     def get_queryset(self):
-        return LessonCompletion.objects.filter(
+        # Per-user isolation first.
+        qs = LessonCompletion.objects.filter(
             enrollment__user=self.request.user,
         ).select_related('enrollment')
+        # CRITICAL: scope to a specific enrollment when the caller asks for it.
+        # Lesson keys ('01', '02', ...) are NOT plan-namespaced — they repeat
+        # across every dev plan — so without this filter a user who has
+        # paused one plan and opened another would see the old plan's
+        # completions overwrite the new plan's empty state by lesson_key
+        # collision. See test_lesson_completion_isolation_by_enrollment.
+        enrollment_id = self.request.query_params.get('enrollment')
+        if enrollment_id:
+            qs = qs.filter(enrollment_id=enrollment_id)
+        return qs
 
     def _validate_enrollment(self, enrollment):
         if enrollment.user_id != self.request.user.id:

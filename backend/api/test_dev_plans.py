@@ -13,7 +13,7 @@ from datetime import date, timedelta
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import Store, User, UserDevelopmentPlan
+from .models import LessonCompletion, Store, User, UserDevelopmentPlan
 
 
 class _DevPlanTestMixin:
@@ -252,3 +252,78 @@ class TeamProgressTest(_DevPlanTestMixin, TestCase):
         for key in ('user', 'user_name', 'plan_key', 'status',
                     'progress_percent', 'completed_lesson_keys'):
             self.assertIn(key, first, f'missing field: {key}')
+
+
+class LessonCompletionIsolationTest(_DevPlanTestMixin, TestCase):
+    """Lesson keys ('01', '02', ...) are deliberately NOT plan-namespaced
+    in the frontend catalog. The backend MUST therefore honor the
+    `?enrollment=` query param so the detail page never sees completions
+    that belong to another enrollment owned by the same user.
+
+    Reproduces the bug: pause Plan A (with lessons 01/02/03 completed),
+    open Plan B → top three lessons appeared completed in Plan B's UI
+    because the lesson_key map collided.
+    """
+    URL = '/api/leadership/lesson-completions/'
+
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.member_a)
+        # Plan A — paused, with completions on lessons 01/02/03.
+        self.plan_a = UserDevelopmentPlan.objects.create(
+            user=self.member_a, plan_key='heart-of-leadership',
+            total_steps=19, status='paused', current_step=3,
+        )
+        for lesson_key in ('01', '02', '03'):
+            LessonCompletion.objects.create(
+                enrollment=self.plan_a, lesson_key=lesson_key,
+            )
+        # Plan B — active, brand-new, NO completions of its own.
+        self.plan_b = UserDevelopmentPlan.objects.create(
+            user=self.member_a, plan_key='restaurant-culture-builder',
+            total_steps=19, status='active', current_step=0,
+        )
+
+    def _completions_for(self, enrollment_id):
+        res = self.client.get(self.URL, {'enrollment': enrollment_id})
+        self.assertEqual(res.status_code, 200, res.content)
+        body = res.json()
+        return body.get('results') if isinstance(body, dict) else body
+
+    def test_enrollment_filter_scopes_completions(self):
+        """Plan B has zero completions of its own. Querying with
+        ?enrollment=<plan_b.id> must return [] — NOT plan A's three rows."""
+        rows = self._completions_for(self.plan_b.id)
+        self.assertEqual(rows, [], 'plan B leaked plan A completions')
+
+        # And Plan A still returns its own three rows.
+        rows_a = self._completions_for(self.plan_a.id)
+        self.assertEqual(len(rows_a), 3)
+        self.assertEqual(
+            sorted(r['lesson_key'] for r in rows_a),
+            ['01', '02', '03'],
+        )
+
+    def test_no_enrollment_filter_returns_all_for_user(self):
+        """Without the query param the endpoint still returns every
+        completion owned by the requester — that's the manager-style
+        per-user view used elsewhere."""
+        res = self.client.get(self.URL)
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        rows = body.get('results') if isinstance(body, dict) else body
+        self.assertEqual(len(rows), 3)
+
+    def test_completions_for_another_users_enrollment_are_invisible(self):
+        """Hardening: even if member_a forges plan_b.id of another user,
+        the per-user filter still hides it."""
+        plan_other = UserDevelopmentPlan.objects.create(
+            user=self.member_b, plan_key='heart-of-leadership',
+            total_steps=19, status='active',
+        )
+        LessonCompletion.objects.create(
+            enrollment=plan_other, lesson_key='01',
+        )
+        rows = self._completions_for(plan_other.id)
+        self.assertEqual(rows, [])

@@ -655,3 +655,72 @@
 @media (min-width: 640px) {
   .ldp-title { font-size: 26px; }
 }
+
+/* ============================================================================
+   Gentle radius pass — softens the otherwise 90° aesthetic just enough that
+   the page doesn't feel rigid. Keep this LAST so it overrides any earlier
+   "sharp corners" rules without rewriting the original cascade.
+
+   Radius scale (matches the rest of the app):
+     6px  — chips, badges, small pills
+     8px  — buttons, inputs
+    10px  — cards, panels, KPI tiles
+    12px  — page-level surfaces (modals, hero panels)
+   ============================================================================ */
+
+/* Cards + panels */
+.ldp-tile,
+.ldp-kpi,
+.ldp-loading,
+.ldp-empty,
+.ldp-error,
+.ldp-hint,
+.ldp-team-panel {
+  border-radius: 10px;
+}
+
+/* Buttons */
+.ldp-btn,
+.ldp-assign-btn,
+.ldp-team-refresh,
+.ldp-back {
+  border-radius: 8px;
+}
+
+/* Filter pill group: round the whole group, then square corners on inner
+   pills so they share an unbroken outline. The first/last pills inherit
+   the outer radius so the outline curve looks continuous. */
+.ldp-filters { border-radius: 8px; overflow: hidden; }
+
+/* Badges, chips, status indicators, small pills */
+.ldp-tile-badge,
+.ldp-tile-meta-item,
+.ldp-tile-category-badge,
+.ldp-deadline-pill,
+.ldp-assigned-pill,
+.ldp-team-row-status,
+.ldp-team-row-deadline {
+  border-radius: 6px;
+}
+
+/* Progress bars — fully rounded so the red fill reads as a capsule */
+.ldp-tile-progress-track,
+.ldp-team-row-progress-track,
+.ldp-tile-progress-fill,
+.ldp-team-row-progress-fill {
+  border-radius: 999px;
+}
+
+/* Inputs */
+.ldp-team-search { border-radius: 0; } /* lives inside .ldp-team-panel */
+.ldp-team-close { border-radius: 6px; }
+
+/* The tile's red top accent bar — round its corners so it tucks neatly
+   inside the now-rounded card. */
+.ldp-tile::before {
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+
+/* Tile icon — slightly rounded so the icon tile reads as a soft chip */
+.ldp-tile-icon { border-radius: 8px; }
