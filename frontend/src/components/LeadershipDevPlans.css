@@ -1,12 +1,14 @@
 /* ============================================================================
    Leadership > Development Plans library page
-   Visual style: clean, all-white surfaces with thin black borders, sharp
-   90° corners, red accents (no purple, no rounded edges, no soft shadows).
+   Visual style: matches the rest of the app's "task page" theme — light gray
+   page background (#f9fafb), white cards with soft 0 1px 3px shadows (no
+   heavy borders), gentle radii, and red accents. Borders only as faint
+   #e5e7eb separators where structure demands it.
    ============================================================================ */
 
 .ldp-page {
   min-height: 100vh;
-  background: #ffffff;
+  background: #f9fafb;
   padding: 8px clamp(12px, 3vw, 24px) 32px;
 }
 
@@ -30,24 +32,24 @@
 .ldp-header > .ldp-header-titles { grid-column: 1; }
 .ldp-header > .ldp-assign-btn { grid-column: 2; align-self: end; }
 
-/* Manager-only "Assign to team member" button */
+/* Manager-only "Assign to team member" / "Team Progress" buttons */
 .ldp-assign-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   background: #ffffff;
-  border: 1px solid #000000;
-  color: #000000;
+  border: 1px solid #e5e7eb;
+  color: #374151;
   font-size: 13px;
   font-weight: 600;
   padding: 8px 14px;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
 }
-.ldp-assign-btn:hover { background: #000000; color: #ffffff; }
-.ldp-assign-btn:hover svg { color: #ffffff; }
-.ldp-assign-btn svg { color: #000000; transition: color 0.15s ease; }
+.ldp-assign-btn:hover { background: #f9fafb; border-color: #d1d5db; color: #111827; }
+.ldp-assign-btn svg { color: #6b7280; transition: color 0.15s ease; }
+.ldp-assign-btn:hover svg { color: #374151; }
 
 .ldp-assign-help {
   font-size: 13px;
@@ -63,33 +65,33 @@
   gap: 6px;
   background: transparent;
   border: 0;
-  color: #000000;
+  color: #6b7280;
   font-size: 13px;
   font-weight: 500;
   padding: 6px 8px 6px 4px;
   margin-left: -4px;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
-.ldp-back:hover { background: #f3f4f6; }
+.ldp-back:hover { background: #f3f4f6; color: #111827; }
 
 .ldp-header-titles { padding: 0 4px; }
 .ldp-title {
   font-size: 22px;
   font-weight: 700;
-  color: #000000;
+  color: #111827;
   margin: 0 0 4px;
   letter-spacing: -0.01em;
 }
 .ldp-subtitle {
   font-size: 14px;
-  color: #4b5563;
+  color: #6b7280;
   margin: 0;
   max-width: 38rem;
   line-height: 1.5;
 }
 
-/* ---- KPIs (clean, black-bordered, no shadows) ---- */
+/* ---- KPIs (white card, soft shadow, no border — task-page style) ---- */
 .ldp-kpis {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -100,7 +102,8 @@
 }
 .ldp-kpi {
   background: #ffffff;
-  border: 1px solid #000000;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 14px 16px;
 }
 .ldp-kpi-label {
@@ -108,13 +111,13 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #000000;
+  color: #6b7280;
   margin-bottom: 4px;
 }
 .ldp-kpi-value {
   font-size: 22px;
   font-weight: 700;
-  color: #000000;
+  color: #111827;
   line-height: 1.2;
 }
 .ldp-kpi-value--purple,   /* legacy class name — repurposed to red */
@@ -122,49 +125,51 @@
 .ldp-kpi-value--emerald   { color: #059669; }
 .ldp-kpi-value--amber     { color: #b45309; }
 
-/* ---- Filter pills (no rounded edges per request) ---- */
+/* ---- Filter pills — task-page tab-strip style (white card, soft shadow,
+   pill-shaped active state in brand red) ---- */
 .ldp-filters {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 0;
+  gap: 4px;
   background: #ffffff;
-  border: 1px solid #000000;
-  padding: 0;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 6px;
   align-self: flex-start;
 }
 .ldp-pill {
   background: transparent;
   border: 0;
-  padding: 8px 16px;
+  padding: 8px 14px;
   font-size: 13px;
   font-weight: 600;
-  color: #000000;
+  color: #6b7280;
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
-  border-right: 1px solid #000000;
 }
-.ldp-pill:last-child { border-right: 0; }
-.ldp-pill:hover { background: #f3f4f6; }
+.ldp-pill:hover { background: #f3f4f6; color: #111827; }
 .ldp-pill.is-active {
-  background: #000000;
+  background: #E51636;
   color: #ffffff;
 }
+.ldp-pill.is-active:hover { background: #c4112d; color: #ffffff; }
 
 /* ---- Loading / empty / error ---- */
 .ldp-loading,
 .ldp-empty {
   padding: 32px 16px;
   text-align: center;
-  color: #4b5563;
+  color: #6b7280;
   font-size: 14px;
   background: #ffffff;
-  border: 1px solid #000000;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 .ldp-error {
   padding: 12px 14px;
-  background: #ffffff;
-  border: 1px solid #E51636;
-  color: #E51636;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
   font-size: 13px;
 }
 
@@ -181,89 +186,82 @@
 .ldp-tile {
   position: relative;
   background: #ffffff;
-  border: 1px solid #000000;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 18px 18px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: background-color 0.15s ease;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
-.ldp-tile:hover { background: #fafafa; }
+.ldp-tile:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  border-color: #d1d5db;
+}
 .ldp-tile.is-completed { background: #ffffff; }
 
-/* Top accent stripe — kept but always red */
-.ldp-tile::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: #E51636;
-}
-.ldp-tile--purple::before,
-.ldp-tile--red::before,
-.ldp-tile--blue::before,
-.ldp-tile--emerald::before,
-.ldp-tile--amber::before { background: #E51636; }
+/* The top red accent stripe felt heavy against the soft card; drop it.
+   Status communication now lives in the badge (top-right) and the progress
+   bar. */
 
 .ldp-tile-head {
   display: flex;
   align-items: flex-start;
   gap: 12px;
 }
+/* Pastel icon tile — same shape rule as the lesson cards on the detail page */
 .ldp-tile-icon {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  background: #ffffff;
-  border: 1px solid #000000;
+  width: 44px;
+  height: 44px;
+  background: #fff1f2;
+  color: #E51636;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
 }
-.ldp-tile--purple .ldp-tile-icon,
 .ldp-tile--red .ldp-tile-icon,
-.ldp-tile--blue .ldp-tile-icon,
-.ldp-tile--emerald .ldp-tile-icon,
-.ldp-tile--amber .ldp-tile-icon { background: #ffffff; }
+.ldp-tile--purple .ldp-tile-icon { background: #fff1f2; color: #E51636; }
+.ldp-tile--blue .ldp-tile-icon    { background: #eff6ff; color: #2563eb; }
+.ldp-tile--emerald .ldp-tile-icon { background: #ecfdf5; color: #059669; }
+.ldp-tile--amber .ldp-tile-icon   { background: #fffbeb; color: #b45309; }
 
 .ldp-tile-headings { flex: 1; min-width: 0; }
 .ldp-tile-name {
   font-size: 16px;
   font-weight: 700;
-  color: #000000;
+  color: #111827;
   margin: 0;
   line-height: 1.2;
   letter-spacing: -0.01em;
 }
 .ldp-tile-tagline {
   font-size: 13px;
-  color: #4b5563;
+  color: #6b7280;
   margin: 4px 0 0;
   line-height: 1.4;
 }
 
 .ldp-tile-badge {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 4px 10px;
-  border: 1px solid #000000;
-  background: #ffffff;
-  color: #000000;
+  border: 0;
+  background: #f3f4f6;
+  color: #4b5563;
 }
-.ldp-tile-badge--active    { background: #E51636; color: #ffffff; border-color: #E51636; }
-.ldp-tile-badge--paused    { background: #ffffff; color: #b45309; border-color: #b45309; }
-.ldp-tile-badge--completed { background: #ffffff; color: #059669; border-color: #059669; }
-.ldp-tile-badge--available { background: #ffffff; color: #000000; border-color: #000000; }
+.ldp-tile-badge--active    { background: #E51636; color: #ffffff; }
+.ldp-tile-badge--paused    { background: #fffbeb; color: #b45309; }
+.ldp-tile-badge--completed { background: #ecfdf5; color: #059669; }
+.ldp-tile-badge--available { background: #f3f4f6; color: #6b7280; }
 
 .ldp-tile-description {
   font-size: 13px;
-  color: #111827;
+  color: #4b5563;
   margin: 0;
   line-height: 1.55;
 }
@@ -282,63 +280,60 @@
   gap: 4px;
   font-size: 11px;
   font-weight: 600;
-  padding: 3px 8px;
-  border: 1px solid #000000;
-  background: #ffffff;
-  color: #000000;
+  padding: 3px 10px;
+  border: 0;
+  background: #f3f4f6;
+  color: #4b5563;
 }
 
 .ldp-tile-category-badge {
   font-size: 11px;
   font-weight: 700;
-  padding: 3px 8px;
-  border: 1px solid #000000;
-  background: #ffffff;
-  color: #000000;
+  padding: 3px 10px;
+  border: 0;
+  background: #f3f4f6;
+  color: #4b5563;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 .ldp-badge--purple,
-.ldp-badge--red,
-.ldp-badge--blue,
-.ldp-badge--emerald,
-.ldp-badge--amber {
-  background: #ffffff;
-  color: #000000;
-  border-color: #000000;
-}
+.ldp-badge--red     { background: #fff1f2; color: #E51636; }
+.ldp-badge--blue    { background: #eff6ff; color: #2563eb; }
+.ldp-badge--emerald { background: #ecfdf5; color: #059669; }
+.ldp-badge--amber   { background: #fffbeb; color: #b45309; }
 
-/* Deadline + assigned-by pills */
+/* Deadline + assigned-by pills — soft tinted (matches task-page chips) */
 .ldp-deadline-pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: 11px;
   font-weight: 600;
-  padding: 3px 8px;
-  border: 1px solid #000000;
-  background: #ffffff;
-  color: #000000;
+  padding: 3px 10px;
+  border: 0;
+  background: #f3f4f6;
+  color: #4b5563;
 }
-.ldp-deadline-pill svg { color: #000000; }
+.ldp-deadline-pill svg { color: #6b7280; }
 .ldp-deadline-pill.is-overdue {
-  background: #E51636;
-  color: #ffffff;
-  border-color: #E51636;
+  background: #fef2f2;
+  color: #b91c1c;
 }
-.ldp-deadline-pill.is-overdue svg { color: #ffffff; }
+.ldp-deadline-pill.is-overdue svg { color: #b91c1c; }
 .ldp-assigned-pill {
   display: inline-flex;
   align-items: center;
   font-size: 11px;
   font-weight: 500;
-  padding: 3px 8px;
-  border: 1px solid #000000;
-  background: #ffffff;
-  color: #000000;
+  padding: 3px 10px;
+  border: 0;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-style: italic;
 }
 
-/* Progress bar — red fill, black outline */
+/* Progress bar — borderless track, red fill (matches TaskHistory.css
+   .stats-progress-bar) */
 .ldp-tile-progress {
   display: flex;
   align-items: center;
@@ -347,8 +342,8 @@
 .ldp-tile-progress-track {
   flex: 1;
   height: 6px;
-  background: #ffffff;
-  border: 1px solid #000000;
+  background: #f3f4f6;
+  border: 0;
   overflow: hidden;
 }
 .ldp-tile-progress-fill {
@@ -357,12 +352,12 @@
   transition: width 0.3s ease;
 }
 .ldp-tile-progress-fill.is-paused {
-  background: #000000;
+  background: #9ca3af;
 }
 .ldp-tile-progress-text {
   font-size: 12px;
   font-weight: 700;
-  color: #000000;
+  color: #4b5563;
   min-width: 36px;
   text-align: right;
 }
@@ -376,7 +371,7 @@
 }
 .ldp-btn {
   flex: 1;
-  border: 1px solid #000000;
+  border: 1px solid transparent;
   padding: 10px 14px;
   font-size: 13px;
   font-weight: 600;
@@ -394,30 +389,35 @@
   border-color: #E51636;
 }
 .ldp-btn--primary:hover:not(:disabled) {
-  background: #E51636;
-  border-color: #E51636;
+  background: #c4112d;
+  border-color: #c4112d;
 }
 .ldp-btn--secondary {
-  background: #000000;
+  background: #E51636;
   color: #ffffff;
-  border-color: #000000;
+  border-color: #E51636;
 }
-.ldp-btn--secondary:hover:not(:disabled) { background: #1f2937; }
+.ldp-btn--secondary:hover:not(:disabled) {
+  background: #c4112d;
+  border-color: #c4112d;
+}
 .ldp-btn--ghost {
   background: #ffffff;
-  color: #000000;
-  border-color: #000000;
+  color: #374151;
+  border-color: #e5e7eb;
 }
 .ldp-btn--ghost:hover:not(:disabled) {
-  background: #000000;
-  color: #ffffff;
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #111827;
 }
 
 /* ---- Friendly hint ---- */
 .ldp-hint {
   background: #ffffff;
-  border: 1px solid #000000;
-  color: #000000;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  color: #374151;
   padding: 10px 14px;
   font-size: 13px;
   line-height: 1.5;
@@ -433,21 +433,30 @@
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-/* Active toggle state for the Team Progress button */
+/* Active toggle state for the Team Progress button (red accent like
+   .history-tab.active in TaskHistory.css) */
 .ldp-assign-btn.is-active {
-  background: #000000;
+  background: #E51636;
+  color: #ffffff;
+  border-color: #E51636;
+}
+.ldp-assign-btn.is-active:hover {
+  background: #c4112d;
+  border-color: #c4112d;
   color: #ffffff;
 }
-.ldp-assign-btn.is-active svg { color: #ffffff; }
+.ldp-assign-btn.is-active svg,
+.ldp-assign-btn.is-active:hover svg { color: #ffffff; }
 
 /* ============================================================================
    Team Progress panel — manager+ tool listing subordinates' enrollments.
-   Same crisp aesthetic as the rest of the page (white bg, black border,
-   sharp corners, red accents).
+   Themed to match the task pages: white card, faint #e5e7eb border, soft
+   shadow, light separators inside.
    ============================================================================ */
 .ldp-team-panel {
   background: #ffffff;
-  border: 1px solid #000000;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
 }
@@ -457,18 +466,18 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid #000000;
+  border-bottom: 1px solid #f3f4f6;
 }
 .ldp-team-title {
   font-size: 16px;
   font-weight: 700;
-  color: #000000;
+  color: #111827;
   margin: 0 0 2px;
   letter-spacing: -0.01em;
 }
 .ldp-team-sub {
   font-size: 12px;
-  color: #4b5563;
+  color: #6b7280;
   margin: 0;
   line-height: 1.4;
   max-width: 36rem;
@@ -483,27 +492,31 @@
   align-items: center;
   gap: 4px;
   background: #ffffff;
-  border: 1px solid #000000;
-  color: #000000;
+  border: 1px solid #e5e7eb;
+  color: #374151;
   font-size: 12px;
   font-weight: 600;
   padding: 5px 10px;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.ldp-team-refresh:hover:not(:disabled) { background: #000000; color: #ffffff; }
+.ldp-team-refresh:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #111827;
+}
 .ldp-team-refresh:disabled { opacity: 0.5; cursor: progress; }
 .ldp-team-close {
   background: transparent;
   border: 1px solid transparent;
   font-size: 18px;
   line-height: 1;
-  color: #000000;
+  color: #6b7280;
   cursor: pointer;
   padding: 4px 9px;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
-.ldp-team-close:hover { background: #f3f4f6; }
+.ldp-team-close:hover { background: #f3f4f6; color: #111827; }
 
 /* Search input */
 .ldp-team-search {
@@ -511,10 +524,10 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  border-bottom: 1px solid #000000;
+  border-bottom: 1px solid #f3f4f6;
   background: #ffffff;
 }
-.ldp-team-search svg { color: #000000; flex-shrink: 0; }
+.ldp-team-search svg { color: #9ca3af; flex-shrink: 0; }
 .ldp-team-search input {
   flex: 1;
   border: 0;
@@ -536,8 +549,8 @@
   text-align: center;
   font-size: 13px;
 }
-.ldp-team-empty { color: #4b5563; }
-.ldp-team-error { color: #E51636; }
+.ldp-team-empty { color: #6b7280; }
+.ldp-team-error { color: #b91c1c; }
 
 /* List of subordinates */
 .ldp-team-list {
@@ -568,7 +581,7 @@
 .ldp-team-row-name {
   font-size: 14px;
   font-weight: 700;
-  color: #000000;
+  color: #111827;
   letter-spacing: -0.005em;
 }
 .ldp-team-row-status {
@@ -576,18 +589,18 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 2px 8px;
-  border: 1px solid #000000;
-  background: #ffffff;
-  color: #000000;
+  padding: 2px 10px;
+  border: 0;
+  background: #f3f4f6;
+  color: #4b5563;
 }
-.ldp-team-row-status.ldp-status--active    { background: #E51636; color: #ffffff; border-color: #E51636; }
-.ldp-team-row-status.ldp-status--paused    { background: #ffffff; color: #b45309; border-color: #b45309; }
-.ldp-team-row-status.ldp-status--completed { background: #ffffff; color: #047857; border-color: #047857; }
+.ldp-team-row-status.ldp-status--active    { background: #E51636; color: #ffffff; }
+.ldp-team-row-status.ldp-status--paused    { background: #fffbeb; color: #b45309; }
+.ldp-team-row-status.ldp-status--completed { background: #ecfdf5; color: #047857; }
 
 .ldp-team-row-plan {
   font-size: 13px;
-  color: #111827;
+  color: #4b5563;
   margin-bottom: 6px;
 }
 .ldp-team-row-progress {
@@ -599,8 +612,8 @@
 .ldp-team-row-progress-track {
   flex: 1;
   height: 6px;
-  background: #ffffff;
-  border: 1px solid #000000;
+  background: #f3f4f6;
+  border: 0;
   overflow: hidden;
 }
 .ldp-team-row-progress-fill {
@@ -611,7 +624,7 @@
 .ldp-team-row-progress-text {
   font-size: 12px;
   font-weight: 700;
-  color: #000000;
+  color: #4b5563;
   min-width: 36px;
   text-align: right;
 }
@@ -623,26 +636,25 @@
   align-items: flex-end;
   gap: 4px;
   font-size: 11px;
-  color: #4b5563;
+  color: #6b7280;
 }
 .ldp-team-row-deadline {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-weight: 600;
-  padding: 2px 8px;
-  border: 1px solid #000000;
-  background: #ffffff;
-  color: #000000;
+  padding: 2px 10px;
+  border: 0;
+  background: #f3f4f6;
+  color: #4b5563;
 }
 .ldp-team-row-deadline.is-overdue {
-  background: #E51636;
-  color: #ffffff;
-  border-color: #E51636;
+  background: #fef2f2;
+  color: #b91c1c;
 }
 .ldp-team-row-assigner {
   font-style: italic;
-  color: #4b5563;
+  color: #6b7280;
 }
 
 @media (max-width: 640px) {

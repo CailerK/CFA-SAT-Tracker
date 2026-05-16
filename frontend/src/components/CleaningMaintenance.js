@@ -110,10 +110,10 @@ const CleaningMaintenance = ({ user }) => {
   };
 
   const frequencies = [
-    { id: 'daily', label: 'Daily', count: counts.daily.done, total: counts.daily.total },
-    { id: 'weekly', label: 'Weekly', count: counts.weekly.done, total: counts.weekly.total },
-    { id: 'monthly', label: 'Monthly', count: counts.monthly.done, total: counts.monthly.total },
-    { id: 'quarterly', label: 'Quarterly', count: counts.quarterly.done, total: counts.quarterly.total },
+    { id: 'daily',     label: 'Daily',     emoji: '☀️', count: counts.daily.done,     total: counts.daily.total },
+    { id: 'weekly',    label: 'Weekly',    emoji: '📅', count: counts.weekly.done,    total: counts.weekly.total },
+    { id: 'monthly',   label: 'Monthly',   emoji: '🌙', count: counts.monthly.done,   total: counts.monthly.total },
+    { id: 'quarterly', label: 'Quarterly', emoji: '⭐', count: counts.quarterly.done, total: counts.quarterly.total },
   ];
 
   const currentTasks = tasks[activeFrequency] || [];
@@ -250,6 +250,7 @@ const CleaningMaintenance = ({ user }) => {
                 className={`frequency-tab ${activeFrequency === freq.id ? 'active' : ''}`}
                 onClick={() => setActiveFrequency(freq.id)}
               >
+                <span className="freq-emoji" role="img" aria-hidden="true">{freq.emoji}</span>
                 <span className="freq-label">{freq.label}</span>
                 <span className="freq-count">{freq.count}/{freq.total}</span>
               </button>
@@ -257,7 +258,14 @@ const CleaningMaintenance = ({ user }) => {
           </div>
         </div>
 
-        {/* Tasks List */}
+        {/* Tasks card — wraps progress bar + list, FOH-style */}
+        <div className="tasks-card">
+          <div className="tasks-progress-track">
+            <div
+              className="tasks-progress-fill"
+              style={{ width: `${currentFreq.total ? (currentFreq.count / currentFreq.total) * 100 : 0}%` }}
+            />
+          </div>
         <div className="tasks-list">
           {isLoading && <div style={{ padding: 24, color: '#6b7280' }}>Loading tasks…</div>}
           {!isLoading && errorMsg && <div style={{ padding: 12, color: '#dc2626', fontSize: 14 }}>{errorMsg}</div>}
@@ -303,6 +311,7 @@ const CleaningMaintenance = ({ user }) => {
               )}
             </div>
           ))}
+        </div>
         </div>
 
         {/* Progress Footer */}

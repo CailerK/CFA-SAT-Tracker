@@ -218,6 +218,18 @@ const leadershipService = {
       { method: "DELETE" },
     );
   },
+
+  // PATCH the reflection notes on an existing completion without changing
+  // its completed_at or other fields. Used by the "Edit Response" button.
+  async updateLessonCompletion(completionId, { notes = "" } = {}) {
+    return apiService.request(
+      `/leadership/lesson-completions/${completionId}/`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ notes }),
+      },
+    );
+  },
 };
 
 export default leadershipService;

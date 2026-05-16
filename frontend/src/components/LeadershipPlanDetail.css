@@ -211,8 +211,9 @@
 .lpd-lesson:hover { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); }
 .lpd-lesson.is-completed { background: #ffffff; }
 
-/* Header row — no longer a button (the lesson is always expanded). It still
-   uses flex so the icon + title block lay out side-by-side. */
+/* Header row — clickable button that toggles the body. Lessons default to
+   collapsed; the divider only shows when the lesson is expanded so a tight
+   stack of closed cards doesn't have stripes inside each one. */
 .lpd-lesson-row {
   width: 100%;
   display: flex;
@@ -222,9 +223,24 @@
   text-align: left;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid #f3f4f6;
-  cursor: default;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: background-color 0.15s ease;
 }
+.lpd-lesson-row:hover { background: #f9fafb; }
+.lpd-lesson.is-expanded .lpd-lesson-row {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+/* Chevron — rotates 180° when the lesson is open */
+.lpd-row-chevron {
+  flex-shrink: 0;
+  color: #9ca3af;
+  transition: transform 0.2s ease, color 0.15s ease;
+}
+.lpd-lesson-row:hover .lpd-row-chevron { color: #6b7280; }
+.lpd-row-chevron.is-open { transform: rotate(180deg); color: #6b7280; }
 
 /* ---- Type icon — circular pastel tile, per-type tint ----
    Matches the LD Growth screenshot: 36×36 round, soft tinted background,
@@ -336,7 +352,9 @@
 }
 
 .lpd-resource-btn,
-.lpd-complete-btn {
+.lpd-complete-btn,
+.lpd-edit-btn,
+.lpd-remove-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -367,16 +385,7 @@
   color: #ffffff;
   border: 1px solid #E51636;
 }
-.lpd-complete-btn:hover { background: #c4112d; border-color: #c4112d; }
-.lpd-complete-btn.is-done {
-  background: #ffffff;
-  color: #059669;
-  border-color: #a7f3d0;
-}
-.lpd-complete-btn.is-done:hover {
-  background: #ecfdf5;
-  border-color: #059669;
-}
+.lpd-complete-btn:hover:not(:disabled) { background: #c4112d; border-color: #c4112d; }
 .lpd-complete-btn.is-pending { opacity: 0.7; cursor: progress; }
 .lpd-complete-btn:disabled {
   opacity: 0.5;
@@ -386,10 +395,35 @@
   background: #E51636;
   border-color: #E51636;
 }
-.lpd-complete-btn.is-done:disabled:hover {
+
+/* "Edit Response" — neutral outlined (pencil icon).
+   Shown alongside "Remove" when the lesson is already completed. */
+.lpd-edit-btn {
   background: #ffffff;
-  border-color: #a7f3d0;
+  color: #374151;
+  border: 1px solid #e5e7eb;
 }
+.lpd-edit-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #111827;
+}
+.lpd-edit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* "Remove" — destructive outlined (trash icon).
+   Clears the completion record (un-completes the lesson). */
+.lpd-remove-btn {
+  background: #ffffff;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+.lpd-remove-btn:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+.lpd-remove-btn.is-pending { opacity: 0.7; cursor: progress; }
+.lpd-remove-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ============================================================================
    Completion reflection modal (LD-Growth style: white card, black border,

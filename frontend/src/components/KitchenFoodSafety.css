@@ -240,13 +240,13 @@
 }
 
 /* Task Tabs */
-.task-tabs {
+.kfs-task-tabs {
   display: flex;
   gap: 4px;
   margin-bottom: 16px;
 }
 
-.task-tab {
+.kfs-task-tab {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -263,17 +263,17 @@
   justify-content: center;
 }
 
-.task-tab:hover {
+.kfs-task-tab:hover {
   background: #f3f4f6;
   color: #374151;
 }
 
-.task-tab.active {
+.kfs-task-tab.active {
   background: #E51636;
   color: white;
 }
 
-.task-count {
+.kfs-task-count {
   background: rgba(255, 255, 255, 0.2);
   padding: 2px 8px;
   border-radius: 12px;
@@ -282,13 +282,13 @@
 }
 
 /* Task List */
-.task-list {
+.kfs-task-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.task-item {
+.kfs-task-item {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -298,40 +298,54 @@
   transition: all 0.2s ease;
 }
 
-.task-item.completed {
+.kfs-task-item.completed {
   background: #f0fdf4;
 }
 
-.task-checkbox {
-  width: 20px;
-  height: 20px;
+.kfs-task-checkbox {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #d1d5db;
+  background: #ffffff;
   border-radius: 6px;
-  background: #10b981;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: #ffffff;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 0;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
 }
 
-.task-content {
+.kfs-task-checkbox:hover {
+  border-color: #9ca3af;
+}
+
+.kfs-task-item.completed .kfs-task-checkbox {
+  background: #E51636;
+  border-color: #E51636;
+}
+
+.kfs-task-content {
   flex: 1;
 }
 
-.task-text {
+.kfs-task-text {
   font-size: 14px;
   color: #111827;
   line-height: 1.4;
+  font-weight: 500;
 }
 
-.task-item.completed .task-text {
-  color: #15803d;
+.kfs-task-item.completed .kfs-task-text {
+  color: #9ca3af;
+  text-decoration: line-through;
 }
 
-.task-meta {
+.kfs-task-meta {
   font-size: 12px;
-  color: #10b981;
+  color: #6b7280;
   margin-top: 4px;
 }
 
@@ -460,12 +474,12 @@
     grid-template-columns: 1fr;
   }
 
-  .task-tabs,
+  .kfs-task-tabs,
   .temp-tabs {
     flex-wrap: wrap;
   }
 
-  .task-tab,
+  .kfs-task-tab,
   .temp-tab {
     flex: 1 1 auto;
     font-size: 12px;

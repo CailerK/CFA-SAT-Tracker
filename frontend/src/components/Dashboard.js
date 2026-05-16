@@ -39,6 +39,7 @@ import TeamDevelopment from './TeamDevelopment';
 import LeadershipDevelopment from './LeadershipDevelopment';
 import LeadershipDevPlans from './LeadershipDevPlans';
 import LeadershipPlanDetail from './LeadershipPlanDetail';
+import CultureLeadershipPlanTemplate from './CultureLeadershipPlanTemplate';
 import Leadership360Evaluations from './Leadership360Evaluations';
 import New360Evaluation from './New360Evaluation';
 
@@ -501,7 +502,22 @@ const Dashboard = ({ user, onLogout }) => {
         ) : currentPage === 'dev-plan-detail' ? (
           <LeadershipPlanDetail
             planKey={currentParam}
-            onNavigate={(page) => setCurrentPage(page)}
+            onNavigate={(page, data) => setCurrentPage(page, data?.planKey ?? null)}
+          />
+        ) : currentPage === 'culture-leadership-plan-template' ? (
+          <CultureLeadershipPlanTemplate
+            onNavigate={(page) => {
+              // The template page's only navigation target is "Back to plan".
+              // currentParam holds the plan key the user opened the resource
+              // from (passed via onNavigate(page, { planKey }) in
+              // LeadershipPlanDetail). Falls back to the plan that owns this
+              // resource if currentParam isn't set.
+              if (page === 'dev-plan-detail') {
+                setCurrentPage('dev-plan-detail', currentParam || 'restaurant-culture-builder');
+              } else {
+                setCurrentPage(page);
+              }
+            }}
           />
         ) : currentPage === 'team-development' ? (
           <TeamDevelopment 

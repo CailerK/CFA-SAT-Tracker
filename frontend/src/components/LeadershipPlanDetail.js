@@ -123,6 +123,18 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
   const [error, setError] = useState(null);
   // Pending toggle keys to debounce double-clicks.
   const [pendingKeys, setPendingKeys] = useState(() => new Set());
+  // Lessons default to COLLAPSED. We track the set of expanded keys so the
+  // user can drill in to a single lesson at a time without overwhelming the
+  // page. Marking a lesson complete auto-closes it (handled in submitCompletion).
+  const [expandedKeys, setExpandedKeys] = useState(() => new Set());
+  const toggleExpanded = (key) => {
+    setExpandedKeys((s) => {
+      const next = new Set(s);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
   // Completion modal: when the user clicks Complete on an unfinished lesson,
   // we open this modal asking for a short reflection (matches LD Growth's
   // "Describe what you did and what you learned from it" flow). The notes
@@ -130,6 +142,9 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
   const [completionLesson, setCompletionLesson] = useState(null);
   const [completionNotes, setCompletionNotes] = useState('');
   const [completionBusy, setCompletionBusy] = useState(false);
+  // When set, the modal is in "edit" mode for an EXISTING completion (PATCH
+  // its notes) instead of creating a new one (POST). null = create mode.
+  const [editingCompletionId, setEditingCompletionId] = useState(null);
   // "Task Completed" success toast — shows for ~4s after a successful save.
   const [showCompletionToast, setShowCompletionToast] = useState(false);
   // Confirm "Unenroll" dialog.
@@ -261,15 +276,57 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
     }
   };
 
-  // POST the completion with the user's reflection notes. Optimistically
-  // marks the lesson done; on failure rolls back and keeps the modal open
-  // so the user can retry without losing what they typed.
+  // Open the modal in EDIT mode for a lesson that's already been completed.
+  // Pre-fills the existing notes so the user is editing, not starting over.
+  const openEditResponse = (lesson) => {
+    const existing = completionsByKey[lesson.key];
+    if (!existing) return;
+    setCompletionLesson(lesson);
+    setCompletionNotes(existing.notes || '');
+    setEditingCompletionId(existing.id);
+  };
+
+  // Submit handler — branches on editingCompletionId. When set, PATCH the
+  // existing completion's notes. When null, POST a new completion (the
+  // first-time reflection flow). Both paths optimistically update the UI
+  // and roll back on failure.
   const submitCompletion = async () => {
     if (!completionLesson || !enrollment) return;
     const lesson = completionLesson;
     const notes = completionNotes.trim();
     setCompletionBusy(true);
 
+    // ---- EDIT mode: PATCH the existing completion's notes only. ----
+    if (editingCompletionId) {
+      const prev = completionsByKey[lesson.key];
+      setCompletionsByKey((m) => ({
+        ...m,
+        [lesson.key]: { ...(prev || {}), notes },
+      }));
+      try {
+        const updated = await leadershipService.updateLessonCompletion(
+          editingCompletionId,
+          { notes },
+        );
+        setCompletionsByKey((m) => ({ ...m, [lesson.key]: updated }));
+        setCompletionLesson(null);
+        setCompletionNotes('');
+        setEditingCompletionId(null);
+      } catch (err) {
+        console.error('Update response failed:', err);
+        // Roll back to whatever was there before — leave the modal open
+        // so the user can retry without losing their edit.
+        if (prev) {
+          setCompletionsByKey((m) => ({ ...m, [lesson.key]: prev }));
+        }
+        setError('Could not save your response. Please try again.');
+      } finally {
+        setCompletionBusy(false);
+      }
+      return;
+    }
+
+    // ---- CREATE mode: POST a new completion (first-time reflection). ----
     setPendingKeys((s) => new Set(s).add(lesson.key));
     const placeholder = {
       id: `tmp-${lesson.key}`,
@@ -289,6 +346,13 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
       await loadEnrollment();
       setCompletionLesson(null);
       setCompletionNotes('');
+      // Auto-collapse the lesson now that it's done so the list stays tidy.
+      setExpandedKeys((s) => {
+        if (!s.has(lesson.key)) return s;
+        const next = new Set(s);
+        next.delete(lesson.key);
+        return next;
+      });
       // Pop the success toast.
       setShowCompletionToast(true);
     } catch (err) {
@@ -315,6 +379,7 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
     if (completionBusy) return;
     setCompletionLesson(null);
     setCompletionNotes('');
+    setEditingCompletionId(null);
   };
 
   const performUnenroll = async () => {
@@ -472,13 +537,19 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
             {plan.lessons.map((lesson) => {
               const isCompleted = !!completionsByKey[lesson.key];
               const isPending = pendingKeys.has(lesson.key);
+              const isExpanded = expandedKeys.has(lesson.key);
               const typeClass = TYPE_META[lesson.type]?.className || 'lpd-type--gray';
               return (
                 <article
                   key={lesson.key}
-                  className={`lpd-lesson ${isCompleted ? 'is-completed' : ''}`}
+                  className={`lpd-lesson ${isCompleted ? 'is-completed' : ''} ${isExpanded ? 'is-expanded' : ''}`}
                 >
-                  <div className="lpd-lesson-row">
+                  <button
+                    type="button"
+                    className="lpd-lesson-row"
+                    onClick={() => toggleExpanded(lesson.key)}
+                    aria-expanded={isExpanded}
+                  >
                     <span className={`lpd-type-icon ${typeClass}`} aria-hidden="true">
                       <TypeIcon type={lesson.type} />
                     </span>
@@ -496,7 +567,17 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
                         </span>
                       </span>
                     </span>
-                  </div>
+                    <svg
+                      className={`lpd-row-chevron ${isExpanded ? 'is-open' : ''}`}
+                      width="16" height="16" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor"
+                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </button>
+                  {isExpanded && (
                   <div className="lpd-lesson-body">
                     {renderMarkdown(lesson.description)}
                     {isCompleted && completionsByKey[lesson.key]?.notes && (
@@ -508,51 +589,101 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
                       </div>
                     )}
                     <div className="lpd-lesson-actions">
-                      {lesson.resourceUrl && (
-                        <a
-                          className="lpd-resource-btn"
-                          href={lesson.resourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                      {lesson.resourceUrl && (() => {
+                        // resourceUrl beginning with '#/' is an in-app page.
+                        // Navigate via onNavigate so we don't bounce out to a
+                        // new tab, and pass the current plan key so "Back to
+                        // plan" inside the resource works.
+                        const isInternal = lesson.resourceUrl.startsWith('#/');
+                        if (isInternal) {
+                          const targetPage = lesson.resourceUrl.slice(2);
+                          return (
+                            <button
+                              type="button"
+                              className="lpd-resource-btn"
+                              onClick={() => onNavigate
+                                && onNavigate(targetPage, { planKey: plan.key })}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                <polyline points="15 3 21 3 21 9"/>
+                                <line x1="10" x2="21" y1="14" y2="3"/>
+                              </svg>
+                              Open Resource
+                            </button>
+                          );
+                        }
+                        return (
+                          <a
+                            className="lpd-resource-btn"
+                            href={lesson.resourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                              <polyline points="15 3 21 3 21 9"/>
+                              <line x1="10" x2="21" y1="14" y2="3"/>
+                            </svg>
+                            Open Resource
+                          </a>
+                        );
+                      })()}
+                      {isCompleted ? (
+                        <>
+                          <button
+                            type="button"
+                            className="lpd-edit-btn"
+                            onClick={() => openEditResponse(lesson)}
+                            disabled={isPending || isPaused}
+                            title={isPaused
+                              ? 'Resume the plan to edit your response'
+                              : 'Edit your reflection on this lesson'}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                            </svg>
+                            Edit Response
+                          </button>
+                          <button
+                            type="button"
+                            className={`lpd-remove-btn ${isPending ? 'is-pending' : ''}`}
+                            onClick={() => toggleLesson(lesson)}
+                            disabled={isPending || isPaused}
+                            title={isPaused
+                              ? 'Resume the plan to update lessons'
+                              : 'Remove your completion for this lesson'}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6"/>
+                              <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/>
+                              <path d="M10 11v6"/>
+                              <path d="M14 11v6"/>
+                              <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            Remove
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`lpd-complete-btn ${isPending ? 'is-pending' : ''}`}
+                          onClick={() => toggleLesson(lesson)}
+                          disabled={isPending || isPaused}
+                          title={isPaused
+                            ? 'Resume the plan to update lessons'
+                            : 'Mark this lesson complete'}
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                            <polyline points="15 3 21 3 21 9"/>
-                            <line x1="10" x2="21" y1="14" y2="3"/>
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="9 12 11 14 15 10"/>
                           </svg>
-                          Open Resource
-                        </a>
+                          Complete
+                        </button>
                       )}
-                      <button
-                        type="button"
-                        className={`lpd-complete-btn ${isCompleted ? 'is-done' : ''} ${isPending ? 'is-pending' : ''}`}
-                        onClick={() => toggleLesson(lesson)}
-                        disabled={isPending || isPaused}
-                        title={isPaused
-                          ? 'Resume the plan to update lessons'
-                          : isCompleted
-                            ? 'Mark this lesson incomplete'
-                            : 'Mark this lesson complete'}
-                      >
-                        {isCompleted ? (
-                          <>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12"/>
-                            </svg>
-                            Completed
-                          </>
-                        ) : (
-                          <>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10"/>
-                              <polyline points="9 12 11 14 15 10"/>
-                            </svg>
-                            Complete
-                          </>
-                        )}
-                      </button>
                     </div>
                   </div>
+                  )}
                 </article>
               );
             })}
@@ -579,10 +710,12 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
               ×
             </button>
             <h2 className="lpd-modal-title" id="lpd-completion-title">
-              {completionLesson.title}
+              {editingCompletionId ? 'Edit your response' : completionLesson.title}
             </h2>
             <p className="lpd-modal-desc">
-              {(completionLesson.description || '').split('\n')[0]}
+              {editingCompletionId
+                ? completionLesson.title
+                : (completionLesson.description || '').split('\n')[0]}
             </p>
             <textarea
               className="lpd-modal-textarea"
@@ -610,7 +743,11 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
                 onClick={submitCompletion}
                 disabled={completionBusy}
               >
-                {completionBusy ? 'Saving…' : 'Complete'}
+                {completionBusy
+                  ? 'Saving…'
+                  : editingCompletionId
+                    ? 'Save changes'
+                    : 'Complete'}
               </button>
             </div>
           </div>

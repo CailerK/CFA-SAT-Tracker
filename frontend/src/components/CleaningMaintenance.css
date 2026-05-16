@@ -105,61 +105,109 @@
 }
 
 /* Frequency Tabs */
+/* Frequency tabs — FOH-pill style for visual consistency */
 .frequency-tabs-wrap {
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 0 16px;
+  background: transparent;
+  border-bottom: none;
+  padding: 12px 16px 0;
+  max-width: 42rem;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .frequency-tabs {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(229, 231, 235, 0.8);
   display: flex;
-  gap: 0;
-  overflow-x: auto;
+  gap: 4px;
 }
 
 .frequency-tab {
   flex: 1;
   min-width: 0;
-  padding: 12px 16px;
+  padding: 12px;
   border: none;
   background: transparent;
-  color: #6b7280;
-  font-size: 13px;
-  font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
-  border-bottom: 2px solid transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  white-space: nowrap;
+  gap: 2px;
+  transition: all 0.2s ease;
+  color: #4b5563;
+  font-family: inherit;
+  border-radius: 12px;
 }
 
-.frequency-tab:hover {
-  color: #374151;
-  background: #f9fafb;
+.frequency-tab:hover:not(.active) {
+  background: #fff1f2;
 }
 
 .frequency-tab.active {
-  color: #E51636;
-  border-bottom-color: #E51636;
+  background: #E51636;
+  color: #ffffff;
+  box-shadow: 0 10px 15px -3px rgba(229, 22, 54, 0.25),
+              0 4px 6px -2px rgba(229, 22, 54, 0.1);
+}
+
+.freq-emoji {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .freq-label {
   display: block;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: #111827;
+}
+
+.frequency-tab.active .freq-label {
+  color: #ffffff;
 }
 
 .freq-count {
-  font-size: 11px;
-  color: inherit;
-  opacity: 0.7;
+  font-size: 12px;
+  line-height: 1;
+  margin-top: 2px;
+  color: #6b7280;
+}
+
+.frequency-tab.active .freq-count {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Tasks card — wraps the list with progress bar at top */
+.tasks-card {
+  max-width: 42rem;
+  margin: 12px auto 0;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  overflow: hidden;
+}
+
+.tasks-progress-track {
+  height: 4px;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+.tasks-progress-fill {
+  height: 100%;
+  background: linear-gradient(to right, rgba(229, 22, 54, 0.7), #E51636);
+  transition: width 0.5s ease-out;
 }
 
 /* Tasks List */
 .tasks-list {
   background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
 }
 
 /* Task row — mirrors .foh-task-row exactly */

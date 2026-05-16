@@ -474,47 +474,47 @@ const KitchenFoodSafety = ({ onNavigate, user }) => {
           </div>
 
           {/* Task Tabs */}
-          <div className="task-tabs">
+          <div className="kfs-task-tabs">
             <button 
-              className={`task-tab ${activeTaskTab === 'morning' ? 'active' : ''}`}
+              className={`kfs-task-tab ${activeTaskTab === 'morning' ? 'active' : ''}`}
               onClick={() => setActiveTaskTab('morning')}
             >
               🌅 Morning
             </button>
             <button 
-              className={`task-tab ${activeTaskTab === 'lunch' ? 'active' : ''}`}
+              className={`kfs-task-tab ${activeTaskTab === 'lunch' ? 'active' : ''}`}
               onClick={() => setActiveTaskTab('lunch')}
             >
-              ☀️ Lunch <span className="task-count">10</span>
+              ☀️ Lunch <span className="kfs-task-count">10</span>
             </button>
             <button 
-              className={`task-tab ${activeTaskTab === 'dinner' ? 'active' : ''}`}
+              className={`kfs-task-tab ${activeTaskTab === 'dinner' ? 'active' : ''}`}
               onClick={() => setActiveTaskTab('dinner')}
             >
-              🌙 Dinner <span className="task-count">10</span>
+              🌙 Dinner <span className="kfs-task-count">10</span>
             </button>
           </div>
 
           {/* Task List */}
-          <div className="task-list">
+          <div className="kfs-task-list">
             {safetyTasks[activeTaskTab].map(task => (
               <div
                 key={task.id}
-                className={`task-item ${task.completed ? 'completed' : ''}`}
+                className={`kfs-task-item ${task.completed ? 'completed' : ''}`}
                 onClick={() => toggleSafetyTask(task.id, task.completed)}
                 style={{ cursor: 'pointer' }}
               >
-                <div className="task-checkbox">
+                <div className="kfs-task-checkbox">
                   {task.completed && (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                       <polyline points="20,6 9,17 4,12"/>
                     </svg>
                   )}
                 </div>
-                <div className="task-content">
-                  <div className="task-text">{task.text}</div>
+                <div className="kfs-task-content">
+                  <div className="kfs-task-text">{task.text}</div>
                   {task.completed && (
-                    <div className="task-meta">{task.user} • {task.time}</div>
+                    <div className="kfs-task-meta">{task.user} • {task.time}</div>
                   )}
                 </div>
               </div>
