@@ -287,7 +287,7 @@
 }
 
 .calendar-day.selected {
-  background: #fef2f2;
+  background: #fff1f2;
   color: #E51636;
 }
 
@@ -491,7 +491,7 @@
   width: 18px;
   height: 18px;
   border: 2px solid #d1d5db;
-  border-radius: 4px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;

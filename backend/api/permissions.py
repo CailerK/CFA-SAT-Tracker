@@ -22,6 +22,53 @@ def is_manager_or_above(user) -> bool:
     return getattr(user, "role", "") in MANAGER_ROLES
 
 
+# ---------------------------------------------------------------------------
+# Role hierarchy
+# ---------------------------------------------------------------------------
+# Higher rank = more authority. Used for "show me everyone below me"
+# features like team-level dev-plan progress (managers see team_members,
+# admins see everything below admin, superusers see everyone).
+#
+# A user can ONLY see subordinates whose rank is strictly less than theirs.
+# Same-rank peers are NOT visible — that prevents managers from snooping
+# on each other's team-member assignments.
+ROLE_RANK = {
+    "team_member": 0,
+    "shift_lead": 1,
+    "shift_leader": 1,  # legacy alias
+    "manager": 2,
+    "director": 3,
+    "admin": 4,
+}
+SUPERUSER_RANK = 5
+
+
+def role_rank(user) -> int:
+    """Return the rank for the user's role (superusers rank highest)."""
+    if not user:
+        return -1
+    if getattr(user, "is_superuser", False):
+        return SUPERUSER_RANK
+    return ROLE_RANK.get(getattr(user, "role", ""), 0)
+
+
+def subordinate_roles(user) -> set:
+    """All role strings strictly below `user`'s rank.
+
+    Used to filter querysets like:
+        User.objects.filter(role__in=subordinate_roles(request.user))
+    Returns an empty set if the user has no subordinates (team_member, or
+    unauthenticated). Superusers see every role below SUPERUSER_RANK.
+    """
+    rank = role_rank(user)
+    return {role for role, r in ROLE_RANK.items() if r < rank}
+
+
+def can_view_subordinates(user) -> bool:
+    """True if the user has anyone below them. Team-members do not."""
+    return bool(subordinate_roles(user))
+
+
 class IsManagerOrAbove(BasePermission):
     """Allow only authenticated managers/directors/admins (or superusers)."""
 

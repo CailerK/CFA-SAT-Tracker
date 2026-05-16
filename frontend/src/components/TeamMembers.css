@@ -218,7 +218,7 @@
   padding: 2px 8px;
   font-size: 12px;
   font-weight: 600;
-  border-radius: 9999px;
+  border-radius: 999px;
 }
 
 .tm-status-count.active-green {
@@ -287,7 +287,7 @@
   background: #f3f4f6;
   color: #6b7280;
   font-size: 12px;
-  border-radius: 9999px;
+  border-radius: 999px;
 }
 
 .tm-managers-body {
@@ -387,7 +387,7 @@
 .tm-avatar {
   width: 40px;
   height: 40px;
-  border-radius: 9999px;
+  border-radius: 999px;
   background: rgba(229, 22, 54, 0.1);
   color: #E51636;
   display: inline-flex;
@@ -411,7 +411,7 @@
   height: 12px;
   background: #22c55e;
   border: 2px solid #ffffff;
-  border-radius: 9999px;
+  border-radius: 999px;
 }
 
 .tm-status-dot-lg {
@@ -450,7 +450,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .tm-email {
@@ -652,7 +652,7 @@
   background: #f3f4f6;
   color: #374151;
   font-size: 12px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 /* ========== Pagination ========== */

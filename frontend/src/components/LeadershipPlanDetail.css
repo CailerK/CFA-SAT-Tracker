@@ -1,6 +1,9 @@
 /* ============================================================================
    Leadership > Development Plan Detail (e.g., The Heart of Leadership)
-   Mirrors LD Growth /leadership/plans/:key/tasks
+   Visual style: clean, all-white surfaces with thin black borders, sharp
+   90° corners, red accents (no purple, no rounded edges). Mirrors LD
+   Growth /leadership/plans/:key/tasks but with the user's preferred
+   "magazine-print" crispness.
    ============================================================================ */
 
 .lpd-page {
@@ -36,39 +39,39 @@
   border: 0;
   padding: 8px;
   margin-left: -8px;
-  border-radius: 8px;
-  color: #9ca3af;
+  color: #000000;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition: background-color 0.15s ease;
 }
-.lpd-back-btn:hover { color: #374151; background: #f3f4f6; }
+.lpd-back-btn:hover { background: #f3f4f6; }
 .lpd-back-inline {
   background: transparent;
   border: 0;
-  color: #6b7280;
+  color: #111827;
   font-size: 13px;
   cursor: pointer;
   padding: 6px 0;
   text-align: left;
 }
-.lpd-back-inline:hover { color: #111827; }
+.lpd-back-inline:hover { text-decoration: underline; }
 .lpd-header-titles { min-width: 0; }
 .lpd-title {
   font-size: 20px;
   font-weight: 700;
-  color: #111827;
+  color: #000000;
   margin: 0;
   letter-spacing: -0.01em;
   line-height: 1.25;
 }
 .lpd-sub {
   font-size: 13px;
-  color: #6b7280;
+  color: #4b5563;
   margin: 2px 0 0;
 }
+
 /* Assignment + deadline metadata under the X% complete line. */
 .lpd-assignment-row {
   display: flex;
@@ -82,27 +85,29 @@
   gap: 4px;
   font-size: 11px;
   font-weight: 600;
-  padding: 3px 9px 3px 7px;
-  border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
+  padding: 3px 8px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
 }
-.lpd-deadline-pill svg { color: #3b82f6; }
+.lpd-deadline-pill svg { color: #000000; }
 .lpd-deadline-pill.is-overdue {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: #E51636;
+  color: #ffffff;
+  border-color: #E51636;
 }
-.lpd-deadline-pill.is-overdue svg { color: #ef4444; }
+.lpd-deadline-pill.is-overdue svg { color: #ffffff; }
 .lpd-assigned-pill {
   display: inline-flex;
   align-items: center;
   font-size: 11px;
   font-weight: 500;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: #f3f4f6;
-  color: #4b5563;
+  padding: 3px 8px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
 }
+
 .lpd-header-actions {
   display: inline-flex;
   align-items: center;
@@ -112,64 +117,64 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: #f5f3ff;
-  border: 1px solid #ede9fe;
-  color: #7c3aed;
+  background: #ffffff;
+  border: 1px solid #000000;
+  color: #000000;
   font-size: 12px;
   font-weight: 600;
   padding: 6px 10px;
-  border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
-.lpd-pause-btn:hover { background: #ede9fe; }
+.lpd-pause-btn:hover { background: #f3f4f6; }
 .lpd-pause-btn.is-resume {
   background: #E51636;
   border-color: #E51636;
   color: #ffffff;
 }
-.lpd-pause-btn.is-resume:hover { background: #C41230; border-color: #C41230; }
+.lpd-pause-btn.is-resume:hover { background: #E51636; border-color: #E51636; }
 .lpd-pause-btn:disabled { opacity: 0.55; cursor: progress; }
 
 .lpd-unenroll {
   background: transparent;
-  border: 0;
+  border: 1px solid #000000;
   font-size: 12px;
-  color: #9ca3af;
+  color: #000000;
   cursor: pointer;
-  padding: 6px 8px;
-  border-radius: 6px;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  padding: 6px 10px;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
-.lpd-unenroll:hover { color: #ef4444; background: #fef2f2; }
+.lpd-unenroll:hover {
+  color: #ffffff;
+  background: #E51636;
+  border-color: #E51636;
+}
 
-/* Paused banner */
+/* Paused banner — clean, red-accented (no purple) */
 .lpd-paused-banner {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #f5f3ff;
-  border: 1px solid #ede9fe;
-  color: #6b21a8;
-  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #000000;
+  color: #000000;
   padding: 10px 14px;
   font-size: 13px;
   line-height: 1.4;
 }
-.lpd-paused-banner svg { flex-shrink: 0; color: #7c3aed; }
-.lpd-paused-banner strong { color: #581c87; font-weight: 600; }
+.lpd-paused-banner svg { flex-shrink: 0; color: #E51636; }
+.lpd-paused-banner strong { color: #E51636; font-weight: 600; }
 
-/* ---- Purple progress bar ---- */
+/* ---- Progress bar (red, sharp) ---- */
 .lpd-progress-track {
-  height: 8px;
-  background: #f3f4f6;
-  border-radius: 999px;
+  height: 6px;
+  background: #ffffff;
+  border: 1px solid #000000;
   overflow: hidden;
 }
 .lpd-progress-fill {
   height: 100%;
-  background: #a855f7;
-  border-radius: 999px;
+  background: #E51636;
   transition: width 0.3s ease;
 }
 
@@ -177,15 +182,14 @@
 .lpd-loading {
   padding: 32px 16px;
   text-align: center;
-  color: #6b7280;
+  color: #4b5563;
   font-size: 14px;
 }
 .lpd-error {
   padding: 12px 14px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 10px;
-  color: #b91c1c;
+  background: #ffffff;
+  border: 1px solid #E51636;
+  color: #E51636;
   font-size: 13px;
 }
 
@@ -198,13 +202,12 @@
 
 .lpd-lesson {
   background: #ffffff;
-  border: 1px solid #f3f4f6;
-  border-radius: 12px;
+  border: 1px solid #000000;
   overflow: hidden;
-  transition: border-color 0.15s ease;
+  transition: background-color 0.15s ease;
 }
-.lpd-lesson.is-completed { background: #f9fafb; }
-.lpd-lesson:hover { border-color: #e5e7eb; }
+.lpd-lesson.is-completed { background: #ffffff; }
+.lpd-lesson:hover { background: #fafafa; }
 
 .lpd-lesson-row {
   width: 100%;
@@ -216,26 +219,29 @@
   background: transparent;
   border: 0;
   cursor: pointer;
-  transition: background-color 0.15s ease;
 }
-.lpd-lesson-row:hover { background: rgba(249, 250, 251, 0.5); }
 
-/* ---- Type icon ---- */
+/* ---- Type icon (small square, black outline) ---- */
 .lpd-type-icon {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
-.lpd-type--emerald { color: #10b981; background: #ecfdf5; }
-.lpd-type--blue    { color: #3b82f6; background: #eff6ff; }
-.lpd-type--amber   { color: #f59e0b; background: #fffbeb; }
-.lpd-type--purple  { color: #a855f7; background: #f5f3ff; }
-.lpd-type--red     { color: #E51636; background: #fef2f2; }
-.lpd-type--gray    { color: #6b7280; background: #f3f4f6; }
+.lpd-type--emerald,
+.lpd-type--blue,
+.lpd-type--amber,
+.lpd-type--purple,
+.lpd-type--red,
+.lpd-type--gray {
+  color: #000000;
+  background: #ffffff;
+}
 
 .lpd-lesson-titles {
   flex: 1;
@@ -246,8 +252,8 @@
 }
 .lpd-lesson-title {
   font-size: 14px;
-  font-weight: 500;
-  color: #111827;
+  font-weight: 600;
+  color: #000000;
   line-height: 1.3;
 }
 .lpd-lesson.is-completed .lpd-lesson-title {
@@ -259,9 +265,9 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #9ca3af;
+  color: #4b5563;
 }
-.lpd-meta-dot { color: #e5e7eb; }
+.lpd-meta-dot { color: #000000; }
 .lpd-meta-time {
   display: inline-flex;
   align-items: center;
@@ -271,23 +277,21 @@
 /* ---- Row chevron ---- */
 .lpd-row-chevron {
   flex-shrink: 0;
-  color: #9ca3af;
+  color: #000000;
   transition: transform 0.2s ease;
 }
 .lpd-row-chevron.is-open { transform: rotate(180deg); }
-.lpd-lesson:hover .lpd-row-chevron { color: #6b7280; }
 
 /* ---- Expanded body ---- */
 .lpd-lesson-body {
   padding: 4px 16px 16px;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid #000000;
   margin-top: 0;
   background: #ffffff;
 }
-.lpd-lesson.is-completed .lpd-lesson-body { background: #f9fafb; }
 .lpd-md-p {
   font-size: 13px;
-  color: #4b5563;
+  color: #111827;
   line-height: 1.55;
   margin: 12px 0 0;
 }
@@ -296,11 +300,33 @@
   margin: 8px 0 0;
   padding-left: 18px;
   font-size: 13px;
-  color: #4b5563;
+  color: #111827;
   line-height: 1.6;
 }
 .lpd-md-list li { margin: 2px 0; }
-.lpd-md-p strong, .lpd-md-list strong { color: #111827; font-weight: 600; }
+.lpd-md-p strong, .lpd-md-list strong { color: #000000; font-weight: 700; }
+
+/* ---- Saved reflection notes (shown under description once completed) ---- */
+.lpd-lesson-notes {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #000000;
+  background: #ffffff;
+}
+.lpd-lesson-notes-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #E51636;
+  margin-bottom: 4px;
+}
+.lpd-lesson-notes-body {
+  font-size: 13px;
+  color: #111827;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
 
 /* ---- In-body action row (Open Resource + Complete) ---- */
 .lpd-lesson-actions {
@@ -318,44 +344,42 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: 8px;
+  font-weight: 600;
+  padding: 7px 14px;
   cursor: pointer;
   text-decoration: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
-/* Outlined blue "Open Resource" pill */
+/* "Open Resource" — black outline, white fill */
 .lpd-resource-btn {
   background: #ffffff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  color: #000000;
+  border: 1px solid #000000;
 }
 .lpd-resource-btn:hover {
-  background: #eff6ff;
-  border-color: #93c5fd;
+  background: #000000;
+  color: #ffffff;
 }
 
-/* Solid red "Complete" button — switches to outlined emerald when done */
+/* "Complete" — solid red. Becomes outlined when done. */
 .lpd-complete-btn {
   background: #E51636;
   color: #ffffff;
   border: 1px solid #E51636;
-  margin-left: auto; /* keep the button right-aligned when no resource present */
+  margin-left: auto;
 }
 .lpd-complete-btn:hover {
-  background: #C41230;
-  border-color: #C41230;
+  background: #E51636;
+  border-color: #E51636;
 }
 .lpd-complete-btn.is-done {
-  background: #ecfdf5;
-  color: #059669;
-  border-color: #a7f3d0;
+  background: #ffffff;
+  color: #000000;
+  border-color: #000000;
 }
 .lpd-complete-btn.is-done:hover {
-  background: #d1fae5;
-  border-color: #6ee7b7;
+  background: #f3f4f6;
 }
 .lpd-complete-btn.is-pending { opacity: 0.7; cursor: progress; }
 .lpd-complete-btn:disabled {
@@ -367,8 +391,186 @@
   border-color: #E51636;
 }
 .lpd-complete-btn.is-done:disabled:hover {
-  background: #ecfdf5;
-  border-color: #a7f3d0;
+  background: #ffffff;
+  border-color: #000000;
+}
+
+/* ============================================================================
+   Completion reflection modal (LD-Growth style: white card, black border,
+   sharp corners, red Complete button)
+   ============================================================================ */
+.lpd-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: lpdModalIn 0.15s ease-out;
+}
+@keyframes lpdModalIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.lpd-modal {
+  background: #ffffff;
+  border: 1px solid #000000;
+  width: 100%;
+  max-width: 520px;
+  padding: 24px 24px 20px;
+  position: relative;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+.lpd-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: 0;
+  font-size: 22px;
+  line-height: 1;
+  color: #000000;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: background-color 0.15s ease;
+}
+.lpd-modal-close:hover { background: #f3f4f6; }
+.lpd-modal-close:disabled { opacity: 0.4; cursor: not-allowed; }
+.lpd-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #000000;
+  margin: 0 32px 8px 0;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.lpd-modal-desc {
+  font-size: 13px;
+  color: #4b5563;
+  margin: 0 0 16px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lpd-modal-textarea {
+  width: 100%;
+  min-height: 120px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #111827;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.15s ease;
+}
+.lpd-modal-textarea:focus {
+  outline: 0;
+  border-color: #E51636;
+  box-shadow: 0 0 0 2px rgba(229, 22, 54, 0.15);
+}
+.lpd-modal-textarea::placeholder { color: #9ca3af; }
+.lpd-modal-textarea:disabled { background: #fafafa; cursor: not-allowed; }
+
+.lpd-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.lpd-modal-cancel,
+.lpd-modal-submit {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 18px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+.lpd-modal-cancel {
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
+}
+.lpd-modal-cancel:hover:not(:disabled) { background: #f3f4f6; }
+.lpd-modal-submit {
+  background: #E51636;
+  color: #ffffff;
+  border: 1px solid #E51636;
+}
+.lpd-modal-submit:hover:not(:disabled) { background: #E51636; border-color: #E51636; }
+.lpd-modal-submit.is-busy { opacity: 0.7; cursor: progress; }
+.lpd-modal-cancel:disabled,
+.lpd-modal-submit:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ============================================================================
+   "Task Completed" success toast
+   Slides up from the bottom-left after a successful save and auto-dismisses.
+   Matches the LD-Growth toast pattern: white card, green success title.
+   ============================================================================ */
+.lpd-toast {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 1100;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-left: 4px solid #047857;
+  padding: 14px 36px 14px 16px;
+  min-width: 280px;
+  max-width: 360px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  animation: lpdToastIn 0.25s ease-out;
+}
+@keyframes lpdToastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.lpd-toast-text { flex: 1; min-width: 0; }
+.lpd-toast-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #047857;
+  margin-bottom: 2px;
+  line-height: 1.3;
+}
+.lpd-toast-body {
+  font-size: 13px;
+  color: #111827;
+  line-height: 1.4;
+}
+.lpd-toast-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: 0;
+  font-size: 18px;
+  line-height: 1;
+  color: #4b5563;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: background-color 0.15s ease;
+}
+.lpd-toast-close:hover { background: #f3f4f6; }
+
+@media (max-width: 640px) {
+  .lpd-toast {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
+  }
 }
 
 /* ---- Responsive ---- */

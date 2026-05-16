@@ -97,7 +97,7 @@
   cursor: pointer;
   transition: background-color 0.15s ease, transform 0.1s ease;
 }
-.ld-empty-cta:hover { background: #C41230; }
+.ld-empty-cta:hover { background: #E51636; }
 .ld-empty-cta:active { transform: scale(0.98); }
 
 /* ============== My Numbers (per-area scorecards) ============== */
@@ -483,7 +483,7 @@
   justify-content: center;
   transition: color 0.15s ease, background-color 0.15s ease;
 }
-.ld-note-delete:hover { color: #ef4444; background: #fef2f2; }
+.ld-note-delete:hover { color: #ef4444; background: #fff1f2; }
 
 /* ============== Manage Areas modal grid ============== */
 .ld-modal-hint {

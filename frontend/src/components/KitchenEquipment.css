@@ -43,14 +43,14 @@
   max-width: 120px;
   height: 6px;
   background: #f3f4f6;
-  border-radius: 9999px;
+  border-radius: 999px;
   overflow: hidden;
 }
 
 .ke-running-fill {
   height: 100%;
   background: #10b981;
-  border-radius: 9999px;
+  border-radius: 999px;
   transition: width 0.5s ease;
 }
 
@@ -102,7 +102,7 @@
   color: #ffffff;
   font-size: 10px;
   font-weight: 700;
-  border-radius: 9999px;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -181,7 +181,7 @@
   font-weight: 500;
   background: #f3f4f6;
   color: #374151;
-  border-radius: 9999px;
+  border-radius: 999px;
 }
 
 .ke-cat.active .ke-cat-count {
@@ -284,7 +284,7 @@
   color: #047857;
   font-size: 10px;
   font-weight: 600;
-  border-radius: 9999px;
+  border-radius: 999px;
   flex-shrink: 0;
 }
 
@@ -358,7 +358,7 @@
   border: none;
   background: transparent;
   color: #9ca3af;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -387,7 +387,7 @@
   color: #d97706;
   font-size: 10px;
   font-weight: 500;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-family: inherit;
   transition: background 0.15s ease;
@@ -453,7 +453,7 @@
 .ke-action-blue:hover { background: #eff6ff; }
 
 .ke-action-red { color: #ef4444; }
-.ke-action-red:hover { background: #fef2f2; }
+.ke-action-red:hover { background: #fff1f2; }
 
 .ke-action span {
   overflow: hidden;

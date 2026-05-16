@@ -66,7 +66,7 @@
   align-items: center;
   justify-content: center;
   padding: 8px;
-  background: #fef2f2;
+  background: #fff1f2;
   border-radius: 16px;
   margin-bottom: 24px;
   border: 1px solid rgba(254, 226, 226, 0.5);
@@ -193,7 +193,7 @@
   width: 16rem;
   height: 16rem;
   background: rgba(254, 242, 242, 0.5);
-  border-radius: 9999px;
+  border-radius: 999px;
   filter: blur(80px);
   transform: translate(50%, -50%);
   pointer-events: none;
@@ -309,7 +309,7 @@
   width: 24px;
   height: 6px;
   background: #ef4444;
-  border-radius: 9999px;
+  border-radius: 999px;
   flex-shrink: 0;
 }
 
@@ -335,7 +335,7 @@
   background: #ffffff;
   border: 1px solid #e5e7eb;
   color: #374151;
-  border-radius: 9999px;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -345,7 +345,7 @@
 }
 
 .ssb-step-num-red {
-  background: #fef2f2;
+  background: #fff1f2;
   border-color: #fee2e2;
   color: #dc2626;
 }
@@ -445,7 +445,7 @@
 
 .ssb-dropzone:hover .ssb-dropzone-icon,
 .ssb-dropzone.dragging .ssb-dropzone-icon {
-  background: #fef2f2;
+  background: #fff1f2;
   border-color: #fee2e2;
   transform: translateY(-4px);
 }
@@ -493,7 +493,7 @@
   background: #ffffff;
   border: 1px solid #e5e7eb;
   padding: 6px 16px;
-  border-radius: 9999px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
   color: #4b5563;
@@ -523,7 +523,7 @@
   width: 8rem;
   height: 8rem;
   background: #f9fafb;
-  border-radius: 9999px;
+  border-radius: 999px;
   transform: translate(50%, -50%);
   pointer-events: none;
 }

@@ -142,6 +142,14 @@ const leadershipService = {
     return apiService.request("/leadership/development-plans/");
   },
 
+  // Team-progress: every dev-plan enrollment owned by a user STRICTLY BELOW
+  // the requester in the role hierarchy and IN THE SAME STORE. Backend
+  // returns 403 for team_members (no subordinates). Used by the manager+
+  // "Team Progress" panel on the dev plans library page.
+  async listTeamDevPlans() {
+    return apiService.request("/leadership/development-plans/team_progress/");
+  },
+
   async enrollInDevPlan({ plan_key, total_steps = 0, current_step = 0 }) {
     return apiService.request("/leadership/development-plans/", {
       method: "POST",

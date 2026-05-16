@@ -22,7 +22,7 @@ from .models import (
     TrackProgress,
     UserDevelopmentPlan,
 )
-from .permissions import IsManagerOrAbove
+from .permissions import IsManagerOrAbove, subordinate_roles
 from .serializers import (
     Evaluation360Serializer,
     Evaluation360TemplateSerializer,
@@ -364,6 +364,52 @@ class UserDevelopmentPlanViewSet(StoreScopedViewSet):
             serializer.save(completed_at=None)
         else:
             serializer.save()
+
+    # ------------------------------------------------------------------
+    # GET /api/leadership/development-plans/team_progress/
+    # ------------------------------------------------------------------
+    # Returns every dev-plan enrollment belonging to a user STRICTLY BELOW
+    # the requester in the role hierarchy and IN THE SAME STORE. Used by the
+    # manager/admin "Team progress" panel on the Dev Plans library page so
+    # leaders can see how their reports are progressing through plans.
+    #
+    # - Managers see team-members + shift-leads
+    # - Directors see managers + below
+    # - Admins see directors + below
+    # - Superusers see every role below super-admin (still store-scoped)
+    # - Team members get 403 (no subordinates)
+    @action(detail=False, methods=['get'], url_path='team_progress')
+    def team_progress(self, request):
+        requester = request.user
+        roles = subordinate_roles(requester)
+        if not roles:
+            return Response(
+                {'detail': 'You do not have any subordinates to view.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        # Same-store guard. Without a store the user can't see anything.
+        store_id = getattr(requester, 'store_id', None)
+        if store_id is None:
+            return Response({'results': []})
+
+        # Anti-snooping: even though we filter by `role__in=roles`, also
+        # exclude the requester themselves and any superuser (defense in depth
+        # — superusers should never appear under another admin's panel even
+        # if their role string accidentally matches).
+        qs = (
+            UserDevelopmentPlan.objects
+            .filter(
+                user__role__in=roles,
+                user__store_id=store_id,
+                user__is_superuser=False,
+            )
+            .exclude(user_id=requester.id)
+            .select_related('user', 'assigned_by')
+            .prefetch_related('lesson_completions')
+            .order_by('user__last_name', 'user__first_name', '-started_at')
+        )
+        serializer = self.get_serializer(qs, many=True)
+        return Response({'results': serializer.data})
 
 
 class LessonCompletionViewSet(StoreScopedViewSet):

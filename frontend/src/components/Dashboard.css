@@ -2,7 +2,7 @@
 
 .dashboard-container {
   min-height: 100vh;
-  background: #f8f9fa;
+  background: #f9fafb;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-weight: 400;
 }
@@ -161,14 +161,14 @@
 }
 
 .dropdown-item.logout-item:hover {
-  background: #fef2f2;
+  background: #fff1f2;
 }
 
 /* Red Header Banner - LD Growth style */
 .red-header-banner {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #E51636 0%, #C41230 50%, #A00D26 100%);
+  background: linear-gradient(135deg, #E51636 0%, #E51636 50%, #c4112d 100%);
   color: white;
   border-radius: 20px;
   box-shadow: 0 25px 50px -12px rgba(127, 10, 27, 0.25);
@@ -195,7 +195,7 @@
   width: 24rem;
   height: 24rem;
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 9999px;
+  border-radius: 999px;
   filter: blur(48px);
   transform: translate(50%, -50%);
   pointer-events: none;
@@ -515,7 +515,7 @@
 
 .status-bg-blur {
   position: absolute;
-  border-radius: 9999px;
+  border-radius: 999px;
   pointer-events: none;
   background: rgba(167, 243, 208, 0.5);
 }
@@ -624,7 +624,7 @@
 }
 
 .customize-button:hover {
-  color: #C41230;
+  color: #E51636;
   background: rgba(229, 22, 54, 0.1);
 }
 
@@ -695,7 +695,7 @@
   right: 0;
   width: 6rem;
   height: 6rem;
-  border-radius: 9999px;
+  border-radius: 999px;
   filter: blur(48px);
   opacity: 0.6;
   transform: translate(2rem, -2rem);

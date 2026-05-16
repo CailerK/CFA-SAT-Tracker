@@ -57,7 +57,7 @@
 .kcl-btn {
   height: 36px;
   padding: 0 16px;
-  border-radius: 9999px;
+  border-radius: 999px;
   font-size: 14px;
   font-weight: 500;
   font-family: inherit;
@@ -121,7 +121,7 @@
   padding: 8px 16px;
   background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 9999px;
+  border-radius: 999px;
   color: rgba(39, 37, 31, 0.6);
   font-size: 14px;
   font-weight: 500;

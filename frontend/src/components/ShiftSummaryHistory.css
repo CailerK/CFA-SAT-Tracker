@@ -10,7 +10,7 @@
 
 /* Red Header Banner */
 .shift-history-banner {
-  background: linear-gradient(135deg, #E51636 0%, #B91C1C 100%);
+  background: linear-gradient(135deg, #E51636 0%, #b91c1c 100%);
   color: white;
   padding: 32px;
   border-radius: 20px;
@@ -82,7 +82,7 @@
 }
 
 .history-tab.active {
-  background: #fef2f2;
+  background: #fff1f2;
   color: #E51636;
 }
 

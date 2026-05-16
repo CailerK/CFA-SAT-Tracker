@@ -90,7 +90,7 @@
 }
 
 .cleaning-add-btn:hover {
-  background: #C41230;
+  background: #E51636;
 }
 
 .cleaning-add-btn:active {
@@ -212,8 +212,8 @@
 }
 
 .task-checkbox.checked:hover {
-  background: #C91432;
-  border-color: #C91432;
+  background: #E51636;
+  border-color: #E51636;
 }
 
 /* Task text */
@@ -252,7 +252,7 @@
 
 .task-delete:hover {
   color: #ef4444;
-  background: #fef2f2;
+  background: #fff1f2;
 }
 
 /* Tasks Footer */
@@ -282,7 +282,7 @@
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #E51636 0%, #C41230 100%);
+  background: linear-gradient(90deg, #E51636 0%, #E51636 100%);
   transition: width 0.3s ease;
 }
 

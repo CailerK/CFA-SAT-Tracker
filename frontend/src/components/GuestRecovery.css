@@ -52,7 +52,7 @@
   transition: all 0.15s;
 }
 .gr-search-wrap:focus-within {
-  background: #fff;
+  background: #ffffff;
   border-color: #E51636;
   color: #374151;
 }
@@ -75,7 +75,7 @@
   padding: 8px 14px;
   border: none;
   background: #E51636;
-  color: #fff;
+  color: #ffffff;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
@@ -83,7 +83,7 @@
   transition: background 0.15s;
   font-family: inherit;
 }
-.gr-add-btn:hover { background: #C41230; }
+.gr-add-btn:hover { background: #E51636; }
 
 /* ── Main ───────────────────────────────────────── */
 .gr-main {
@@ -103,7 +103,7 @@
 }
 
 .gr-stat-card {
-  background: #fff;
+  background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   padding: 16px;
@@ -134,7 +134,7 @@
 .gr-tabs {
   display: flex;
   gap: 0;
-  background: #fff;
+  background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   overflow: hidden;
@@ -159,7 +159,7 @@
 }
 .gr-tab:last-child { border-right: none; }
 .gr-tab:hover { background: #f9fafb; color: #374151; }
-.gr-tab.active { background: #E51636; color: #fff; }
+.gr-tab.active { background: #E51636; color: #ffffff; }
 
 .gr-tab-count {
   background: rgba(0,0,0,0.1);
@@ -174,7 +174,7 @@
 .gr-list { display: flex; flex-direction: column; gap: 10px; }
 
 .gr-card {
-  background: #fff;
+  background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   padding: 16px;
@@ -287,7 +287,7 @@
 }
 
 .gr-modal {
-  background: #fff;
+  background: #ffffff;
   border-radius: 14px;
   width: 100%;
   max-width: 560px;
@@ -393,8 +393,8 @@
   font-family: inherit;
   text-align: center;
 }
-.gr-cat-btn:hover { border-color: #d1d5db; background: #fff; }
-.gr-cat-btn.selected { background: #E51636; color: #fff; border-color: #E51636; }
+.gr-cat-btn:hover { border-color: #d1d5db; background: #ffffff; }
+.gr-cat-btn.selected { background: #E51636; color: #ffffff; border-color: #E51636; }
 
 /* Detail view */
 .gr-detail-row {
@@ -418,7 +418,7 @@
 .gr-btn-cancel {
   padding: 9px 18px;
   border: 1px solid #e5e7eb;
-  background: #fff;
+  background: #ffffff;
   color: #374151;
   border-radius: 8px;
   font-size: 14px;
@@ -433,7 +433,7 @@
   padding: 9px 18px;
   border: none;
   background: #E51636;
-  color: #fff;
+  color: #ffffff;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
@@ -441,7 +441,7 @@
   transition: background 0.15s;
   font-family: inherit;
 }
-.gr-btn-submit:hover { background: #C41230; }
+.gr-btn-submit:hover { background: #E51636; }
 
 /* Responsive */
 @media (max-width: 640px) {

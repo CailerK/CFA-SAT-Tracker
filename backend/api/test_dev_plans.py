@@ -146,3 +146,109 @@ class DevelopmentPlanAssignmentTest(_DevPlanTestMixin, TestCase):
         row = UserDevelopmentPlan.objects.get()
         self.assertEqual(row.user_id, self.member_a.id)
         self.assertIsNone(row.assigned_by_id)
+
+
+class TeamProgressTest(_DevPlanTestMixin, TestCase):
+    """Manager/admin "Team Progress" endpoint visibility rules.
+
+    The endpoint must:
+    - Return 403 for team members (no subordinates).
+    - Show only users strictly BELOW the requester in role rank.
+    - Always be store-scoped (no cross-store leaks).
+    - Never include the requester's own enrollment.
+    - Never include superusers (even if a role matches).
+    """
+    URL = '/api/leadership/development-plans/team_progress/'
+
+    def setUp(self):
+        super().setUp()
+        # Add a director and an admin in the same store, plus a manager peer
+        # (same rank as self.manager — must NOT be visible to self.manager).
+        self.director = User.objects.create_user(
+            username='dir@test.com', email='dir@test.com',
+            password='pw', role='director', store=self.store,
+        )
+        self.admin = User.objects.create_user(
+            username='admin@test.com', email='admin@test.com',
+            password='pw', role='admin', store=self.store,
+        )
+        self.peer_manager = User.objects.create_user(
+            username='peer@test.com', email='peer@test.com',
+            password='pw', role='manager', store=self.store,
+        )
+        # Outsider (different store) — also has an enrollment to verify the
+        # store guard.
+        UserDevelopmentPlan.objects.create(
+            user=self.outsider, plan_key='heart-of-leadership',
+            total_steps=19, status='active',
+        )
+        # Subordinate enrollments for the manager/director/admin to see.
+        UserDevelopmentPlan.objects.create(
+            user=self.member_a, plan_key='heart-of-leadership',
+            total_steps=19, status='active',
+        )
+        UserDevelopmentPlan.objects.create(
+            user=self.member_b, plan_key='heart-of-leadership',
+            total_steps=19, status='paused',
+        )
+
+    def _list(self, user):
+        c = APIClient()
+        c.force_authenticate(user=user)
+        return c.get(self.URL)
+
+    def test_team_member_gets_403(self):
+        """A team member has no subordinates → 403."""
+        res = self._list(self.member_a)
+        self.assertEqual(res.status_code, 403)
+
+    def test_manager_sees_team_members_only(self):
+        """A manager sees the two team_member enrollments but NOT their
+        peer manager (same rank), the director (above), the admin (above),
+        or the outsider (different store)."""
+        res = self._list(self.manager)
+        self.assertEqual(res.status_code, 200, res.content)
+        rows = res.json()['results']
+        user_ids = sorted(r['user'] for r in rows)
+        self.assertEqual(user_ids, sorted([self.member_a.id, self.member_b.id]))
+
+    def test_director_sees_managers_and_below(self):
+        """Director sees the manager + peer_manager + both team_members,
+        but NOT admin (above) and NOT the outsider."""
+        res = self._list(self.director)
+        self.assertEqual(res.status_code, 200, res.content)
+        rows = res.json()['results']
+        # The manager + peer_manager have NO enrollments yet, so they don't
+        # show up. Only the two team-member enrollments do.
+        user_ids = sorted(r['user'] for r in rows)
+        self.assertEqual(user_ids, sorted([self.member_a.id, self.member_b.id]))
+        # And confirm cross-store outsider was excluded.
+        self.assertNotIn(self.outsider.id, user_ids)
+
+    def test_admin_does_not_see_other_admins_or_outsider(self):
+        """Admin sees director + below, never another admin, never cross-store."""
+        # Give the director an enrollment so we can assert it appears.
+        UserDevelopmentPlan.objects.create(
+            user=self.director, plan_key='heart-of-leadership',
+            total_steps=19, status='active',
+        )
+        res = self._list(self.admin)
+        self.assertEqual(res.status_code, 200, res.content)
+        rows = res.json()['results']
+        user_ids = sorted(r['user'] for r in rows)
+        self.assertIn(self.director.id, user_ids)
+        self.assertIn(self.member_a.id, user_ids)
+        self.assertIn(self.member_b.id, user_ids)
+        self.assertNotIn(self.admin.id, user_ids)
+        self.assertNotIn(self.outsider.id, user_ids)
+
+    def test_payload_includes_user_name_and_progress(self):
+        """The serializer fields must round-trip so the UI can render
+        '<name> · <plan> · <pct>%' without a second request."""
+        res = self._list(self.manager)
+        rows = res.json()['results']
+        self.assertGreaterEqual(len(rows), 1)
+        first = rows[0]
+        for key in ('user', 'user_name', 'plan_key', 'status',
+                    'progress_percent', 'completed_lesson_keys'):
+            self.assertIn(key, first, f'missing field: {key}')

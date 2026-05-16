@@ -34,7 +34,7 @@
 }
 
 .kwt-mode-btn.active {
-  background: #fef2f2;
+  background: #fff1f2;
   color: #E51636;
   border-color: #fecaca;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -146,7 +146,7 @@
 }
 
 .kwt-bulk-btn:hover {
-  background: #C41230;
+  background: #E51636;
 }
 
 .kwt-bulk-btn:active {
@@ -321,7 +321,7 @@
 }
 
 .kwt-reason.active {
-  background: #fef2f2;
+  background: #fff1f2;
   color: #E51636;
   border-color: #fecaca;
 }
@@ -476,7 +476,7 @@
 
 .kwt-entry-delete:hover {
   color: #ef4444;
-  background: #fef2f2;
+  background: #fff1f2;
 }
 
 .kwt-entry-delete-icon {
@@ -536,7 +536,7 @@
 }
 
 .kwt-add-btn:hover:not(:disabled) {
-  background: #C41230;
+  background: #E51636;
 }
 
 .kwt-add-btn:active:not(:disabled) {

@@ -22,9 +22,9 @@
   position: relative;
   overflow: hidden;
   border-radius: 1rem;
-  background: linear-gradient(135deg, #E51636 0%, #C41230 55%, #9E0F26 100%);
+  background: linear-gradient(135deg, #E51636 0%, #E51636 55%, #c4112d 100%);
   box-shadow: 0 25px 50px -12px rgba(155, 16, 32, 0.25);
-  color: #fff;
+  color: #ffffff;
 }
 .tql-hero-glow {
   position: absolute;
@@ -81,7 +81,7 @@
   font-size: 1.125rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #fff;
+  color: #ffffff;
 }
 @media (min-width: 640px) { .tql-hero-greeting { font-size: 1.25rem; } }
 @media (min-width: 1024px) { .tql-hero-greeting { font-size: 1.5rem; } }
@@ -145,14 +145,14 @@
 
 .tql-btn--ghost {
   background: rgba(255,255,255,0.2);
-  color: #fff;
+  color: #ffffff;
   border: 1px solid rgba(255,255,255,0.5);
   backdrop-filter: blur(4px);
 }
 .tql-btn--ghost:hover { background: rgba(255,255,255,0.3); }
 
 .tql-btn--primary {
-  background: #fff;
+  background: #ffffff;
   color: #DD0031;
   border: 1px solid rgba(255,255,255,0.5);
   box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
@@ -179,7 +179,7 @@
 }
 
 .tql-empty-card {
-  background: #fff;
+  background: #ffffff;
   border: 1px solid #f3f4f6;
   border-radius: 1rem;
   box-shadow: 0 1px 2px rgba(0,0,0,0.04);
@@ -193,7 +193,7 @@
   width: 4rem;
   height: 4rem;
   border-radius: 50%;
-  background: #fef2f2;
+  background: #fff1f2;
   color: #DC2626;
   display: inline-flex;
   align-items: center;
@@ -225,14 +225,14 @@
   border: 0;
   border-radius: 0.5rem;
   background: #DC2626;
-  color: #fff;
+  color: #ffffff;
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 .tql-empty-cta:hover {
-  background: #B91C1C;
+  background: #b91c1c;
   box-shadow: 0 10px 15px -3px rgba(0,0,0,0.12);
 }
 .tql-empty-cta:active { transform: scale(0.98); }

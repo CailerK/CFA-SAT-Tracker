@@ -113,14 +113,14 @@
   color: #ffffff;
   border-color: #E51636;
 }
-.sste-btn-primary:hover { background: #C41230; border-color: #C41230; }
+.sste-btn-primary:hover { background: #E51636; border-color: #E51636; }
 
 .sste-btn-soft {
-  background: #fef2f2;
+  background: #fff1f2;
   color: #E51636;
   border-color: #fecaca;
 }
-.sste-btn-soft:hover { background: #fee2e2; color: #C41230; }
+.sste-btn-soft:hover { background: #fee2e2; color: #E51636; }
 
 .sste-btn-outline {
   background: #ffffff;
@@ -464,7 +464,7 @@
 .sste-icon-btn-svg { width: 18px; height: 18px; }
 
 .sste-icon-btn-trash:hover {
-  background: #fef2f2;
+  background: #fff1f2;
   color: #ef4444;
 }
 
@@ -637,7 +637,7 @@
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 .sste-add-position:hover {
-  background: #fef2f2;
+  background: #fff1f2;
   border-color: #fca5a5;
 }
 

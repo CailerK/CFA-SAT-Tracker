@@ -95,7 +95,7 @@
 }
 
 .foh-icon-btn-primary:hover {
-  background: #C91432;
+  background: #E51636;
   color: #ffffff;
 }
 
@@ -145,7 +145,7 @@
 }
 
 .foh-tab:hover:not(.active) {
-  background: #fef2f2;
+  background: #fff1f2;
 }
 
 .foh-tab:active:not(.active) {
@@ -236,7 +236,7 @@
 
 .foh-task-row.is-dragging {
   opacity: 0.6;
-  background: #fef2f2;
+  background: #fff1f2;
 }
 
 .foh-task-row.is-drag-target {
@@ -295,8 +295,8 @@
 }
 
 .foh-checkbox.checked:hover {
-  background: #C91432;
-  border-color: #C91432;
+  background: #E51636;
+  border-color: #E51636;
 }
 
 /* Task text */
@@ -335,7 +335,7 @@
 
 .foh-delete-btn:hover {
   color: #ef4444;
-  background: #fef2f2;
+  background: #fff1f2;
 }
 
 /* Footer */
@@ -487,7 +487,7 @@
   cursor: pointer;
   inset: 0;
   background: #d1d5db;
-  border-radius: 9999px;
+  border-radius: 999px;
   transition: background 0.2s ease;
 }
 
@@ -518,7 +518,7 @@
   align-items: center;
   gap: 12px;
   padding: 20px 24px;
-  background: linear-gradient(135deg, #E51636 0%, #C91432 100%);
+  background: linear-gradient(135deg, #E51636 0%, #E51636 100%);
   color: #ffffff;
 }
 
@@ -641,7 +641,7 @@
 }
 
 .btn-create:hover {
-  background: #C91432;
+  background: #E51636;
 }
 
 /* Mobile adjustments */

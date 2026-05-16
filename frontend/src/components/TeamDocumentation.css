@@ -216,7 +216,7 @@
 }
 
 .td-filter-pill:hover:not(.active) {
-  background: #fef2f2;
+  background: #fff1f2;
   color: #E51636;
 }
 
@@ -302,7 +302,7 @@
   width: 48px;
   height: 48px;
   flex-shrink: 0;
-  border-radius: 9999px;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -436,7 +436,7 @@
 }
 
 .td-latest-tile.td-latest-tile-warning {
-  background: #fef2f2;
+  background: #fff1f2;
   border-color: #fecaca;
 }
 
@@ -479,7 +479,7 @@
   font-size: 11px;
   font-weight: 600;
   border: 1px solid transparent;
-  border-radius: 9999px;
+  border-radius: 999px;
   white-space: nowrap;
   flex-shrink: 0;
 }

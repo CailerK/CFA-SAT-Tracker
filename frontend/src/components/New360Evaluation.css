@@ -197,7 +197,7 @@
 
 .template-card.selected {
   border-color: #E51636;
-  background: #fef2f2;
+  background: #fff1f2;
 }
 
 .template-info h4 {
@@ -314,7 +314,7 @@
 }
 
 .btn-add-evaluator:hover {
-  background: #B91C1C;
+  background: #b91c1c;
 }
 
 /* Navigation Buttons */
@@ -360,7 +360,7 @@
 }
 
 .btn-nav-next:hover {
-  background: #B91C1C;
+  background: #b91c1c;
 }
 
 .btn-create-eval {
@@ -379,7 +379,7 @@
 }
 
 .btn-create-eval:hover {
-  background: #B91C1C;
+  background: #b91c1c;
 }
 
 .btn-create-eval:disabled {

@@ -174,7 +174,7 @@
 
 .cct-freq-card.active {
   border-color: #E51636;
-  background: #fef2f2;
+  background: #fff1f2;
   color: #E51636;
   box-shadow: 0 0 0 1px rgba(229, 22, 54, 0.2) inset;
 }
@@ -249,7 +249,7 @@
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.cct-add-btn:hover { background: #fef2f2; border-color: #fca5a5; color: #E51636; }
+.cct-add-btn:hover { background: #fff1f2; border-color: #fca5a5; color: #E51636; }
 .cct-add-btn-icon { width: 16px; height: 16px; }
 
 /* ---------- List items (links) ---------- */
@@ -314,7 +314,7 @@
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
-.cct-list-remove:hover { background: #fef2f2; color: #ef4444; }
+.cct-list-remove:hover { background: #fff1f2; color: #ef4444; }
 .cct-list-remove-icon { width: 16px; height: 16px; }
 
 /* ---------- Chips (supplies) ---------- */
@@ -328,7 +328,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: #fef2f2;
+  background: #fff1f2;
   color: #E51636;
   border: 1px solid #fecaca;
   border-radius: 999px;
@@ -509,7 +509,7 @@
   color: #ffffff;
   border: 1px solid #E51636;
 }
-.cct-btn-submit:hover { background: #C41230; border-color: #C41230; }
+.cct-btn-submit:hover { background: #E51636; border-color: #E51636; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 480px) {

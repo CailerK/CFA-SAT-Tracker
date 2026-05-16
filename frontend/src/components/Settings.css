@@ -50,7 +50,7 @@
 
 /* ── Sidebar Nav ─────────────────────────────────── */
 .stg-nav {
-  background: #fff;
+  background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 8px;
@@ -95,7 +95,7 @@
 
 /* ── Content Panel ───────────────────────────────── */
 .stg-panel {
-  background: #fff;
+  background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   overflow: hidden;
@@ -201,7 +201,7 @@
   left: 3px;
   width: 18px;
   height: 18px;
-  background: #fff;
+  background: #ffffff;
   border-radius: 50%;
   transition: transform 0.2s ease;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
@@ -242,7 +242,7 @@
   border-radius: 8px;
   font-size: 13px;
   color: #111827;
-  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'%2F%3E%3C%2Fsvg%3E") no-repeat right 10px center;
+  background: #ffffff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'%2F%3E%3C%2Fsvg%3E") no-repeat right 10px center;
   -webkit-appearance: none;
   appearance: none;
   outline: none;
@@ -337,7 +337,7 @@
 .stg-btn-secondary {
   padding: 9px 18px;
   border: 1px solid #e5e7eb;
-  background: #fff;
+  background: #ffffff;
   color: #374151;
   border-radius: 8px;
   font-size: 14px;
@@ -352,7 +352,7 @@
   padding: 9px 18px;
   border: none;
   background: #E51636;
-  color: #fff;
+  color: #ffffff;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
@@ -360,7 +360,7 @@
   transition: background 0.15s;
   font-family: inherit;
 }
-.stg-btn-primary:hover { background: #C41230; }
+.stg-btn-primary:hover { background: #E51636; }
 
 /* ── Responsive ─────────────────────────────────── */
 @media (max-width: 768px) {

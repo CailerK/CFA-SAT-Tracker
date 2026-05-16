@@ -127,6 +127,15 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
   const [collapsedKeys, setCollapsedKeys] = useState(() => new Set());
   // Pending toggle keys to debounce double-clicks.
   const [pendingKeys, setPendingKeys] = useState(() => new Set());
+  // Completion modal: when the user clicks Complete on an unfinished lesson,
+  // we open this modal asking for a short reflection (matches LD Growth's
+  // "Describe what you did and what you learned from it" flow). The notes
+  // get saved on the LessonCompletion row so the user can revisit later.
+  const [completionLesson, setCompletionLesson] = useState(null);
+  const [completionNotes, setCompletionNotes] = useState('');
+  const [completionBusy, setCompletionBusy] = useState(false);
+  // "Task Completed" success toast — shows for ~4s after a successful save.
+  const [showCompletionToast, setShowCompletionToast] = useState(false);
   // Confirm "Unenroll" dialog.
   const [confirmUnenroll, setConfirmUnenroll] = useState(false);
   // True while a pause/resume request is in flight.
@@ -168,6 +177,13 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
   }, [plan]);
 
   useEffect(() => { loadEnrollment(); }, [loadEnrollment]);
+
+  // Auto-dismiss the "Task Completed" toast after 4s.
+  useEffect(() => {
+    if (!showCompletionToast) return undefined;
+    const t = setTimeout(() => setShowCompletionToast(false), 4000);
+    return () => clearTimeout(t);
+  }, [showCompletionToast]);
 
   // ---------------------------------------------------------------
   // Derived numbers for the header
@@ -217,61 +233,92 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
     if (pendingKeys.has(lesson.key)) return;
     const existing = completionsByKey[lesson.key];
 
+    if (!existing) {
+      // First-time completion: open the reflection modal instead of POSTing
+      // directly. The actual POST happens in `submitCompletion` once the
+      // user fills in (or skips) their notes.
+      setCompletionLesson(lesson);
+      setCompletionNotes('');
+      return;
+    }
+
+    // Uncomplete: direct, no modal. (Users can re-complete and rewrite their
+    // notes if they want.)
     setPendingKeys((s) => new Set(s).add(lesson.key));
-    if (existing) {
-      // Optimistic uncomplete.
+    setCompletionsByKey((m) => {
+      const c = { ...m };
+      delete c[lesson.key];
+      return c;
+    });
+    try {
+      await leadershipService.uncompleteLesson(existing.id);
+      await loadEnrollment();
+    } catch (err) {
+      console.error('Uncomplete failed:', err);
+      setCompletionsByKey((m) => ({ ...m, [lesson.key]: existing }));
+    } finally {
+      setPendingKeys((s) => {
+        const c = new Set(s);
+        c.delete(lesson.key);
+        return c;
+      });
+    }
+  };
+
+  // POST the completion with the user's reflection notes. Optimistically
+  // marks the lesson done; on failure rolls back and keeps the modal open
+  // so the user can retry without losing what they typed.
+  const submitCompletion = async () => {
+    if (!completionLesson || !enrollment) return;
+    const lesson = completionLesson;
+    const notes = completionNotes.trim();
+    setCompletionBusy(true);
+
+    setPendingKeys((s) => new Set(s).add(lesson.key));
+    const placeholder = {
+      id: `tmp-${lesson.key}`,
+      enrollment: enrollment.id,
+      lesson_key: lesson.key,
+      completed_at: new Date().toISOString(),
+      notes,
+    };
+    setCompletionsByKey((m) => ({ ...m, [lesson.key]: placeholder }));
+    try {
+      const created = await leadershipService.completeLesson({
+        enrollmentId: enrollment.id,
+        lessonKey: lesson.key,
+        notes,
+      });
+      setCompletionsByKey((m) => ({ ...m, [lesson.key]: created }));
+      await loadEnrollment();
+      setCompletionLesson(null);
+      setCompletionNotes('');
+      // Pop the success toast.
+      setShowCompletionToast(true);
+    } catch (err) {
+      console.error('Complete failed:', err);
+      // Roll the optimistic state back so the lesson card looks un-checked
+      // again. Leave the modal open with whatever the user typed.
       setCompletionsByKey((m) => {
         const c = { ...m };
         delete c[lesson.key];
         return c;
       });
-      try {
-        await leadershipService.uncompleteLesson(existing.id);
-        // Refresh enrollment so status/current_step stay in sync.
-        await loadEnrollment();
-      } catch (err) {
-        console.error('Uncomplete failed:', err);
-        setCompletionsByKey((m) => ({ ...m, [lesson.key]: existing }));
-      } finally {
-        setPendingKeys((s) => {
-          const c = new Set(s);
-          c.delete(lesson.key);
-          return c;
-        });
-      }
-    } else {
-      // Optimistic complete with a placeholder.
-      const placeholder = {
-        id: `tmp-${lesson.key}`,
-        enrollment: enrollment.id,
-        lesson_key: lesson.key,
-        completed_at: new Date().toISOString(),
-        notes: '',
-      };
-      setCompletionsByKey((m) => ({ ...m, [lesson.key]: placeholder }));
-      try {
-        const created = await leadershipService.completeLesson({
-          enrollmentId: enrollment.id,
-          lessonKey: lesson.key,
-        });
-        setCompletionsByKey((m) => ({ ...m, [lesson.key]: created }));
-        // Refresh enrollment so auto-flip to completed propagates.
-        await loadEnrollment();
-      } catch (err) {
-        console.error('Complete failed:', err);
-        setCompletionsByKey((m) => {
-          const c = { ...m };
-          delete c[lesson.key];
-          return c;
-        });
-      } finally {
-        setPendingKeys((s) => {
-          const c = new Set(s);
-          c.delete(lesson.key);
-          return c;
-        });
-      }
+      setError('Could not save your completion. Please try again.');
+    } finally {
+      setPendingKeys((s) => {
+        const c = new Set(s);
+        c.delete(lesson.key);
+        return c;
+      });
+      setCompletionBusy(false);
     }
+  };
+
+  const closeCompletionModal = () => {
+    if (completionBusy) return;
+    setCompletionLesson(null);
+    setCompletionNotes('');
   };
 
   const performUnenroll = async () => {
@@ -482,6 +529,14 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
                   {isExpanded && (
                     <div className="lpd-lesson-body">
                       {renderMarkdown(lesson.description)}
+                      {isCompleted && completionsByKey[lesson.key]?.notes && (
+                        <div className="lpd-lesson-notes">
+                          <div className="lpd-lesson-notes-label">Your reflection</div>
+                          <div className="lpd-lesson-notes-body">
+                            {completionsByKey[lesson.key].notes}
+                          </div>
+                        </div>
+                      )}
                       <div className="lpd-lesson-actions">
                         {lesson.resourceUrl ? (
                           <a
@@ -543,6 +598,81 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
           </div>
         )}
       </div>
+
+      {/* ---- Completion reflection modal ---- */}
+      {completionLesson && (
+        <div className="lpd-modal-overlay" onClick={closeCompletionModal}>
+          <div
+            className="lpd-modal"
+            role="dialog"
+            aria-labelledby="lpd-completion-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="lpd-modal-close"
+              onClick={closeCompletionModal}
+              aria-label="Close"
+              disabled={completionBusy}
+            >
+              ×
+            </button>
+            <h2 className="lpd-modal-title" id="lpd-completion-title">
+              {completionLesson.title}
+            </h2>
+            <p className="lpd-modal-desc">
+              {(completionLesson.description || '').split('\n')[0]}
+            </p>
+            <textarea
+              className="lpd-modal-textarea"
+              placeholder="Describe what you did and what you learned from it…"
+              value={completionNotes}
+              onChange={(e) => setCompletionNotes(e.target.value)}
+              rows={5}
+              autoFocus
+              disabled={completionBusy}
+            />
+            <div className="lpd-modal-actions">
+              <button
+                type="button"
+                className="lpd-modal-cancel"
+                onClick={closeCompletionModal}
+                disabled={completionBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`lpd-modal-submit ${
+                  completionNotes.trim() ? '' : 'is-empty'
+                } ${completionBusy ? 'is-busy' : ''}`}
+                onClick={submitCompletion}
+                disabled={completionBusy}
+              >
+                {completionBusy ? 'Saving…' : 'Complete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- "Task Completed" success toast ---- */}
+      {showCompletionToast && (
+        <div className="lpd-toast" role="status" aria-live="polite">
+          <div className="lpd-toast-text">
+            <div className="lpd-toast-title">Task Completed</div>
+            <div className="lpd-toast-body">Great job! You've completed this task.</div>
+          </div>
+          <button
+            type="button"
+            className="lpd-toast-close"
+            onClick={() => setShowCompletionToast(false)}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <ConfirmDialog
         isOpen={confirmUnenroll}
