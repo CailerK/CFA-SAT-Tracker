@@ -42,12 +42,15 @@ const LeadershipDevelopment = ({ user, onNavigate }) => {
         for (const a of areaRows) map[a.area_key] = a.id;
         setAreaRecordIds(map);
         setNotes(noteRes.results || noteRes || []);
-        // Pick the first active enrollment as the "primary" plan to feature
-        // on the Development card. Most-recent active wins because the API
-        // returns by `-started_at`.
+        // Pick the most relevant enrollment to feature on the Development
+        // card: active first, then most-recently paused (so the user can
+        // resume in one click). Most-recent wins because the API returns
+        // by `-started_at`.
         const plans = plansRes.results || plansRes || [];
-        const firstActive = plans.find((p) => p.status === 'active') || null;
-        setActivePlan(firstActive);
+        const featured = plans.find((p) => p.status === 'active')
+          || plans.find((p) => p.status === 'paused')
+          || null;
+        setActivePlan(featured);
       } catch (err) {
         console.error('Failed to load leadership dashboard data:', err);
       }
@@ -537,6 +540,7 @@ const LeadershipDevelopment = ({ user, onNavigate }) => {
           const planName = activePlanMeta?.name || activePlan?.plan_key || '';
           const planTagline = activePlanMeta?.tagline || 'In progress';
           const progressPct = activePlan?.progress_percent ?? 0;
+          const isPaused = activePlan?.status === 'paused';
           return (
             <button
               type="button"
@@ -562,12 +566,19 @@ const LeadershipDevelopment = ({ user, onNavigate }) => {
                 </div>
                 {activePlan ? (
                   <div className="ld-dev-text">
-                    <h3 className="ld-dev-title">Development</h3>
-                    <p className="ld-dev-sub">{planName || planTagline}</p>
+                    <h3 className="ld-dev-title">
+                      Development
+                      {isPaused && (
+                        <span className="ld-dev-paused-chip">Paused</span>
+                      )}
+                    </h3>
+                    <p className="ld-dev-sub">
+                      {isPaused ? `Resume "${planName}"` : (planName || planTagline)}
+                    </p>
                     <div className="ld-dev-progress-row">
                       <div className="ld-dev-progress-track">
                         <div
-                          className="ld-dev-progress-fill"
+                          className={`ld-dev-progress-fill ${isPaused ? 'is-paused' : ''}`}
                           style={{ width: `${progressPct}%` }}
                         />
                       </div>

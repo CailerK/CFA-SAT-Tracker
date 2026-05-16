@@ -69,6 +69,68 @@
   color: #6b7280;
   margin: 2px 0 0;
 }
+/* Assignment + deadline metadata under the X% complete line. */
+.lpd-assignment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.lpd-deadline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.lpd-deadline-pill svg { color: #3b82f6; }
+.lpd-deadline-pill.is-overdue {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+.lpd-deadline-pill.is-overdue svg { color: #ef4444; }
+.lpd-assigned-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+.lpd-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lpd-pause-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f5f3ff;
+  border: 1px solid #ede9fe;
+  color: #7c3aed;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.lpd-pause-btn:hover { background: #ede9fe; }
+.lpd-pause-btn.is-resume {
+  background: #E51636;
+  border-color: #E51636;
+  color: #ffffff;
+}
+.lpd-pause-btn.is-resume:hover { background: #C41230; border-color: #C41230; }
+.lpd-pause-btn:disabled { opacity: 0.55; cursor: progress; }
+
 .lpd-unenroll {
   background: transparent;
   border: 0;
@@ -80,6 +142,22 @@
   transition: color 0.15s ease, background-color 0.15s ease;
 }
 .lpd-unenroll:hover { color: #ef4444; background: #fef2f2; }
+
+/* Paused banner */
+.lpd-paused-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f5f3ff;
+  border: 1px solid #ede9fe;
+  color: #6b21a8;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.lpd-paused-banner svg { flex-shrink: 0; color: #7c3aed; }
+.lpd-paused-banner strong { color: #581c87; font-weight: 600; }
 
 /* ---- Purple progress bar ---- */
 .lpd-progress-track {
@@ -190,29 +268,14 @@
   gap: 4px;
 }
 
-/* ---- Checkbox / check pill on the right ---- */
-.lpd-check {
+/* ---- Row chevron ---- */
+.lpd-row-chevron {
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  border: 1.5px solid #d1d5db;
-  background: #ffffff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: transparent;
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  color: #9ca3af;
+  transition: transform 0.2s ease;
 }
-.lpd-check:hover { border-color: #9ca3af; }
-.lpd-check.is-checked {
-  background: #10b981;
-  border-color: #10b981;
-  color: #ffffff;
-}
-.lpd-check.is-pending { opacity: 0.6; cursor: progress; }
-.lpd-check:focus { outline: 2px solid #a855f7; outline-offset: 2px; }
+.lpd-row-chevron.is-open { transform: rotate(180deg); }
+.lpd-lesson:hover .lpd-row-chevron { color: #6b7280; }
 
 /* ---- Expanded body ---- */
 .lpd-lesson-body {
@@ -238,6 +301,75 @@
 }
 .lpd-md-list li { margin: 2px 0; }
 .lpd-md-p strong, .lpd-md-list strong { color: #111827; font-weight: 600; }
+
+/* ---- In-body action row (Open Resource + Complete) ---- */
+.lpd-lesson-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.lpd-resource-placeholder { flex: 1; }
+
+.lpd-resource-btn,
+.lpd-complete-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+/* Outlined blue "Open Resource" pill */
+.lpd-resource-btn {
+  background: #ffffff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+.lpd-resource-btn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+/* Solid red "Complete" button — switches to outlined emerald when done */
+.lpd-complete-btn {
+  background: #E51636;
+  color: #ffffff;
+  border: 1px solid #E51636;
+  margin-left: auto; /* keep the button right-aligned when no resource present */
+}
+.lpd-complete-btn:hover {
+  background: #C41230;
+  border-color: #C41230;
+}
+.lpd-complete-btn.is-done {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+}
+.lpd-complete-btn.is-done:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+.lpd-complete-btn.is-pending { opacity: 0.7; cursor: progress; }
+.lpd-complete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.lpd-complete-btn:disabled:hover {
+  background: #E51636;
+  border-color: #E51636;
+}
+.lpd-complete-btn.is-done:disabled:hover {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
 
 /* ---- Responsive ---- */
 @media (min-width: 640px) {

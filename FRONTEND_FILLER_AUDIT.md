@@ -42,7 +42,7 @@ What's still filler / needs backend:
 
 ---
 
-### 1b. **Development Plans library + Plan Detail** (`/dev-plans`, `/dev-plan-detail/:key`) � — _shipped 2026-05-15_
+### 1b. **Development Plans library + Plan Detail** (`/dev-plans`, `/dev-plan-detail/:key`) 🟢 — _shipped 2026-05-15_
 
 **Status update**: full end-to-end flow shipped. Library + detail + per-lesson completion + 1-active-plan enforcement.
 
@@ -51,12 +51,17 @@ What works now:
   - `UserDevelopmentPlan` — per-user enrollment with `plan_key / status / current_step / total_steps / completed_at`. Unique `(user, plan_key)`.
   - `LessonCompletion` — per-lesson record under an enrollment, with `lesson_key`, `completed_at`, optional `notes`. Unique `(enrollment, lesson_key)`.
 - **Business rules** enforced server-side in `UserDevelopmentPlanViewSet`:
-  - **1-active-plan-per-user**: `perform_create` rejects a new `active` enrollment if another exists; `perform_update` rejects reactivation under the same condition.
-  - **Auto-status transitions**: `LessonCompletionViewSet._sync_enrollment()` recomputes `current_step` from completion count and flips `status='completed'` (with `completed_at=now()`) when all lessons are done — and rolls back to `active` if a completion is deleted below the threshold.
-- **Library page** (`LeadershipDevPlans.js`) — three card states with KPI strip and All/Active/Completed/Available filter pills:
-  - **Available** → "Start plan" (blocked + relabeled "Active plan in progress" when another plan is active).
+  - **1-active-plan-per-user**: `perform_create` rejects a new `active` enrollment if another exists; `perform_update` rejects reactivation (paused/completed → active) under the same condition. **Paused plans don't count as active** — that's the whole point of pause.
+  - **Auto-status transitions**: `LessonCompletionViewSet._sync_enrollment()` recomputes `current_step` from completion count and flips `status='completed'` (with `completed_at=now()`) when all lessons are done. Un-completion rolls back to `active` — or to `paused` if another plan is now active, preserving the 1-active invariant.
+- **Pause / Resume / Switch flow** (migration `0017_paused_dev_plan.py`):
+  - Plan detail page has Pause / Resume buttons in the header next to Unenroll; paused plans show a banner and lock the per-lesson check pills (must Resume to keep checking off lessons).
+  - Library Start / Resume / Restart relabel to **"Pause & …"** when another plan is active; a single ConfirmDialog explains "{active plan} will be paused (progress kept) so you can {start|resume|restart} {target}" and on confirm the active plan is paused before the queued action runs.
+  - Dashboard Development card features a paused plan (with "Paused" chip + "Resume {plan}" subtitle + amber progress fill) when no active plan exists.
+- **Library page** (`LeadershipDevPlans.js`) — four card states with KPI strip (Active / Paused / Completed / Available) and All/Active/Paused/Completed/Available filter pills:
+  - **Available** → "Start plan" (or "Pause & switch" when another active).
   - **Active** → Remove + **View plan** (navigates to detail).
-  - **Completed** → Remove + Restart (also blocked when another plan is active).
+  - **Paused** → Remove + Resume (or "Pause & resume" when another active), with amber progress bar.
+  - **Completed** → Remove + Restart (or "Pause & restart").
   - All mutations optimistic with rollback; server-side error messages surfaced.
 - **Plan detail page** (`LeadershipPlanDetail.js`) — pixel-match LD Growth `/leadership/plans/:key/tasks`:
   - Header: back arrow + title + `X% complete · N of M lessons` + Unenroll.

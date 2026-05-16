@@ -19,9 +19,43 @@
 
 /* ---- Header ---- */
 .ldp-header {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 6px 12px;
+}
+.ldp-header > .ldp-back { grid-column: 1 / -1; }
+.ldp-header > .ldp-header-titles { grid-column: 1; }
+.ldp-header > .ldp-assign-btn { grid-column: 2; align-self: end; }
+
+/* Manager-only "Assign to team member" button on the header */
+.ldp-assign-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+.ldp-assign-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+.ldp-assign-btn svg { color: #6b7280; }
+
+.ldp-assign-help {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0 0 12px;
+  line-height: 1.5;
 }
 .ldp-back {
   align-self: flex-start;
@@ -88,6 +122,7 @@
 }
 .ldp-kpi-value--purple  { color: #9333ea; }
 .ldp-kpi-value--emerald { color: #059669; }
+.ldp-kpi-value--amber   { color: #b45309; }
 
 /* ---- Filter pills ---- */
 .ldp-filters {
@@ -232,6 +267,7 @@
   border-radius: 999px;
 }
 .ldp-tile-badge--active    { background: #f5f3ff; color: #7c3aed; }
+.ldp-tile-badge--paused    { background: #fffbeb; color: #b45309; }
 .ldp-tile-badge--completed { background: #ecfdf5; color: #059669; }
 .ldp-tile-badge--available { background: #f3f4f6; color: #6b7280; }
 
@@ -269,6 +305,35 @@
 .ldp-badge--emerald { background: #ecfdf5; color: #047857; }
 .ldp-badge--amber   { background: #fffbeb; color: #b45309; }
 
+/* Deadline + assigned-by pills (shown on enrolled cards only) */
+.ldp-deadline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px 3px 6px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.ldp-deadline-pill svg { color: #3b82f6; }
+.ldp-deadline-pill.is-overdue {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+.ldp-deadline-pill.is-overdue svg { color: #ef4444; }
+.ldp-assigned-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
 /* Progress (active only) */
 .ldp-tile-progress {
   display: flex;
@@ -287,6 +352,9 @@
   background: #a855f7;
   border-radius: 999px;
   transition: width 0.3s ease;
+}
+.ldp-tile-progress-fill.is-paused {
+  background: #f59e0b;
 }
 .ldp-tile-progress-text {
   font-size: 12px;

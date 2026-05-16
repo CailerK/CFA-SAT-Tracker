@@ -1243,28 +1243,51 @@ class LessonCompletionSerializer(serializers.ModelSerializer):
 
 class UserDevelopmentPlanSerializer(serializers.ModelSerializer):
     progress_percent = serializers.IntegerField(read_only=True)
+    # `user` is writable but optional — defaults to the requester in
+    # `UserDevelopmentPlanViewSet.perform_create`. Managers may pass another
+    # user's id to assign on their behalf.
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), required=False,
+    )
     # Embed the keys of every completed lesson so the plan-detail page can
     # render checkmarks without a second request.
     completed_lesson_keys = serializers.SerializerMethodField()
+    assigned_by_name = serializers.SerializerMethodField()
+    user_name = serializers.SerializerMethodField()
 
     class Meta:
         model = UserDevelopmentPlan
         fields = [
-            "id", "user", "plan_key", "status",
+            "id", "user", "user_name", "plan_key", "status",
             "current_step", "total_steps",
             "started_at", "completed_at", "updated_at",
+            "deadline", "assigned_by", "assigned_by_name",
             "progress_percent",
             "completed_lesson_keys",
         ]
+        # `user` is writable so managers can assign plans to other users, but
+        # the viewset locks it down to self for non-managers (see
+        # UserDevelopmentPlanViewSet.perform_create).
         read_only_fields = [
-            "id", "user", "started_at", "updated_at", "progress_percent",
+            "id", "started_at", "updated_at", "progress_percent",
             "completed_lesson_keys",
+            "user_name", "assigned_by", "assigned_by_name",
         ]
 
     def get_completed_lesson_keys(self, obj):
         return list(
             obj.lesson_completions.values_list('lesson_key', flat=True)
         )
+
+    def get_assigned_by_name(self, obj):
+        if not obj.assigned_by_id:
+            return None
+        u = obj.assigned_by
+        return (u.get_full_name() or u.username or '').strip() or None
+
+    def get_user_name(self, obj):
+        u = obj.user
+        return (u.get_full_name() or u.username or '').strip() or None
 
 
 # ============================================================================

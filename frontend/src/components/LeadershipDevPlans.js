@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import './LeadershipDevPlans.css';
 import leadershipService from '../services/leadership';
-import { ConfirmDialog } from './ui';
+import { ConfirmDialog, FormModal, SelectField, DatePicker, UserPicker } from './ui';
 
 // ============================================================================
 // DEV_PLANS catalog — hardcoded while the user transcribes their LD Growth
@@ -21,13 +21,18 @@ import { ConfirmDialog } from './ui';
 // ============================================================================
 // Helper to build a stable lesson key from its 1-indexed position. Backend
 // stores these as the `lesson_key` on `LessonCompletion`.
-const L = (idx, type, title, time, desc) => ({
+//
+// `resourceUrl` is optional — when present the detail page renders an
+// "Open Resource" button inside the expanded lesson body. Leave null until
+// the actual LD Growth URLs are provided.
+const L = (idx, type, title, time, desc, resourceUrl = null) => ({
   key: String(idx).padStart(2, '0'),
   index: idx,
   type, // 'Activity' | 'Reading' | 'Reflection' | 'Assessment' | 'Video'
   title,
   time,
   description: desc,
+  resourceUrl,
 });
 
 export const DEV_PLANS = [
@@ -125,8 +130,28 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
   // plan-detail page took over completion via per-lesson check-offs.)
   const [confirmReactivate, setConfirmReactivate] = useState(null); // enrollment record
   const [confirmRemove, setConfirmRemove] = useState(null);       // enrollment record
+  // Pause-and-switch ConfirmDialog payload — set when the user tries to
+  // Start / Restart / Resume a plan while another plan is already active.
+  //   { plan, action: 'start' | 'resume' | 'restart', enrollment? }
+  const [confirmSwitch, setConfirmSwitch] = useState(null);
   // Filter pills.
-  const [filter, setFilter] = useState('all'); // 'all' | 'active' | 'completed' | 'available'
+  const [filter, setFilter] = useState('all'); // 'all' | 'active' | 'paused' | 'completed' | 'available'
+
+  // ----- Assign flow (manager+ only) -----
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignTargetUserId, setAssignTargetUserId] = useState(null);
+  const [assignTargetUserName, setAssignTargetUserName] = useState('');
+  const [assignPlanKey, setAssignPlanKey] = useState(DEV_PLANS[0]?.key || '');
+  const [assignDeadline, setAssignDeadline] = useState('');
+  const [assignError, setAssignError] = useState(null);
+
+  // Mirror the backend's `is_manager_or_above` rule.
+  const isManagerOrAbove = !!(
+    user?.isSuperuser
+    || user?.isAdmin
+    || (user?.role && ['manager', 'shift_lead', 'shift_leader',
+                       'director', 'admin'].includes(user.role))
+  );
 
   const refresh = useCallback(async () => {
     try {
@@ -154,22 +179,20 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
 
   // ----- Mutations -----
 
-  const handleStart = async (plan) => {
-    // Client-side guard for the 1-active-plan-per-user rule. Backend also
-    // enforces this — this just gives a faster, friendlier error.
-    const hasOtherActive = Object.values(enrollmentsByKey).some(
-      (e) => e?.status === 'active' && e.plan_key !== plan.key,
-    );
-    if (hasOtherActive) {
-      setError(
-        'You already have an active development plan. Complete or remove '
-        + 'it before starting another.',
-      );
-      return;
+  // Helper: find the user's currently-active enrollment, or null.
+  const findActiveEnrollment = (excludeKey = null) => {
+    for (const k in enrollmentsByKey) {
+      if (k === excludeKey) continue;
+      const e = enrollmentsByKey[k];
+      if (e?.status === 'active') return e;
     }
+    return null;
+  };
+
+  // Raw "start" — creates a new enrollment. No 1-active check here; callers
+  // must clear the active slot first (or use handleStart which does it).
+  const startEnrollment = async (plan) => {
     setError(null);
-    // Optimistic: insert a placeholder enrollment so the card flips to "Active"
-    // immediately. Roll back on error.
     const placeholder = {
       id: `tmp-${plan.key}`,
       plan_key: plan.key,
@@ -187,12 +210,9 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
         total_steps: plan.total_steps || 0,
       });
       setEnrollmentsByKey((m) => ({ ...m, [plan.key]: created }));
-      // Immediately deep-link into the plan detail so the user can start
-      // checking off lessons.
       onNavigate && onNavigate('dev-plan-detail', { planKey: plan.key });
     } catch (err) {
       console.error('Enroll failed:', err);
-      // Backend might also reject (race on another tab) — surface a message.
       const msg = err?.data?.detail || err?.message
         || 'Could not start this plan. Please try again.';
       setError(msg);
@@ -204,21 +224,79 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
     }
   };
 
-  const performReactivate = async () => {
-    const enrollment = confirmReactivate;
-    setConfirmReactivate(null);
-    if (!enrollment) return;
-    // Same 1-active guard as Start.
-    const hasOtherActive = Object.values(enrollmentsByKey).some(
-      (e) => e?.status === 'active' && e.plan_key !== enrollment.plan_key,
-    );
-    if (hasOtherActive) {
-      setError(
-        'You already have an active development plan. Complete or remove '
-        + 'it before restarting this one.',
-      );
+  const handleStart = (plan) => {
+    // If another plan is active, ask the user if they want to pause it and
+    // switch to the new plan. Otherwise just start straight away.
+    const active = findActiveEnrollment(plan.key);
+    if (active) {
+      setConfirmSwitch({ plan, action: 'start' });
+    } else {
+      startEnrollment(plan);
+    }
+  };
+
+  // Resume a paused enrollment back to active. If another plan is active,
+  // offer to pause-and-switch (mirror of handleStart).
+  const handleResume = async (enrollment) => {
+    const plan = DEV_PLANS.find((p) => p.key === enrollment.plan_key);
+    if (!plan) return;
+    const active = findActiveEnrollment(plan.key);
+    if (active) {
+      setConfirmSwitch({ plan, enrollment, action: 'resume' });
       return;
     }
+    await resumeEnrollment(enrollment);
+  };
+
+  // Pause an active enrollment in place. Preserves every lesson completion
+  // so the user can Resume later and pick up where they left off. This is
+  // what the previous "Remove on Active" button now does — destructive
+  // delete is only available from the Paused or Completed states.
+  const pauseEnrollment = async (enrollment) => {
+    setError(null);
+    const prev = enrollment;
+    setEnrollmentsByKey((m) => ({
+      ...m,
+      [enrollment.plan_key]: { ...enrollment, status: 'paused' },
+    }));
+    try {
+      const updated = await leadershipService.updateDevPlan(enrollment.id, {
+        status: 'paused',
+      });
+      setEnrollmentsByKey((m) => ({ ...m, [enrollment.plan_key]: updated }));
+    } catch (err) {
+      console.error('Pause failed:', err);
+      const msg = err?.data?.detail || err?.message
+        || 'Could not pause this plan.';
+      setError(msg);
+      setEnrollmentsByKey((m) => ({ ...m, [enrollment.plan_key]: prev }));
+    }
+  };
+
+  const resumeEnrollment = async (enrollment) => {
+    setError(null);
+    const prev = enrollment;
+    setEnrollmentsByKey((m) => ({
+      ...m,
+      [enrollment.plan_key]: { ...enrollment, status: 'active' },
+    }));
+    try {
+      const updated = await leadershipService.updateDevPlan(enrollment.id, {
+        status: 'active',
+      });
+      setEnrollmentsByKey((m) => ({ ...m, [enrollment.plan_key]: updated }));
+      onNavigate && onNavigate('dev-plan-detail', { planKey: enrollment.plan_key });
+    } catch (err) {
+      console.error('Resume failed:', err);
+      const msg = err?.data?.detail || err?.message
+        || 'Could not resume this plan.';
+      setError(msg);
+      setEnrollmentsByKey((m) => ({ ...m, [enrollment.plan_key]: prev }));
+    }
+  };
+
+  // Raw "restart" — flips a completed enrollment back to active with 0 steps.
+  const restartEnrollment = async (enrollment) => {
     setError(null);
     const prev = enrollment;
     setEnrollmentsByKey((m) => ({
@@ -247,6 +325,113 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
     }
   };
 
+  const performReactivate = async () => {
+    const enrollment = confirmReactivate;
+    setConfirmReactivate(null);
+    if (!enrollment) return;
+    const plan = DEV_PLANS.find((p) => p.key === enrollment.plan_key);
+    // If another plan is active, offer pause-and-switch instead of blocking.
+    const active = findActiveEnrollment(enrollment.plan_key);
+    if (active && plan) {
+      setConfirmSwitch({ plan, enrollment, action: 'restart' });
+      return;
+    }
+    await restartEnrollment(enrollment);
+  };
+
+  // Pause the currently-active plan, then run the queued action (start /
+  // resume / restart). Used by the "Pause current plan and switch?" dialog.
+  const performSwitch = async () => {
+    const job = confirmSwitch;
+    setConfirmSwitch(null);
+    if (!job) return;
+    const active = findActiveEnrollment(job.plan.key);
+    if (!active) {
+      // Active plan disappeared while the dialog was open — just run the
+      // action directly without pausing.
+      if (job.action === 'start') return startEnrollment(job.plan);
+      if (job.action === 'resume' && job.enrollment) return resumeEnrollment(job.enrollment);
+      if (job.action === 'restart' && job.enrollment) return restartEnrollment(job.enrollment);
+      return;
+    }
+    setError(null);
+    // Optimistic: flip the current active to paused.
+    const prevActive = active;
+    setEnrollmentsByKey((m) => ({
+      ...m,
+      [active.plan_key]: { ...active, status: 'paused' },
+    }));
+    try {
+      const paused = await leadershipService.updateDevPlan(active.id, {
+        status: 'paused',
+      });
+      setEnrollmentsByKey((m) => ({ ...m, [active.plan_key]: paused }));
+      // Now perform the queued action with the active slot freed.
+      if (job.action === 'start') {
+        await startEnrollment(job.plan);
+      } else if (job.action === 'resume' && job.enrollment) {
+        await resumeEnrollment(job.enrollment);
+      } else if (job.action === 'restart' && job.enrollment) {
+        await restartEnrollment(job.enrollment);
+      }
+    } catch (err) {
+      console.error('Pause-and-switch failed:', err);
+      setEnrollmentsByKey((m) => ({ ...m, [active.plan_key]: prevActive }));
+      const msg = err?.data?.detail || err?.message
+        || 'Could not switch plans. Please try again.';
+      setError(msg);
+    }
+  };
+
+  // ----- Manager-only: assign a plan to another team member -----
+
+  const openAssignModal = () => {
+    setAssignTargetUserId(null);
+    setAssignTargetUserName('');
+    setAssignPlanKey(DEV_PLANS[0]?.key || '');
+    setAssignDeadline('');
+    setAssignError(null);
+    setAssignOpen(true);
+  };
+
+  const submitAssign = async () => {
+    setAssignError(null);
+    if (!assignTargetUserId) {
+      setAssignError('Pick a team member first.');
+      return;
+    }
+    if (!assignPlanKey) {
+      setAssignError('Pick a plan.');
+      return;
+    }
+    const plan = DEV_PLANS.find((p) => p.key === assignPlanKey);
+    try {
+      await leadershipService.assignDevPlanToUser({
+        user_id: assignTargetUserId,
+        plan_key: assignPlanKey,
+        total_steps: plan?.total_steps || 0,
+        deadline: assignDeadline || null,
+      });
+      setAssignOpen(false);
+      // Toast-style status — re-use the page error banner with success copy.
+      const who = assignTargetUserName || 'the team member';
+      setError(null);
+      // eslint-disable-next-line no-alert
+      // (Skip a real toast for now — manager will see the success implicitly.)
+      // We don't refresh the local list since this assignment is for someone
+      // else and the manager's own list shouldn't change.
+      window.alert(`Assigned "${plan?.name || assignPlanKey}" to ${who}.`);
+    } catch (err) {
+      console.error('Assign failed:', err);
+      const msg = err?.data?.detail
+        || err?.data?.user?.[0]
+        || err?.message
+        || 'Could not assign this plan. Please try again.';
+      setAssignError(msg);
+      throw err; // let FormModal stay open on failure
+    }
+  };
+
   const performRemove = async () => {
     const enrollment = confirmRemove;
     setConfirmRemove(null);
@@ -268,19 +453,19 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
 
   // ----- Derived counts for the filter pills -----
   const counts = useMemo(() => {
-    let active = 0, completed = 0, available = 0;
+    let active = 0, paused = 0, completed = 0, available = 0;
     for (const plan of DEV_PLANS) {
       const enrollment = enrollmentsByKey[plan.key];
       if (!enrollment) available += 1;
       else if (enrollment.status === 'completed') completed += 1;
+      else if (enrollment.status === 'paused') paused += 1;
       else active += 1;
     }
-    return { all: DEV_PLANS.length, active, completed, available };
+    return { all: DEV_PLANS.length, active, paused, completed, available };
   }, [enrollmentsByKey]);
 
   // Business rule (mirrored on the backend): a user can only have ONE active
-  // plan at a time. Find it once so we can disable Start / Restart on every
-  // other card.
+  // plan at a time. Paused plans are NOT counted here.
   const activeEnrollmentKey = useMemo(() => {
     for (const k in enrollmentsByKey) {
       if (enrollmentsByKey[k]?.status === 'active') return k;
@@ -293,6 +478,7 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
       const enrollment = enrollmentsByKey[plan.key];
       if (filter === 'all') return true;
       if (filter === 'active') return enrollment && enrollment.status === 'active';
+      if (filter === 'paused') return enrollment && enrollment.status === 'paused';
       if (filter === 'completed') return enrollment && enrollment.status === 'completed';
       if (filter === 'available') return !enrollment;
       return true;
@@ -322,6 +508,22 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
               up on your Leadership dashboard.
             </p>
           </div>
+          {isManagerOrAbove && (
+            <button
+              type="button"
+              className="ldp-assign-btn"
+              onClick={openAssignModal}
+              title="Assign a plan to a team member with an optional deadline"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M3 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/>
+                <line x1="19" x2="19" y1="8" y2="14"/>
+                <line x1="22" x2="16" y1="11" y2="11"/>
+              </svg>
+              Assign to team member
+            </button>
+          )}
         </div>
 
         {/* ---- KPI strip ---- */}
@@ -331,16 +533,16 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
             <div className="ldp-kpi-value ldp-kpi-value--purple">{counts.active}</div>
           </div>
           <div className="ldp-kpi">
+            <div className="ldp-kpi-label">Paused</div>
+            <div className="ldp-kpi-value ldp-kpi-value--amber">{counts.paused}</div>
+          </div>
+          <div className="ldp-kpi">
             <div className="ldp-kpi-label">Completed</div>
             <div className="ldp-kpi-value ldp-kpi-value--emerald">{counts.completed}</div>
           </div>
           <div className="ldp-kpi">
             <div className="ldp-kpi-label">Available</div>
             <div className="ldp-kpi-value">{counts.available}</div>
-          </div>
-          <div className="ldp-kpi">
-            <div className="ldp-kpi-label">Total Plans</div>
-            <div className="ldp-kpi-value">{counts.all}</div>
           </div>
         </div>
 
@@ -349,6 +551,7 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
           {[
             { id: 'all',       label: `All (${counts.all})` },
             { id: 'active',    label: `Active (${counts.active})` },
+            { id: 'paused',    label: `Paused (${counts.paused})` },
             { id: 'completed', label: `Completed (${counts.completed})` },
             { id: 'available', label: `Available (${counts.available})` },
           ].map((p) => (
@@ -397,10 +600,12 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
                     </div>
                     <span className={`ldp-tile-badge ${
                       status === 'active'    ? 'ldp-tile-badge--active' :
+                      status === 'paused'    ? 'ldp-tile-badge--paused' :
                       status === 'completed' ? 'ldp-tile-badge--completed' :
                                                'ldp-tile-badge--available'
                     }`}>
                       {status === 'active'    && 'Active'}
+                      {status === 'paused'    && 'Paused'}
                       {status === 'completed' && 'Completed'}
                       {status === 'available' && 'Available'}
                     </span>
@@ -422,13 +627,43 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
                         ~{plan.estimated_hours}h
                       </span>
                     )}
+                    {/* Assignment + deadline metadata, present only when the
+                        current row is an enrollment that came from a manager. */}
+                    {enrollment?.deadline && (() => {
+                      const d = new Date(enrollment.deadline + 'T00:00:00');
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const overdue = d < today && status !== 'completed';
+                      const label = d.toLocaleDateString(undefined, {
+                        month: 'short', day: 'numeric',
+                      });
+                      return (
+                        <span
+                          className={`ldp-deadline-pill ${overdue ? 'is-overdue' : ''}`}
+                          title={overdue ? 'Overdue' : 'Deadline'}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect width="18" height="18" x="3" y="4" rx="2"/>
+                            <path d="M3 10h18"/>
+                            <path d="M8 2v4"/>
+                            <path d="M16 2v4"/>
+                          </svg>
+                          Due {label}
+                        </span>
+                      );
+                    })()}
+                    {enrollment?.assigned_by_name && (
+                      <span className="ldp-assigned-pill" title="Assigned by your manager">
+                        Assigned by {enrollment.assigned_by_name}
+                      </span>
+                    )}
                   </div>
 
-                  {status === 'active' && plan.total_steps > 0 && (
+                  {(status === 'active' || status === 'paused') && plan.total_steps > 0 && (
                     <div className="ldp-tile-progress">
                       <div className="ldp-tile-progress-track">
                         <div
-                          className="ldp-tile-progress-fill"
+                          className={`ldp-tile-progress-fill ${status === 'paused' ? 'is-paused' : ''}`}
                           style={{ width: `${progress}%` }}
                         />
                       </div>
@@ -438,21 +673,21 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
 
                   <footer className="ldp-tile-actions">
                     {status === 'available' && (() => {
-                      // Block "Start" when the user already has another
-                      // active plan (1-active-per-user business rule).
-                      const blocked = !!activeEnrollmentKey
+                      // If another plan is already active, the click will
+                      // prompt the user to pause-and-switch (handleStart
+                      // shows a ConfirmDialog instead of starting straight away).
+                      const willSwitch = !!activeEnrollmentKey
                         && activeEnrollmentKey !== plan.key;
                       return (
                         <button
                           type="button"
-                          className={`ldp-btn ldp-btn--primary ${blocked ? 'is-disabled' : ''}`}
+                          className="ldp-btn ldp-btn--primary"
                           onClick={() => handleStart(plan)}
-                          disabled={blocked}
-                          title={blocked
-                            ? 'Finish or remove your active plan first'
+                          title={willSwitch
+                            ? 'Pause your active plan and switch to this one'
                             : 'Start this plan'}
                         >
-                          {blocked ? 'Active plan in progress' : 'Start plan'}
+                          {willSwitch ? 'Pause & switch' : 'Start plan'}
                         </button>
                       );
                     })()}
@@ -461,9 +696,10 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
                         <button
                           type="button"
                           className="ldp-btn ldp-btn--ghost"
-                          onClick={() => setConfirmRemove(enrollment)}
+                          onClick={() => pauseEnrollment(enrollment)}
+                          title="Pause this plan — your progress is kept so you can resume later"
                         >
-                          Remove
+                          Pause
                         </button>
                         <button
                           type="button"
@@ -476,8 +712,8 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
                         </button>
                       </>
                     )}
-                    {status === 'completed' && (() => {
-                      const blocked = !!activeEnrollmentKey
+                    {status === 'paused' && (() => {
+                      const willSwitch = !!activeEnrollmentKey
                         && activeEnrollmentKey !== plan.key;
                       return (
                         <>
@@ -490,14 +726,38 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
                           </button>
                           <button
                             type="button"
-                            className={`ldp-btn ldp-btn--secondary ${blocked ? 'is-disabled' : ''}`}
+                            className="ldp-btn ldp-btn--primary"
+                            onClick={() => handleResume(enrollment)}
+                            title={willSwitch
+                              ? 'Pause your active plan and resume this one'
+                              : 'Resume this plan'}
+                          >
+                            {willSwitch ? 'Pause & resume' : 'Resume'}
+                          </button>
+                        </>
+                      );
+                    })()}
+                    {status === 'completed' && (() => {
+                      const willSwitch = !!activeEnrollmentKey
+                        && activeEnrollmentKey !== plan.key;
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            className="ldp-btn ldp-btn--ghost"
+                            onClick={() => setConfirmRemove(enrollment)}
+                          >
+                            Remove
+                          </button>
+                          <button
+                            type="button"
+                            className="ldp-btn ldp-btn--secondary"
                             onClick={() => setConfirmReactivate(enrollment)}
-                            disabled={blocked}
-                            title={blocked
-                              ? 'Finish or remove your active plan first'
+                            title={willSwitch
+                              ? 'Pause your active plan and restart this one'
                               : 'Restart this plan'}
                           >
-                            Restart
+                            {willSwitch ? 'Pause & restart' : 'Restart'}
                           </button>
                         </>
                       );
@@ -517,6 +777,70 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
           </div>
         )}
       </div>
+
+      {/* ---- Assign plan to a team member (manager+ only) ---- */}
+      <FormModal
+        isOpen={assignOpen}
+        title="Assign a development plan"
+        submitLabel="Assign plan"
+        onClose={() => setAssignOpen(false)}
+        onSubmit={submitAssign}
+      >
+        <p className="ldp-assign-help">
+          Pick a team member, choose a plan, and optionally set a deadline.
+          The plan will appear on their Leadership dashboard immediately.
+        </p>
+        <UserPicker
+          label="Team member"
+          value={assignTargetUserId}
+          onChange={(id, u) => {
+            setAssignTargetUserId(id);
+            setAssignTargetUserName(u?.name || u?.email || '');
+          }}
+          placeholder="Search by name or email…"
+          required
+        />
+        <SelectField
+          label="Plan"
+          value={assignPlanKey}
+          onChange={setAssignPlanKey}
+          options={DEV_PLANS.map((p) => ({ value: p.key, label: p.name }))}
+          required
+        />
+        <DatePicker
+          label="Deadline (optional)"
+          value={assignDeadline}
+          onChange={setAssignDeadline}
+          help="Leave blank for no deadline."
+        />
+        {assignError && (
+          <div className="ldp-error" style={{ marginTop: 8 }}>{assignError}</div>
+        )}
+      </FormModal>
+
+      {/* ---- Confirm: pause-and-switch ---- */}
+      <ConfirmDialog
+        isOpen={!!confirmSwitch}
+        title="Pause your active plan and switch?"
+        message={(() => {
+          if (!confirmSwitch) return '';
+          const active = findActiveEnrollment(confirmSwitch.plan.key);
+          const activeName = active
+            ? (DEV_PLANS.find((p) => p.key === active.plan_key)?.name || active.plan_key)
+            : 'your active plan';
+          const verb = confirmSwitch.action === 'start' ? 'start'
+                     : confirmSwitch.action === 'resume' ? 'resume'
+                     : 'restart';
+          return `"${activeName}" will be paused (progress kept) so you can ${verb} "${confirmSwitch.plan.name}". You can come back to it any time.`;
+        })()}
+        confirmLabel={
+          confirmSwitch?.action === 'start' ? 'Pause & start'
+          : confirmSwitch?.action === 'resume' ? 'Pause & resume'
+          : 'Pause & restart'
+        }
+        onConfirm={performSwitch}
+        onClose={() => setConfirmSwitch(null)}
+      />
 
       {/* ---- Confirm: restart completed plan ---- */}
       <ConfirmDialog
@@ -539,7 +863,7 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
         title="Remove this plan?"
         message={
           confirmRemove
-            ? `"${DEV_PLANS.find((p) => p.key === confirmRemove.plan_key)?.name || confirmRemove.plan_key}" and any progress will be removed from your dashboard.`
+            ? `"${DEV_PLANS.find((p) => p.key === confirmRemove.plan_key)?.name || confirmRemove.plan_key}" will be removed and ALL of your lesson progress will be permanently deleted. If you just want to free up your active slot, use Pause instead.`
             : ''
         }
         confirmLabel="Remove"

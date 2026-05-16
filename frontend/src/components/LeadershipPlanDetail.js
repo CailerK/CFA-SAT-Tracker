@@ -121,12 +121,16 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
   const [completionsByKey, setCompletionsByKey] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Which lesson card is expanded. Only one at a time, like the LD Growth UI.
-  const [expandedKey, setExpandedKey] = useState(null);
+  // LD Growth opens every lesson by default and lets the user collapse them.
+  // We track the *closed* set so the default state can be "everything open"
+  // without needing to know the lesson list at construction time.
+  const [collapsedKeys, setCollapsedKeys] = useState(() => new Set());
   // Pending toggle keys to debounce double-clicks.
   const [pendingKeys, setPendingKeys] = useState(() => new Set());
   // Confirm "Unenroll" dialog.
   const [confirmUnenroll, setConfirmUnenroll] = useState(false);
+  // True while a pause/resume request is in flight.
+  const [pauseBusy, setPauseBusy] = useState(false);
 
   // ---------------------------------------------------------------
   // Initial load: fetch my enrollments, find the matching one, then
@@ -177,8 +181,39 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
   // ---------------------------------------------------------------
   // Mutations
   // ---------------------------------------------------------------
+  // True when this enrollment is paused — disables lesson toggles.
+  const isPaused = enrollment?.status === 'paused';
+
+  const handlePauseResume = async () => {
+    if (!enrollment || pauseBusy) return;
+    setPauseBusy(true);
+    setError(null);
+    const nextStatus = enrollment.status === 'paused' ? 'active' : 'paused';
+    // Optimistic flip.
+    const prev = enrollment;
+    setEnrollment({ ...enrollment, status: nextStatus });
+    try {
+      const updated = await leadershipService.updateDevPlan(enrollment.id, {
+        status: nextStatus,
+      });
+      setEnrollment(updated);
+    } catch (err) {
+      console.error('Pause/resume failed:', err);
+      setEnrollment(prev);
+      const msg = err?.data?.detail || err?.message
+        || (nextStatus === 'paused'
+          ? 'Could not pause this plan.'
+          : 'Could not resume this plan.');
+      setError(msg);
+    } finally {
+      setPauseBusy(false);
+    }
+  };
+
   const toggleLesson = async (lesson) => {
     if (!enrollment) return;
+    // Paused plans are read-only — user must Resume first.
+    if (enrollment.status === 'paused') return;
     if (pendingKeys.has(lesson.key)) return;
     const existing = completionsByKey[lesson.key];
 
@@ -293,18 +328,88 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
               <p className="lpd-sub">
                 {progressPct}% complete · {completedCount} of {totalLessons} lesson{totalLessons === 1 ? '' : 's'}
               </p>
+              {(enrollment?.deadline || enrollment?.assigned_by_name) && (
+                <div className="lpd-assignment-row">
+                  {enrollment?.deadline && (() => {
+                    const d = new Date(enrollment.deadline + 'T00:00:00');
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const overdue = d < today && enrollment.status !== 'completed';
+                    const label = d.toLocaleDateString(undefined, {
+                      month: 'short', day: 'numeric', year: 'numeric',
+                    });
+                    return (
+                      <span className={`lpd-deadline-pill ${overdue ? 'is-overdue' : ''}`}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect width="18" height="18" x="3" y="4" rx="2"/>
+                          <path d="M3 10h18"/>
+                          <path d="M8 2v4"/>
+                          <path d="M16 2v4"/>
+                        </svg>
+                        {overdue ? 'Overdue · ' : 'Due '} {label}
+                      </span>
+                    );
+                  })()}
+                  {enrollment?.assigned_by_name && (
+                    <span className="lpd-assigned-pill">
+                      Assigned by {enrollment.assigned_by_name}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           {enrollment && (
-            <button
-              type="button"
-              className="lpd-unenroll"
-              onClick={() => setConfirmUnenroll(true)}
-            >
-              Unenroll
-            </button>
+            <div className="lpd-header-actions">
+              <button
+                type="button"
+                className={`lpd-pause-btn ${isPaused ? 'is-resume' : ''}`}
+                onClick={handlePauseResume}
+                disabled={pauseBusy}
+                title={isPaused
+                  ? 'Resume this plan and continue tracking lessons'
+                  : 'Pause this plan — your progress is kept'}
+              >
+                {isPaused ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="6 3 20 12 6 21 6 3"/>
+                    </svg>
+                    Resume
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="6" y="4" width="4" height="16" rx="1"/>
+                      <rect x="14" y="4" width="4" height="16" rx="1"/>
+                    </svg>
+                    Pause
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                className="lpd-unenroll"
+                onClick={() => setConfirmUnenroll(true)}
+              >
+                Unenroll
+              </button>
+            </div>
           )}
         </div>
+
+        {/* ---- Paused banner ---- */}
+        {isPaused && (
+          <div className="lpd-paused-banner">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="6" y="4" width="4" height="16" rx="1"/>
+              <rect x="14" y="4" width="4" height="16" rx="1"/>
+            </svg>
+            <span>
+              This plan is paused — your progress is saved. Click <strong>Resume</strong> to keep tracking lessons.
+            </span>
+          </div>
+        )}
 
         {/* ---- Purple progress bar ---- */}
         <div className="lpd-progress-track">
@@ -323,9 +428,17 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
           <div className="lpd-lessons">
             {plan.lessons.map((lesson) => {
               const isCompleted = !!completionsByKey[lesson.key];
-              const isExpanded = expandedKey === lesson.key;
+              const isExpanded = !collapsedKeys.has(lesson.key);
               const isPending = pendingKeys.has(lesson.key);
               const typeClass = TYPE_META[lesson.type]?.className || 'lpd-type--gray';
+              const toggleCollapse = () => {
+                setCollapsedKeys((s) => {
+                  const c = new Set(s);
+                  if (c.has(lesson.key)) c.delete(lesson.key);
+                  else c.add(lesson.key);
+                  return c;
+                });
+              };
               return (
                 <article
                   key={lesson.key}
@@ -334,7 +447,7 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
                   <button
                     type="button"
                     className="lpd-lesson-row"
-                    onClick={() => setExpandedKey(isExpanded ? null : lesson.key)}
+                    onClick={toggleCollapse}
                     aria-expanded={isExpanded}
                   >
                     <span className={`lpd-type-icon ${typeClass}`} aria-hidden="true">
@@ -354,36 +467,74 @@ const LeadershipPlanDetail = ({ planKey, onNavigate }) => {
                         </span>
                       </span>
                     </span>
-                    {/* Checkbox lives inside the row, but stops propagation so
-                        clicking the check doesn't also toggle expansion. */}
-                    <span
-                      role="checkbox"
-                      aria-checked={isCompleted}
-                      tabIndex={0}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleLesson(lesson);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleLesson(lesson);
-                        }
-                      }}
-                      className={`lpd-check ${isCompleted ? 'is-checked' : ''} ${isPending ? 'is-pending' : ''}`}
-                      title={isCompleted ? 'Mark incomplete' : 'Mark complete'}
+                    {/* Small chevron on the right indicates collapse state.
+                        No longer used to mark complete — that lives in the
+                        body now, matching LD Growth. */}
+                    <svg
+                      className={`lpd-row-chevron ${isExpanded ? 'is-open' : ''}`}
+                      width="16" height="16" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor"
+                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                     >
-                      {isCompleted && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                      )}
-                    </span>
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
                   </button>
                   {isExpanded && (
                     <div className="lpd-lesson-body">
                       {renderMarkdown(lesson.description)}
+                      <div className="lpd-lesson-actions">
+                        {lesson.resourceUrl ? (
+                          <a
+                            className="lpd-resource-btn"
+                            href={lesson.resourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                              <polyline points="15 3 21 3 21 9"/>
+                              <line x1="10" x2="21" y1="14" y2="3"/>
+                            </svg>
+                            Open Resource
+                          </a>
+                        ) : (
+                          /* Spacer so the Complete button stays on the right
+                             once we add real URLs. Invisible & unfocusable. */
+                          <span className="lpd-resource-placeholder" aria-hidden="true" />
+                        )}
+                        <button
+                          type="button"
+                          className={`lpd-complete-btn ${isCompleted ? 'is-done' : ''} ${isPending ? 'is-pending' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleLesson(lesson);
+                          }}
+                          disabled={isPending || isPaused}
+                          title={isPaused
+                            ? 'Resume the plan to update lessons'
+                            : isCompleted
+                              ? 'Mark this lesson incomplete'
+                              : 'Mark this lesson complete'}
+                        >
+                          {isCompleted ? (
+                            <>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                              Completed
+                            </>
+                          ) : (
+                            <>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="9 12 11 14 15 10"/>
+                              </svg>
+                              Complete
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </article>

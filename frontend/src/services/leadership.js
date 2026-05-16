@@ -154,6 +154,23 @@ const leadershipService = {
     });
   },
 
+  // Manager/admin assigns a plan to another team member with an optional
+  // deadline. Backend rejects if the requester isn't a manager+ or if the
+  // target user is in a different store.
+  async assignDevPlanToUser({ user_id, plan_key, total_steps = 0, deadline = null }) {
+    const body = {
+      user: user_id,
+      plan_key,
+      total_steps,
+      status: "active",
+    };
+    if (deadline) body.deadline = deadline; // ISO YYYY-MM-DD
+    return apiService.request("/leadership/development-plans/", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
   async updateDevPlan(id, patch) {
     return apiService.request(`/leadership/development-plans/${id}/`, {
       method: "PATCH",

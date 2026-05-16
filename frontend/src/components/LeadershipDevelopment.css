@@ -362,6 +362,25 @@
   color: #9ca3af;
   flex-shrink: 0;
 }
+/* Amber progress fill for a paused plan featured on the dashboard. */
+.ld-dev-progress-fill.is-paused { background: #f59e0b; }
+
+/* Small "Paused" chip rendered next to "Development" in the card title. */
+.ld-dev-paused-chip {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 999px;
+  padding: 1px 8px;
+  vertical-align: middle;
+}
+
 /* CTA pill shown when the user has no active plan. Sits in the same vertical
    slot as the progress bar so the card height matches the active state. */
 .ld-dev-cta-pill {

@@ -287,44 +287,80 @@ class UserDevelopmentPlanViewSet(StoreScopedViewSet):
     serializer_class = UserDevelopmentPlanSerializer
 
     def get_queryset(self):
+        # Strict per-user isolation: only the requesting user's own
+        # enrollments are returned. Managers do NOT see other users' plans
+        # via this endpoint — assignment is fire-and-forget; once created
+        # the enrollment belongs to the assignee.
         return UserDevelopmentPlan.objects.filter(
             user=self.request.user,
-        ).prefetch_related('lesson_completions')
+        ).select_related('user', 'assigned_by').prefetch_related('lesson_completions')
 
-    def _has_other_active(self, exclude_id=None):
+    def _has_other_active(self, target_user, exclude_id=None):
         qs = UserDevelopmentPlan.objects.filter(
-            user=self.request.user, status='active',
+            user=target_user, status='active',
         )
         if exclude_id is not None:
             qs = qs.exclude(id=exclude_id)
         return qs.exists()
 
     def perform_create(self, serializer):
-        # New enrollments default to status='active' — block if one already exists.
+        requester = self.request.user
+        # Default the enrollment to the requester. Managers may pass a
+        # different `user` to assign to a team member.
+        target_user = serializer.validated_data.get('user') or requester
+        is_assignment = target_user.id != requester.id
+        if is_assignment:
+            # Only managers/admins can create an enrollment for someone else.
+            if not getattr(requester, 'is_manager_or_above', False):
+                raise ValidationError(
+                    {'user': 'Only managers can assign plans to other users.'}
+                )
+            # Same-store guard: a manager can only assign to users in their
+            # own store (multi-tenancy invariant).
+            if (getattr(requester, 'store_id', None)
+                    and getattr(target_user, 'store_id', None)
+                    and requester.store_id != target_user.store_id):
+                raise ValidationError(
+                    {'user': 'You can only assign plans to team members in '
+                             'your own store.'}
+                )
+
+        # 1-active-plan-per-user rule applies to the TARGET user.
         intended_status = serializer.validated_data.get('status', 'active')
-        if intended_status == 'active' and self._has_other_active():
+        if intended_status == 'active' and self._has_other_active(target_user):
+            who = 'This team member' if is_assignment else 'You'
             raise ValidationError(
-                {'detail': 'You already have an active development plan. '
+                {'detail': f'{who} already has an active development plan. '
                            'Complete or remove it before starting another.'}
             )
-        serializer.save(user=self.request.user)
+
+        save_kwargs = {'user': target_user}
+        if is_assignment:
+            save_kwargs['assigned_by'] = requester
+        serializer.save(**save_kwargs)
 
     def perform_update(self, serializer):
         instance = serializer.instance
         new_status = serializer.validated_data.get('status', instance.status)
-        # Block reactivation if another plan is active.
+        # Block reactivation (paused/completed → active) if another plan is
+        # already active for THIS enrollment's owner. Pausing or completing
+        # the active plan is always OK.
         if (new_status == 'active'
                 and instance.status != 'active'
-                and self._has_other_active(exclude_id=instance.id)):
+                and self._has_other_active(instance.user, exclude_id=instance.id)):
             raise ValidationError(
                 {'detail': 'You already have another active development plan. '
-                           'Complete or remove it before reactivating this one.'}
+                           'Pause or remove it before resuming this one.'}
             )
-        # Auto-stamp completed_at when transitioning to completed; clear it on
-        # transitions back to active so re-enrolling resets the timestamp.
+        # Auto-stamp / clear completed_at on transitions.
+        # active → completed   : stamp now
+        # paused → completed   : stamp now
+        # completed → active   : clear
+        # completed → paused   : clear (treat as resetting completion status)
+        # anything → paused/active (non-completed): make sure completed_at is null
         if new_status == 'completed' and instance.status != 'completed':
             serializer.save(completed_at=timezone.now())
-        elif new_status == 'active' and instance.status == 'completed':
+        elif new_status != 'completed' and instance.status == 'completed':
             serializer.save(completed_at=None)
         else:
             serializer.save()
@@ -367,7 +403,12 @@ class LessonCompletionViewSet(StoreScopedViewSet):
         else:
             # Roll back from 'completed' if a row was deleted after auto-complete.
             if enrollment.status == 'completed':
-                enrollment.status = 'active'
+                # Prefer 'active' so the user keeps working; but if another plan
+                # is now active, go to 'paused' to keep the 1-active invariant.
+                has_other_active = UserDevelopmentPlan.objects.filter(
+                    user=enrollment.user, status='active',
+                ).exclude(id=enrollment.id).exists()
+                enrollment.status = 'paused' if has_other_active else 'active'
                 enrollment.completed_at = None
         enrollment.save(
             update_fields=['current_step', 'status', 'completed_at', 'updated_at']

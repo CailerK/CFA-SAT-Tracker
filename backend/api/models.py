@@ -1632,6 +1632,7 @@ class UserDevelopmentPlan(models.Model):
     """
     STATUS_CHOICES = [
         ('active', 'Active'),
+        ('paused', 'Paused'),
         ('completed', 'Completed'),
     ]
 
@@ -1650,6 +1651,17 @@ class UserDevelopmentPlan(models.Model):
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # When a manager/admin assigns this plan to a team member, `assigned_by`
+    # records who did the assignment and `deadline` is the target completion
+    # date. Both stay null on self-started enrollments.
+    deadline = models.DateField(null=True, blank=True)
+    assigned_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='assigned_dev_plans',
+        help_text="Manager/admin who assigned this plan, if applicable.",
+    )
 
     class Meta:
         ordering = ['-started_at', '-id']
