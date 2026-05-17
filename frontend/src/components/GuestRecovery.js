@@ -88,7 +88,8 @@ const GuestRecovery = ({ onBack }) => {
         guestRecoveryService.stats().catch(() => null),
       ]);
       const rows = res.results || res || [];
-      setComplaints(rows.map(normalizeComplaint));
+      const normalized = rows.map(normalizeComplaint);
+      setComplaints(normalized);
       if (statsRes) {
         setStats({
           total: statsRes.total || 0,
@@ -97,6 +98,21 @@ const GuestRecovery = ({ onBack }) => {
           resolved: statsRes.resolved || 0,
         });
       }
+
+      // If we got here via a notification click, the dropdown stashed the
+      // target item in sessionStorage. Open its detail modal once and clear
+      // the slot so refreshes don't keep popping it open.
+      try {
+        const raw = sessionStorage.getItem('cfa:openItem');
+        if (raw) {
+          const target = JSON.parse(raw);
+          if (target.kind === 'guest_concern' && target.id) {
+            const match = normalized.find(c => Number(c.id) === Number(target.id));
+            if (match) setSelectedComplaint(match);
+            sessionStorage.removeItem('cfa:openItem');
+          }
+        }
+      } catch (_) { /* ignore parse errors */ }
     } catch (err) {
       console.error('Failed to load guest complaints:', err);
     }

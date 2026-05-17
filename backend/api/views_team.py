@@ -226,6 +226,157 @@ def documentation_stats(request):
     })
 
 
+# ---- Risk classification (shared by /employees/ and /analytics/) ------------
+
+# 7 risk buckets, surfaced in the Documentation Analytics page's "Risk Level
+# Distribution" chart. Order matters — it's also the display order in the UI,
+# and the precedence used by `_classify_risk` (first match wins, top-down).
+RISK_BUCKETS = [
+    ("final_warning", "Final Warning"),
+    ("excessive",     "Excessive (>3 docs)"),
+    ("critical",      "Critical"),
+    ("high",          "High"),
+    ("medium",        "Medium"),
+    ("low",           "Low"),
+    ("none",          "None"),
+]
+
+
+def _classify_risk(records):
+    """Bucket an employee into one of RISK_BUCKETS based on their records.
+
+    Rules (first match wins, evaluated top-down):
+      - final_warning: any record whose title contains "final warning"
+                       (case-insensitive). This is the most severe state — a
+                       single mis-step away from termination.
+      - excessive: 4+ disciplinary records (warnings + PIPs) total.
+      - critical: at least one active PIP.
+      - high: 3 warnings (no PIP).
+      - medium: 2 warnings.
+      - low: 1 warning, OR admin-only notes with no warnings/PIPs.
+      - none: no records at all.
+    """
+    warnings = [r for r in records if r.kind == "warning"]
+    pips     = [r for r in records if r.kind == "pip"]
+    admins   = [r for r in records if r.kind == "admin"]
+    disc_total = len(warnings) + len(pips)
+
+    if any("final warning" in (r.title or "").lower() for r in records):
+        return "final_warning"
+    if disc_total > 3:
+        return "excessive"
+    if len(pips) >= 1:
+        return "critical"
+    if len(warnings) >= 3:
+        return "high"
+    if len(warnings) == 2:
+        return "medium"
+    if len(warnings) == 1 or admins:
+        return "low"
+    return "none"
+
+
+# Risk levels that count as "needs attention" — anything more serious than
+# admin-only notes. Used by both the KPI and the Attention Needed tab.
+ATTENTION_RISKS = {"medium", "high", "critical", "excessive", "final_warning"}
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def documentation_analytics(request):
+    """Discipline analytics for the Team Documentation page.
+
+    Returns the data backing the "View Analytics" view:
+      - totals: high-level KPIs across the store's active roster
+      - risk_distribution: counts/percentages across all 7 risk buckets
+      - employees: per-employee rollup (used by the Attention Needed +
+                   All Employees tabs)
+
+    Scope: store-scoped (or unrestricted for superusers). Only active users
+    are counted in totals / distribution / employees.
+    """
+    user = request.user
+
+    # Roster: active users in the requester's store (or all if superuser).
+    roster_qs = User.objects.filter(is_active=True)
+    if not user.is_superuser:
+        roster_qs = roster_qs.filter(store=user.store)
+    roster = list(roster_qs.prefetch_related("records"))
+
+    # Bucket every active user by risk, even those with zero records (they
+    # land in the "none" bucket and dominate the chart, which mirrors LD
+    # Growth's layout).
+    buckets = {key: 0 for key, _ in RISK_BUCKETS}
+    employees = []
+    total_incidents = 0
+    employees_with_incidents = 0
+
+    for u in roster:
+        recs = list(u.records.all().order_by("-recorded_at"))
+        warnings = sum(1 for r in recs if r.kind == "warning")
+        pips     = sum(1 for r in recs if r.kind == "pip")
+        admins   = sum(1 for r in recs if r.kind == "admin")
+        disc = warnings + pips
+
+        risk = _classify_risk(recs)
+        buckets[risk] += 1
+
+        # "Incidents" mirrors LD Growth — disciplinary records only
+        # (warnings + PIPs). Admin notes don't count.
+        if disc > 0:
+            employees_with_incidents += 1
+            total_incidents += disc
+
+        latest = recs[0] if recs else None
+        employees.append({
+            "id": u.id,
+            "name": f"{u.first_name} {u.last_name}".strip() or u.email,
+            "initials": u.initials,
+            "role": u.role,
+            "risk_level": risk,
+            "counts": {"disc": warnings, "pip": pips, "admin": admins},
+            "latest": {
+                "id": latest.id,
+                "title": latest.title,
+                "kind": latest.kind,
+                "date": latest.recorded_at.strftime("%b %-d, %Y"),
+                "status": latest.status,
+            } if latest else None,
+        })
+
+    total_employees = len(roster)
+    need_attention = sum(buckets[k] for k in ATTENTION_RISKS)
+
+    # Risk distribution — preserve RISK_BUCKETS order, include percentages
+    # rounded to one decimal so the chart can render labels like "(7.5%)".
+    distribution = []
+    for key, label in RISK_BUCKETS:
+        count = buckets[key]
+        pct = round((count / total_employees) * 100, 1) if total_employees else 0.0
+        distribution.append({
+            "key": key,
+            "label": label,
+            "count": count,
+            "percentage": pct,
+        })
+
+    # Sort employees by risk severity (most-severe first), then by name. This
+    # is the order both the Attention Needed and All Employees tabs render.
+    risk_order = {key: idx for idx, (key, _) in enumerate(RISK_BUCKETS)}
+    employees.sort(key=lambda e: (risk_order[e["risk_level"]], e["name"].lower()))
+
+    return Response({
+        "totals": {
+            "total_employees": total_employees,
+            "employees_with_incidents": employees_with_incidents,
+            "total_incidents": total_incidents,
+            "need_attention": need_attention,
+        },
+        "risk_distribution": distribution,
+        "employees": employees,
+    })
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def documentation_employees(request):

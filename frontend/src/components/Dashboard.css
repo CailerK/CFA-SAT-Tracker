@@ -37,6 +37,24 @@
   gap: 32px;
 }
 
+.company-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #E51636;
+  flex-shrink: 0;
+}
+
+.company-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .nav-right {
   display: flex;
   align-items: center;

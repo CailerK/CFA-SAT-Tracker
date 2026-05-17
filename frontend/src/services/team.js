@@ -43,6 +43,12 @@ const teamService = {
     return apiService.request(`/team/documentation/stats/?window=${window}`);
   },
 
+  async docAnalytics() {
+    // Discipline analytics rollup: totals + 7-bucket risk distribution +
+    // per-employee risk levels. Backs the "View Analytics" page.
+    return apiService.request("/team/documentation/analytics/");
+  },
+
   async docEmployees({ filter, q } = {}) {
     const params = new URLSearchParams();
     if (filter && filter !== "all") params.set("filter", filter);

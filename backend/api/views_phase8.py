@@ -84,17 +84,17 @@ class CalendarEventViewSet(StoreScopedViewSet):
 class GuestComplaintViewSet(StoreScopedViewSet):
     """
     CRUD for guest complaints.
-    Manager+ can create/assign/resolve; all users can read.
+
+    Permissions: manager+ for **every** action (list, retrieve, create,
+    update, destroy, assign, resolve, stats). Guest contact info and
+    incident details are sensitive and shouldn't be visible to team
+    members — the whole feature is manager-and-above only.
     """
     queryset = GuestComplaint.objects.select_related(
         'assigned_to', 'created_by', 'store'
     )
     serializer_class = GuestComplaintSerializer
-
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsManagerOrAbove()]
-        return super().get_permissions()
+    permission_classes = [IsManagerOrAbove]
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -186,15 +186,67 @@ class VendorViewSet(StoreScopedViewSet):
 class ChatChannelViewSet(StoreScopedViewSet):
     """
     CRUD for chat channels.
-    Manager+ can create channels; all users can read.
+
+    Permissions:
+      - Read: any member of the store.
+      - Create: any authenticated user (everyone can spin up a custom group).
+      - Update / partial-update / Save Messaging Permissions: manager+ OR
+        the creator of the channel (owner can run their own group).
+      - Destroy: same as update, BUT default channels (`is_default=True`)
+        can never be destroyed regardless of role.
     """
     queryset = ChatChannel.objects.prefetch_related('memberships')
     serializer_class = ChatChannelSerializer
 
     def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsManagerOrAbove()]
+        # Object-level checks (creator vs. manager) happen in the action
+        # methods below; class-level we just require auth so creators can
+        # reach their own channels.
         return super().get_permissions()
+
+    def _user_can_manage(self, user, channel):
+        """Manager+ OR the channel's creator may mutate the channel."""
+        from .permissions import is_manager_or_above
+        if is_manager_or_above(user):
+            return True
+        return bool(channel.created_by_id and channel.created_by_id == user.id)
+
+    def perform_create(self, serializer):
+        # Auto-tag the creator and join them so they're owner+member.
+        instance = serializer.save(created_by=self.request.user)
+        ChatMembership.objects.get_or_create(channel=instance, user=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        channel = self.get_object()
+        if not self._user_can_manage(request.user, channel):
+            return Response(
+                {"detail": "Only the group owner or a manager can edit this group."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        channel = self.get_object()
+        if not self._user_can_manage(request.user, channel):
+            return Response(
+                {"detail": "Only the group owner or a manager can edit this group."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        channel = self.get_object()
+        if channel.is_default:
+            return Response(
+                {"detail": "Default groups cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not self._user_can_manage(request.user, channel):
+            return Response(
+                {"detail": "Only the group owner or a manager can delete this group."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['post'], url_path='mark-read')
     def mark_read(self, request, pk=None):
@@ -209,6 +261,68 @@ class ChatChannelViewSet(StoreScopedViewSet):
             "status": "ok",
             "last_read_at": membership.last_read_at,
         })
+
+    @action(detail=True, methods=['get', 'post'], url_path='members')
+    def members(self, request, pk=None):
+        """GET roster / POST {user_ids:[]} to bulk-add."""
+        from .permissions import is_manager_or_above
+        channel = self.get_object()
+        if request.method == 'GET':
+            qs = channel.memberships.select_related('user').order_by('joined_at')
+            data = []
+            for m in qs:
+                u = m.user
+                first = (u.first_name or u.email or '?')[:1]
+                last = (u.last_name or '')[:1]
+                data.append({
+                    "id": m.id,
+                    "user_id": u.id,
+                    "name": u.get_full_name() or u.email,
+                    "initials": (first + last).upper(),
+                    "role": getattr(u, 'role', '') or '',
+                    "is_admin": bool(getattr(u, 'is_admin', False)),
+                    "is_superuser": bool(getattr(u, 'is_superuser', False)),
+                    "department": getattr(u, 'department', '') or '',
+                    "shift": getattr(u, 'shift_preference', '') or '',
+                    "joined_at": m.joined_at.isoformat() if m.joined_at else None,
+                })
+            return Response(data)
+
+        if not self._user_can_manage(request.user, channel):
+            return Response(
+                {"detail": "Only the group owner or a manager can add members."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        user_ids = request.data.get('user_ids', []) or []
+        if not isinstance(user_ids, list):
+            return Response({"detail": "user_ids must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        added = 0
+        for uid in user_ids:
+            try:
+                u = User.objects.get(id=int(uid), store=request.user.store)
+            except (User.DoesNotExist, ValueError, TypeError):
+                continue
+            _, was = ChatMembership.objects.get_or_create(channel=channel, user=u)
+            if was:
+                added += 1
+        return Response({"added": added, "total_members": channel.memberships.count()})
+
+    @action(detail=True, methods=['delete'], url_path='members/(?P<user_id>[^/.]+)')
+    def remove_member(self, request, pk=None, user_id=None):
+        """Manager+ removes anyone; user may always remove themselves (leave)."""
+        from .permissions import is_manager_or_above
+        channel = self.get_object()
+        try:
+            uid = int(user_id)
+        except (TypeError, ValueError):
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        is_self = uid == request.user.id
+        if not (is_self or is_manager_or_above(request.user)):
+            return Response({"detail": "Manager role required."}, status=status.HTTP_403_FORBIDDEN)
+        ChatMembership.objects.filter(channel=channel, user_id=uid).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ChatMessageViewSet(StoreScopedViewSet):
@@ -229,6 +343,18 @@ class ChatMessageViewSet(StoreScopedViewSet):
 
     def perform_create(self, serializer):
         channel = serializer.validated_data["channel"]
+        # Role-gated channels: if allowed_roles is non-empty, only those roles
+        # (or admin/superuser) may post.
+        allowed = list(channel.allowed_roles or [])
+        if allowed:
+            user_role = getattr(self.request.user, 'role', '') or ''
+            is_admin = bool(getattr(self.request.user, 'is_admin', False)
+                            or getattr(self.request.user, 'is_superuser', False))
+            if not is_admin and user_role not in allowed:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied(
+                    "Your role is not permitted to send messages in this group."
+                )
         ChatMembership.objects.get_or_create(channel=channel, user=self.request.user)
         serializer.save(author=self.request.user)
 

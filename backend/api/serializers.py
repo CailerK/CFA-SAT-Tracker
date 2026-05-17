@@ -158,6 +158,7 @@ class UserMeSerializer(serializers.ModelSerializer):
             "company_id",
             "phone",
             "avatar",
+            "is_admin",
             "is_demo_user",
             "is_superuser",
             "is_staff",
@@ -204,9 +205,16 @@ class UserManagementListSerializer(serializers.ModelSerializer):
 
 class UserManagementDetailSerializer(serializers.ModelSerializer):
     """Serializer for creating/updating users in the user management interface."""
+    username = serializers.CharField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     initials = serializers.CharField(read_only=True)
     store_name = serializers.CharField(source='store.name', read_only=True)
+    department_slugs = serializers.ListField(
+        child=serializers.CharField(),
+        write_only=True,
+        required=False,
+        help_text="List of Department.name slugs (e.g. ['foh','kitchen']).",
+    )
 
     class Meta:
         model = User
@@ -229,6 +237,7 @@ class UserManagementDetailSerializer(serializers.ModelSerializer):
             "company_id",
             "shift_preference",
             "manager",
+            "department_slugs",
             "created_at",
             "updated_at",
         ]
@@ -267,10 +276,50 @@ class UserManagementDetailSerializer(serializers.ModelSerializer):
         
         return data
 
+    def validate_username(self, value):
+        username = (value or "").strip()
+        if not username:
+            return username
+
+        qs = User.objects.filter(username=username)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "A user with that username already exists."
+            )
+        return username
+
+    def _generate_username(self, email):
+        base = slugify((email or "").split("@", 1)[0]) or "user"
+        username = base
+        suffix = 1
+        while User.objects.filter(username=username).exists():
+            suffix += 1
+            username = f"{base}{suffix}"
+        return username
+
+    def _apply_departments(self, user, slugs):
+        if user.store_id is None:
+            user.departments.set([])
+            return
+        departments = Department.objects.filter(store=user.store, name__in=slugs)
+        user.departments.set(list(departments))
+
     def create(self, validated_data):
         """Create a new user with proper password hashing."""
         password = validated_data.pop('password', None)
-        user = User(**validated_data)
+        department_slugs = validated_data.pop('department_slugs', None)
+        email = (validated_data.get('email') or '').strip()
+        username = (validated_data.pop('username', '') or '').strip()
+
+        if not email:
+            raise serializers.ValidationError({'email': 'Email is required.'})
+        if not username:
+            username = self._generate_username(email)
+
+        validated_data['email'] = email
+        user = User(username=username, **validated_data)
         
         if password:
             user.set_password(password)
@@ -279,19 +328,28 @@ class UserManagementDetailSerializer(serializers.ModelSerializer):
             user.set_password(User.objects.make_random_password())
         
         user.save()
+        if department_slugs is not None:
+            self._apply_departments(user, department_slugs)
         return user
 
     def update(self, instance, validated_data):
         """Update user, handling password separately."""
         password = validated_data.pop('password', None)
+        department_slugs = validated_data.pop('department_slugs', None)
+        username = validated_data.pop('username', None)
         
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+
+        if username is not None:
+            instance.username = username.strip()
         
         if password:
             instance.set_password(password)
         
         instance.save()
+        if department_slugs is not None:
+            self._apply_departments(instance, department_slugs)
         return instance
 
 
@@ -920,6 +978,23 @@ class TeamMemberSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "name", "initials", "manager_name", "departments", "created_at"]
 
+    def validate(self, data):
+        request = self.context.get("request")
+        actor = getattr(request, "user", None)
+        can_toggle_admin = bool(
+            actor and (actor.is_superuser or actor.is_admin)
+        )
+
+        if not can_toggle_admin and "is_admin" in data:
+            current = bool(self.instance.is_admin) if self.instance else False
+            requested = bool(data["is_admin"])
+            if requested != current:
+                raise serializers.ValidationError({
+                    "is_admin": "Only admins can change admin access."
+                })
+
+        return data
+
     def get_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip() or obj.email
 
@@ -1192,7 +1267,13 @@ class PositionTrackSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PositionTrack
-        fields = ["id", "name", "slug", "description", "order",
+        # Visual fields (display_name, step_label, icon_key, color_key) feed
+        # the Career Path editor on Team Development. They're all writable so
+        # admins can rename/recolor a card without touching the canonical
+        # `name` (which other rows reference via slug).
+        fields = ["id", "name", "slug", "display_name", "step_label",
+                  "icon_key", "color_key",
+                  "description", "order",
                   "archived_at", "created_at", "updated_at"]
         read_only_fields = ["id", "slug", "archived_at", "created_at", "updated_at"]
 
@@ -1359,11 +1440,14 @@ class ChatChannelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChatChannel
-        fields = ["id", "name", "slug", "is_default", "unread_count", "member_count",
+        fields = ["id", "name", "slug", "description", "is_default",
+                  "allowed_roles", "created_by",
+                  "unread_count", "member_count",
                   "last_message_preview", "last_message_at",
                   "created_at"]
         read_only_fields = ["id", "unread_count", "member_count",
-                            "last_message_preview", "last_message_at", "created_at"]
+                            "last_message_preview", "last_message_at",
+                            "created_by", "created_at"]
 
     def get_unread_count(self, obj):
         request = self.context.get("request")
@@ -1494,6 +1578,9 @@ class SurveySerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
-        fields = ["id", "user", "notification_type", "title", "message",
-                  "is_read", "action_url", "created_at"]
-        read_only_fields = ["id", "user", "created_at"]
+        fields = [
+            "id", "user", "notification_type", "title", "message",
+            "is_read", "action_url", "created_at",
+            "target_kind", "target_id", "requires_manager",
+        ]
+        read_only_fields = ["id", "user", "created_at", "requires_manager"]

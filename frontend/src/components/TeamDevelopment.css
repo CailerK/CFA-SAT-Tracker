@@ -118,6 +118,23 @@
 .tdev-hero-btn:hover { background: rgba(255,255,255,0.3); }
 .tdev-hero-btn:active { transform: scale(0.98); }
 
+/* Hero action cluster — stacks two buttons on the right side of the hero. */
+.tdev-hero-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* "Secondary" hero button (My Pathway) — slightly less filled than the
+   primary so the admin's Edit Tracks button still stands out. */
+.tdev-hero-btn-secondary {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.tdev-hero-btn-secondary:hover { background: rgba(255, 255, 255, 0.22); }
+
 /* ============ Card ============ */
 .tdev-card {
   background: #ffffff;

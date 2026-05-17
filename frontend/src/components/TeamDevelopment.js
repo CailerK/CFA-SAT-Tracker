@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import leadershipService from '../services/leadership';
 import './TeamDevelopment.css';
-import { isManagerOrAbove } from '../utils/access';
+import { isAdminOrAbove, isManagerOrAbove } from '../utils/access';
 import {
   ActionMenu, ConfirmDialog, FormModal,
   TextField, TextArea, SelectField, NumberField,
@@ -32,6 +32,12 @@ const IconSearch = (p) => (<Icon {...p}><circle cx="11" cy="11" r="8"/><path d="
 const IconChevronDown = (p) => (<Icon {...p}><polyline points="6 9 12 15 18 9"/></Icon>);
 const IconEdit = (p) => (<Icon {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></Icon>);
 
+// CFA brand red — used for the selected Career Journey position card. The
+// per-position `color` field is kept so the unselected (idle) icon tile can
+// still be tinted with the role's pastel; the selected state always wins
+// with classic red.
+const SELECTED_RED = '#E51636';
+
 const POSITIONS = [
   { id: 'all',         name: 'All Positions', Icon: IconUser,        color: '#111827' },
   { id: 'team-member', name: 'Team Member',   Icon: IconClipboard,   color: '#3B82F6' },
@@ -43,8 +49,12 @@ const POSITIONS = [
 const formatToday = () =>
   new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-const TeamDevelopment = ({ user }) => {
+const TeamDevelopment = ({ user, onNavigate }) => {
   const canManage = isManagerOrAbove(user);
+  // Edit Tracks button (top-right) is store-wide config — admins/superusers
+  // only. Managers can VIEW the path but can't change it. The button is
+  // hidden entirely otherwise.
+  const canEditTracks = isAdminOrAbove(user);
   const [active, setActive] = useState('all');
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState('my-team');
@@ -227,12 +237,53 @@ const TeamDevelopment = ({ user }) => {
                 <p>Empowering your team&rsquo;s growth journey</p>
               </div>
             </div>
-            {canManage && (
-              <button className="tdev-hero-btn" type="button" onClick={openTracksManager}>
-                <IconEdit size={16} />
-                <span>Edit Tracks</span>
+            <div className="tdev-hero-actions">
+              {/* My Pathway: visible to every authenticated user; navigates
+                  to the per-user pathway page. */}
+              <button
+                className="tdev-hero-btn tdev-hero-btn-secondary"
+                type="button"
+                onClick={() => {
+                  if (onNavigate) onNavigate('team-development-my-pathway');
+                }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round"
+                >
+                  <path d="M12 2v20"/>
+                  <path d="m17 5-5-3-5 3"/>
+                  <path d="m17 19-5 3-5-3"/>
+                  <path d="M2 12h20"/>
+                  <path d="m5 7-3 5 3 5"/>
+                  <path d="m19 7 3 5-3 5"/>
+                </svg>
+                <span>My Pathway</span>
               </button>
-            )}
+              {canEditTracks && (
+                <button
+                  className="tdev-hero-btn"
+                  type="button"
+                  onClick={() => {
+                    if (onNavigate) onNavigate('team-development-edit-tracks');
+                  }}
+                >
+                  {/* IconAward — matches the hero button in image 2 */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2"
+                    strokeLinecap="round" strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="8" r="6"/>
+                    <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>
+                  </svg>
+                  <span>Edit Tracks</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -259,18 +310,20 @@ const TeamDevelopment = ({ user }) => {
         <div className="tdev-positions">
           {POSITIONS.map((p) => {
             const isActive = active === p.id;
+            // Selected state is always classic CFA red regardless of the
+            // position's pastel tint. The pastel is only used in the idle
+            // icon tile.
             return (
               <button
                 key={p.id}
                 className={`tdev-pos ${isActive ? 'is-active' : ''}`}
                 onClick={() => setActive(p.id)}
-                style={isActive ? { '--pos-color': p.color } : {}}
+                style={isActive ? { '--pos-color': SELECTED_RED } : {}}
               >
                 <span
                   className="tdev-pos-icon"
                   style={{
-                    background: isActive && p.id === 'all' ? 'rgba(255,255,255,0.2)'
-                              : isActive ? 'rgba(255,255,255,0.2)'
+                    background: isActive ? 'rgba(255,255,255,0.2)'
                               : p.id === 'all' ? '#F3F4F6'
                               : `${p.color}1A`,
                     color: isActive ? '#fff' : (p.id === 'all' ? '#6B7280' : p.color),

@@ -2,11 +2,22 @@ import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import LoginPage from './components/LoginPage';
 import Dashboard from './components/Dashboard';
+import ResetPasswordPage from './components/ResetPasswordPage';
 import apiService from './services/api';
+
+const getResetPasswordRoute = () => {
+  const match = window.location.pathname.match(/^\/reset-password\/([^/]+)\/([^/]+)\/?$/);
+  if (!match) return null;
+  return {
+    uid: decodeURIComponent(match[1]),
+    token: decodeURIComponent(match[2]),
+  };
+};
 
 function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [resetPasswordRoute, setResetPasswordRoute] = useState(getResetPasswordRoute);
 
   // Normalize the backend's snake_case user object to the camelCase the UI
   // components (Dashboard, etc.) expect. Single source of truth.
@@ -43,6 +54,12 @@ function App() {
     checkSession();
   }, [checkSession]);
 
+  useEffect(() => {
+    const syncRoute = () => setResetPasswordRoute(getResetPasswordRoute());
+    window.addEventListener('popstate', syncRoute);
+    return () => window.removeEventListener('popstate', syncRoute);
+  }, []);
+
   const handleLogin = () => {
     // LoginPage already called apiService.login() which set the session cookie.
     // Re-fetch the user from the backend so the shape matches what checkSession
@@ -56,6 +73,13 @@ function App() {
     checkSession();
   };
 
+  const handleReturnToLogin = useCallback(() => {
+    setUser(null);
+    setResetPasswordRoute(null);
+    setIsLoading(false);
+    window.history.replaceState(null, '', '/');
+  }, []);
+
   const handleLogout = async () => {
     try {
       await apiService.logout();
@@ -65,6 +89,18 @@ function App() {
     }
     setUser(null);
   };
+
+  if (resetPasswordRoute) {
+    return (
+      <div className="App">
+        <ResetPasswordPage
+          uid={resetPasswordRoute.uid}
+          token={resetPasswordRoute.token}
+          onBackToLogin={handleReturnToLogin}
+        />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

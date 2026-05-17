@@ -39,6 +39,36 @@ const chatService = {
       method: "POST",
     });
   },
+
+  // ---- Group details ----
+  async updateChannel(id, patch) {
+    return apiService.request(`/chat/channels/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  async deleteChannel(id) {
+    return apiService.request(`/chat/channels/${id}/`, { method: "DELETE" });
+  },
+
+  async listMembers(channelId) {
+    return apiService.request(`/chat/channels/${channelId}/members/`);
+  },
+
+  async addMembers(channelId, userIds) {
+    return apiService.request(`/chat/channels/${channelId}/members/`, {
+      method: "POST",
+      body: JSON.stringify({ user_ids: userIds }),
+    });
+  },
+
+  async removeMember(channelId, userId) {
+    return apiService.request(
+      `/chat/channels/${channelId}/members/${userId}/`,
+      { method: "DELETE" },
+    );
+  },
 };
 
 export default chatService;

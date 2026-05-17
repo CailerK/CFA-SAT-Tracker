@@ -887,10 +887,30 @@ def seed_leadership_programs(store):
 
 # Position tracks for Team Development page
 POSITION_TRACKS = [
-    {"name": "Team Member", "description": "Entry-level position", "order": 0},
-    {"name": "Trainer", "description": "Certified to train new team members", "order": 1},
-    {"name": "Zone Leader", "description": "Leads a specific area during shifts", "order": 2},
-    {"name": "Shift Lead", "description": "Manages entire shifts", "order": 3},
+    {
+        "name": "Team Member", "display_name": "Team Memb",
+        "step_label": "Starting Point", "icon_key": "map-pin",
+        "color_key": "red", "order": 0,
+        "description": "Entry-level position",
+    },
+    {
+        "name": "Trainer", "display_name": "Trainer",
+        "step_label": "Step 2", "icon_key": "graduation-cap",
+        "color_key": "red", "order": 1,
+        "description": "Certified to train new team members",
+    },
+    {
+        "name": "Zone Leader", "display_name": "Zone Leader",
+        "step_label": "Step 3", "icon_key": "target",
+        "color_key": "red", "order": 2,
+        "description": "Leads a specific area during shifts",
+    },
+    {
+        "name": "Shift Lead", "display_name": "Shift Lead",
+        "step_label": "Run Operations", "icon_key": "award",
+        "color_key": "red", "order": 3,
+        "description": "Manages entire shifts",
+    },
 ]
 
 
@@ -901,8 +921,12 @@ def seed_position_tracks(store):
         _, was_created = PositionTrack.objects.get_or_create(
             store=store, name=track["name"],
             defaults={
-                "description": track["description"],
-                "order": track["order"],
+                "display_name":   track.get("display_name", ""),
+                "step_label":     track.get("step_label", ""),
+                "icon_key":       track.get("icon_key", "map-pin"),
+                "color_key":      track.get("color_key", "red"),
+                "description":    track["description"],
+                "order":          track["order"],
             },
         )
         if was_created:
@@ -1033,22 +1057,31 @@ def seed_vendors(store):
 
 
 def seed_chat_channels(store):
-    """Create default chat channels."""
+    """Create default chat channels.
+
+    "Whole Store" is the default home channel matching the LD Growth pattern;
+    Operations / Kitchen / FOH are common sub-groups.
+    """
     channels = [
-        {"name": "General", "slug": "general", "is_default": True},
-        {"name": "Operations", "slug": "operations", "is_default": False},
-        {"name": "Kitchen", "slug": "kitchen", "is_default": False},
-        {"name": "FOH", "slug": "foh", "is_default": False},
+        {"name": "Whole Store", "slug": "whole-store", "is_default": True,
+         "description": "All team members in the store"},
+        {"name": "Operations",  "slug": "operations",  "is_default": False,
+         "description": "Daily operations + leadership coordination"},
+        {"name": "Kitchen",     "slug": "kitchen",     "is_default": False,
+         "description": "Kitchen team announcements + quick questions"},
+        {"name": "FOH",         "slug": "foh",         "is_default": False,
+         "description": "Front-of-house team channel"},
     ]
-    
+
     created = 0
-    for channel_data in channels:
+    for c in channels:
         _, was_created = ChatChannel.objects.get_or_create(
             store=store,
-            slug=channel_data["slug"],
+            slug=c["slug"],
             defaults={
-                "name": channel_data["name"],
-                "is_default": channel_data["is_default"],
+                "name": c["name"],
+                "is_default": c["is_default"],
+                "description": c["description"],
             },
         )
         if was_created:

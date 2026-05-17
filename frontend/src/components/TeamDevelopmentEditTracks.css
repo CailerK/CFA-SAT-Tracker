@@ -1,0 +1,425 @@
+/* ============================================================================
+   Team Development → Edit Tracks page
+   - Visibility toggle row
+   - "The Chick-fil-A Career Path" visual editor
+   ============================================================================ */
+
+.ttx-page {
+  background: #ffffff;
+  min-height: 100%;
+  padding: 24px 16px;
+}
+
+.ttx-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---------------- Top bar ---------------- */
+.ttx-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ttx-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ttx-back:hover {
+  background: #fff1f2;
+  color: #E51636;
+}
+
+.ttx-topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Buttons */
+.ttx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.ttx-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.ttx-btn-primary {
+  background: #E51636;
+  color: #ffffff;
+}
+.ttx-btn-primary:hover:not(:disabled) { background: #c4112d; }
+
+.ttx-btn-ghost {
+  background: #ffffff;
+  color: #4b5563;
+  border-color: #e5e7eb;
+}
+.ttx-btn-ghost:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+/* Read-only banner */
+.ttx-readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fff1f2;
+  color: #b91c1c;
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ttx-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+/* ---------------- Section card ---------------- */
+.ttx-section {
+  background: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  padding: 16px;
+}
+
+/* ---------------- Visibility row ---------------- */
+.ttx-vis-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.ttx-vis-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #b91c1c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ttx-vis-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.ttx-vis-sub {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 2px 0 0 0;
+}
+
+.ttx-vis-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ttx-vis-pill-text {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f3f4f6;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ttx-vis-pill-text.is-on {
+  background: #E51636;
+  color: #ffffff;
+}
+
+/* Toggle switch */
+.ttx-toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: #d1d5db;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s ease;
+}
+.ttx-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+.ttx-toggle.is-on { background: #E51636; }
+.ttx-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: left 0.2s ease;
+}
+.ttx-toggle.is-on .ttx-toggle-knob { left: 22px; }
+
+/* ---------------- Career Path editor ---------------- */
+.ttx-path-section { padding: 24px 16px; }
+
+.ttx-path-head {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.ttx-path-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.ttx-path-sub {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 4px 0 0 0;
+}
+
+.ttx-loading {
+  text-align: center;
+  color: #6b7280;
+  padding: 32px 0;
+  font-size: 13px;
+}
+
+/* The path is a horizontal row of cards on desktop, wrapping on small. */
+.ttx-path-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  row-gap: 24px;
+}
+
+.ttx-path-arrow {
+  align-self: flex-start;
+  margin-top: 30px;     /* lines up with center of card */
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+/* ---------------- Card ---------------- */
+.ttx-card-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.ttx-card {
+  position: relative;
+  width: 96px;
+  height: 86px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.25);
+}
+
+.ttx-card-trash {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #dc2626;
+  border: 1px solid #fee2e2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ttx-card-trash:hover {
+  background: #fee2e2;
+}
+
+.ttx-card-num {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.ttx-card-icon-btn {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  padding: 0;
+}
+.ttx-card-icon-btn:disabled { cursor: default; }
+
+.ttx-card-arrows {
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  gap: 4px;
+}
+.ttx-card-arrows button {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #6b7280;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.ttx-card-arrows button:hover {
+  color: #E51636;
+  border-color: #fecdd3;
+}
+
+/* Below-card text */
+.ttx-card-name {
+  margin-top: 18px;
+  padding: 6px 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  cursor: pointer;
+  font-family: inherit;
+  max-width: 120px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: border-color 0.15s ease;
+}
+.ttx-card-name:disabled { cursor: default; }
+.ttx-card-name:hover:not(:disabled) {
+  border-color: #fecdd3;
+  color: #E51636;
+}
+
+.ttx-card-step {
+  margin: 6px 0 0 0;
+  font-size: 11px;
+  color: #6b7280;
+  text-align: center;
+}
+
+/* ---------------- Add role tile ---------------- */
+.ttx-path-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 120px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+.ttx-path-add-tile {
+  width: 96px;
+  height: 86px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  background: #f8fafc;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.ttx-path-add:hover .ttx-path-add-tile {
+  border-color: #E51636;
+  color: #E51636;
+  background: #fff1f2;
+}
+
+.ttx-path-add-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+}
+.ttx-path-add:hover .ttx-path-add-label { color: #E51636; }
+
+@media (max-width: 540px) {
+  .ttx-path-grid { gap: 4px; row-gap: 28px; }
+  .ttx-card-wrap, .ttx-path-add { width: 96px; }
+  .ttx-card, .ttx-path-add-tile { width: 80px; height: 72px; }
+}

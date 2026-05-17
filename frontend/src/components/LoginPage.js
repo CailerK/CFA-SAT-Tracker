@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './LoginPage.css';
 import apiService from '../services/api';
+
+const REMEMBERED_EMAIL_KEY = 'cfa:rememberedEmail';
 
 const LoginPage = ({ onLogin }) => {
   const [email, setEmail] = useState('');
@@ -14,26 +16,35 @@ const LoginPage = ({ onLogin }) => {
   const [isForgotPasswordLoading, setIsForgotPasswordLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  useEffect(() => {
+    try {
+      const rememberedEmail = window.localStorage.getItem(REMEMBERED_EMAIL_KEY);
+      if (!rememberedEmail) return;
+      setEmail(rememberedEmail);
+      setForgotPasswordEmail(rememberedEmail);
+      setRememberMe(true);
+    } catch (err) {
+      console.warn('Remembered email is unavailable on this device.', err);
+    }
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
     try {
-      const response = await apiService.login(email, password);
-      
-      // Transform API response to match frontend expectations
-      const userData = {
-        id: response.user.id,
-        email: response.user.email,
-        firstName: response.user.first_name,
-        lastName: response.user.last_name,
-        storeId: response.user.company_id,
-        role: response.user.role,
-        department: response.user.department
-      };
-      
-      onLogin(userData, rememberMe);
+      await apiService.login(email, password, rememberMe);
+      try {
+        if (rememberMe) {
+          window.localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim());
+        } else {
+          window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+        }
+      } catch (storageErr) {
+        console.warn('Could not update remembered email on this device.', storageErr);
+      }
+      onLogin();
     } catch (err) {
       setError(err.message || 'Login failed. Please try again.');
     } finally {
@@ -54,6 +65,13 @@ const LoginPage = ({ onLogin }) => {
     } finally {
       setIsForgotPasswordLoading(false);
     }
+  };
+
+  const openForgotPassword = () => {
+    setForgotPasswordEmail((prev) => prev || email.trim());
+    setForgotPasswordMessage('');
+    setError('');
+    setShowForgotPassword(true);
   };
 
   return (
@@ -133,7 +151,7 @@ const LoginPage = ({ onLogin }) => {
             </label>
             <button 
               type="button"
-              onClick={() => setShowForgotPassword(true)}
+              onClick={openForgotPassword}
               className="forgot-password"
             >
               Forgot password?

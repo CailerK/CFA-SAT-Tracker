@@ -225,6 +225,7 @@ FRONTEND_URL = os.environ.get(
     "FRONTEND_URL",
     f"https://{_railway_domain}" if _railway_domain else "http://localhost:3000",
 )
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24  # 24 hours
 
 
 # -----------------------------------------------------------------------------

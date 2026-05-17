@@ -1,0 +1,169 @@
+/* ============================================================================
+   Team Development → My Pathway (per-user, read-only path view)
+   Layered on top of TeamDevelopmentEditTracks.css so cards, arrows, and
+   layout stay in sync with the editor.
+   ============================================================================ */
+
+.mp-page { padding-bottom: 32px; }
+
+/* ----- Hero ----- */
+.mp-hero {
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(229, 22, 54, 0.95) 0%, rgba(196, 17, 45, 0.95) 100%);
+  border-radius: 14px;
+  padding: 28px 24px;
+  color: #ffffff;
+  overflow: hidden;
+}
+.mp-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.4;
+  pointer-events: none;
+}
+.mp-hero-inner { position: relative; z-index: 1; max-width: 720px; }
+.mp-hero-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0;
+  opacity: 0.9;
+}
+.mp-hero-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 6px 0 8px 0;
+  letter-spacing: -0.01em;
+}
+.mp-hero-sub {
+  font-size: 14px;
+  margin: 0;
+  opacity: 0.92;
+}
+
+/* ----- Hidden-by-admin banner ----- */
+.mp-hidden {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  color: #9a3412;
+}
+.mp-hidden-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #fed7aa;
+  color: #9a3412;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.mp-hidden-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  color: #9a3412;
+}
+.mp-hidden-sub {
+  font-size: 13px;
+  margin: 2px 0 0 0;
+  color: #b45309;
+}
+
+/* ----- Card status overlays ----- */
+.mp-card-wrap { position: relative; }
+
+/* Completed: green check badge bottom-right */
+.mp-card-check {
+  position: absolute;
+  bottom: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Current: animated pulse ring */
+.mp-card-pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 16px;
+  border: 2px solid #E51636;
+  animation: mp-pulse 1.6s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes mp-pulse {
+  0%   { opacity: 0.9; transform: scale(1); }
+  70%  { opacity: 0;   transform: scale(1.08); }
+  100% { opacity: 0;   transform: scale(1.08); }
+}
+
+/* Locked tracks fade their colors; their text dims too */
+.mp-status-locked .ttx-card { opacity: 0.78; }
+.mp-status-locked .mp-card-name { color: #6b7280; }
+
+/* Card icon centers exactly */
+.mp-card-icon {
+  position: relative;
+  z-index: 1;
+}
+
+/* Below-card text is read-only here, so it isn't a button */
+.mp-card-name {
+  margin: 16px 0 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+/* ----- Summary KPIs ----- */
+.mp-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 540px) {
+  .mp-summary { grid-template-columns: 1fr; }
+}
+
+.mp-stat {
+  background: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.mp-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.mp-stat-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 4px 0 0 0;
+}

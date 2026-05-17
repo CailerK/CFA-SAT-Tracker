@@ -1,0 +1,224 @@
+/* "My Priorities" widget — design-system aligned */
+
+.mp-card {
+  background: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  width: 100%;
+}
+
+.mp-card-loading { min-height: 96px; }
+
+/* ---- Header (clickable to expand/collapse) ---- */
+.mp-head {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 16px 18px;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.mp-head:hover { background: #f9fafb; }
+
+.mp-head-tile {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #E51636;
+}
+
+.mp-head-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.mp-head-title { font-size: 16px; font-weight: 700; color: #111827; line-height: 1.2; }
+.mp-head-sub { font-size: 13px; color: #6b7280; margin-top: 2px; }
+
+.mp-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.mp-badge.is-warn {
+  background: #fff1f2;
+  color: #E51636;
+}
+
+.mp-chevron {
+  display: inline-flex;
+  color: #6b7280;
+  transition: transform 0.2s ease;
+}
+.mp-chevron.is-open { transform: rotate(180deg); }
+
+/* ---- List ---- */
+.mp-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.mp-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.mp-row:hover {
+  border-color: #e5e7eb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.mp-row.is-overdue {
+  border-left: 3px solid #E51636;
+  padding-left: 13px;
+}
+
+.mp-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #E51636;
+  flex-shrink: 0;
+  grid-row: 1 / span 3;
+}
+
+.mp-row-body { min-width: 0; }
+
+.mp-row-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.3;
+}
+
+.mp-row-sub {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.mp-row-due {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #E51636;
+  font-weight: 500;
+}
+
+.mp-row-dot {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #E51636;
+}
+
+.mp-row-cta {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: #E51636;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: end;
+  padding: 0;
+}
+.mp-row-cta:hover { color: #c4112d; }
+
+/* ---- Empty (All Caught Up) — mirrors the old gradient status card ---- */
+.mp-status {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border-radius: 24px;
+  padding: 32px 24px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #a7f3d0;
+}
+
+.mp-status-inner { position: relative; }
+
+.mp-status-bg {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.35;
+  filter: blur(40px);
+}
+.mp-status-bg-1 { width: 240px; height: 240px; background: rgba(16, 185, 129, 0.25); top: -60px; right: -60px; }
+.mp-status-bg-2 { width: 160px; height: 160px; background: rgba(52, 211, 153, 0.25); bottom: -40px; left: -40px; }
+
+.mp-status-content {
+  position: relative;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mp-status-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #047857;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.mp-status-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
+}
+
+.mp-status-sub {
+  font-size: 13px;
+  color: #4b5563;
+  margin: 0;
+  max-width: 32rem;
+  line-height: 1.5;
+}

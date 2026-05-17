@@ -39,20 +39,59 @@ const NotificationDropdown = ({ isOpen, onClose, onNavigate }) => {
     }
   };
 
+  // Map a notification's target_kind → the Dashboard page key + an open-item
+  // id payload. New, structured (target_kind, target_id) takes precedence
+  // over the legacy action_url. Adding a new notification type? add a line
+  // here and a matching `openItemKind/openItemId` handler in the target
+  // component (e.g. GuestRecovery accepts an openConcernId prop).
+  const TARGET_TO_PAGE = {
+    guest_concern:   'guest-recovery',
+    documentation:   'team-documentation',
+    evaluation_360:  'leadership-360',
+    survey:          'team-surveys',
+    shift_summary:   'shift-summary-history',
+    calendar_event:  'calendar',
+    chat_channel:    'team-chat',
+    foh_task:        'foh-tasks',
+    kitchen_task:    'kitchen-checklists',
+    cleaning_task:   'foh-cleaning',
+    dev_plan:        'leadership-dev-plans',
+    training:        'team-training',
+  };
+
   const handleNotificationClick = async (notification) => {
     try {
-      // Mark as read
       if (!notification.is_read) {
         await notificationService.markAsRead(notification.id);
       }
 
-      // Navigate if there's an action URL
-      if (notification.action_url) {
-        // Extract page from action_url (e.g., "/guest-recovery" -> "guest-recovery")
-        const page = notification.action_url.replace(/^\//, '').replace(/\/$/, '');
-        if (page && onNavigate) {
-          onNavigate(page);
+      // Prefer structured routing.
+      let page = null;
+      let openItem = null;
+      if (notification.target_kind && TARGET_TO_PAGE[notification.target_kind]) {
+        page = TARGET_TO_PAGE[notification.target_kind];
+        openItem = {
+          kind: notification.target_kind,
+          id: notification.target_id,
+        };
+      } else if (notification.action_url) {
+        // Legacy fallback — action_url like "/guest-recovery".
+        page = notification.action_url.replace(/^\//, '').replace(/\/$/, '');
+      }
+
+      if (page && onNavigate) {
+        // Dashboard's setCurrentPage accepts a string; for targeted opens we
+        // also stash the openItem in a sessionStorage slot the target page
+        // reads on mount. (Simple cross-component pass without prop drilling.)
+        if (openItem && openItem.id) {
+          try {
+            sessionStorage.setItem(
+              'cfa:openItem',
+              JSON.stringify(openItem),
+            );
+          } catch (_) { /* sessionStorage disabled — fine to skip */ }
         }
+        onNavigate(page);
       }
 
       onClose();

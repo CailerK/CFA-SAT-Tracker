@@ -76,11 +76,11 @@ class ApiService {
 
   // ---------- Auth ----------
 
-  async login(email, password) {
+  async login(email, password, rememberMe = false) {
     // Hits the REAL Django endpoint. No more hardcoded credentials.
     return this.request('/auth/login/', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, remember_me: rememberMe }),
     });
   }
 

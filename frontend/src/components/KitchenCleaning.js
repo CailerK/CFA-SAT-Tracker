@@ -290,18 +290,23 @@ const KitchenCleaning = ({ onNavigate, user }) => {
                 >
                   <span
                     style={{
-                      width: 20, height: 20, borderRadius: 4,
+                      width: 24, height: 24, borderRadius: 6,
                       border: '2px solid #d1d5db',
-                      background: completed ? '#16a34a' : '#fff',
-                      borderColor: completed ? '#16a34a' : '#d1d5db',
+                      background: completed ? '#E51636' : '#ffffff',
+                      borderColor: completed ? '#E51636' : '#d1d5db',
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#fff',
-                      fontSize: 14,
+                      color: '#ffffff',
+                      flexShrink: 0,
+                      transition: 'all 0.2s ease-out',
                     }}
                   >
-                    {completed && '✓'}
+                    {completed && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
                   </span>
                   <span style={{ textDecoration: completed ? 'line-through' : 'none', color: completed ? '#6b7280' : '#111827' }}>
                     {t.name}

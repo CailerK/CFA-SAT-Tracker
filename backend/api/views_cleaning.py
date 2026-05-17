@@ -37,10 +37,11 @@ def _today():
 def period_window(frequency, today=None):
     """Return (start_date, end_date) inclusive for the active period of `frequency`.
 
-    Daily     : today only.
-    Weekly    : Sunday..Saturday containing `today` (resets midnight Sat→Sun;
-                operationally the new week starts Monday since CFA is closed Sunday).
-    Monthly   : first..last day of `today`'s month (resets midnight on the 1st).
+    Daily     : today only (resets at local midnight).
+    Weekly    : Monday..Sunday containing `today` (resets midnight Sun→Mon —
+                i.e. "Sunday night" — fresh week starts Monday).
+    Monthly   : first..last day of `today`'s month (resets midnight on the 1st,
+                i.e. at the end of the last day of the month).
     Quarterly : first day of Jan/Apr/Jul/Oct .. last day of Mar/Jun/Sep/Dec
                 containing `today`.
     """
@@ -49,9 +50,9 @@ def period_window(frequency, today=None):
     if frequency == 'daily':
         return today, today
     if frequency == 'weekly':
-        # Mon=0..Sun=6 → days since Sunday: Sun=0, Mon=1, ..., Sat=6.
-        days_since_sunday = (today.weekday() + 1) % 7
-        start = today - timedelta(days=days_since_sunday)
+        # Python weekday(): Mon=0..Sun=6. Week is Mon..Sun, resets Sunday night.
+        days_since_monday = today.weekday()
+        start = today - timedelta(days=days_since_monday)
         end = start + timedelta(days=6)
         return start, end
     if frequency == 'monthly':

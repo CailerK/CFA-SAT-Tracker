@@ -1,21 +1,115 @@
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework import status
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.utils.encoding import force_bytes, force_str
-from django.conf import settings
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
-from django_ratelimit.decorators import ratelimit
-from .models import User
-from .serializers import UserMeSerializer
 import json
+import logging
+
+from django.conf import settings
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils import timezone
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.views.decorators.csrf import csrf_exempt
+from django_ratelimit.decorators import ratelimit
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+
+from .models import Notification, User
+from .serializers import UserMeSerializer
+
+logger = logging.getLogger(__name__)
+
+
+PASSWORD_RESET_GENERIC_MESSAGE = (
+    'If an account with that email exists, a password reset link has been sent.'
+)
+
+
+def _as_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+    return False
+
+
+def _build_frontend_url(path):
+    base = (settings.FRONTEND_URL or 'http://localhost:3000').rstrip('/')
+    suffix = path if path.startswith('/') else f'/{path}'
+    return f'{base}{suffix}'
+
+
+def _password_reset_notification_recipients():
+    super_admins = list(
+        User.objects.filter(is_active=True, is_superuser=True).order_by('id')
+    )
+    if super_admins:
+        return super_admins
+    # Fallback for environments that have only app-level admins configured.
+    return list(User.objects.filter(is_active=True, is_admin=True).order_by('id'))
+
+
+def _notify_password_reset_event(user, *, event):
+    recipients = _password_reset_notification_recipients()
+    if not recipients:
+        return
+
+    created_at = timezone.now()
+    actor_name = f'{user.first_name} {user.last_name}'.strip() or user.email
+    store_name = user.store.name if user.store else (user.company_id or 'Unknown store')
+    if event == 'requested':
+        title = 'Password reset requested'
+        message = (
+            f'{actor_name} ({user.email}) requested a password reset for {store_name}.'
+        )
+    else:
+        title = 'Password reset completed'
+        message = (
+            f'{actor_name} ({user.email}) completed a password reset for {store_name}.'
+        )
+
+    Notification.objects.bulk_create([
+        Notification(
+            user=recipient,
+            notification_type='system_update',
+            title=title,
+            message=message,
+            action_url='/team-members',
+            requires_manager=True,
+            created_at=created_at,
+        )
+        for recipient in recipients
+    ])
+
+
+def _send_password_reset_email(user, reset_url):
+    context = {
+        'user': user,
+        'reset_url': reset_url,
+        'store_name': user.store.name if user.store else 'CFA SAT Tracker',
+        'support_email': settings.DEFAULT_FROM_EMAIL,
+        'expiry_hours': 24,
+        'current_year': timezone.localdate().year,
+    }
+    subject = 'Reset your CFA SAT Tracker password'
+    text_body = render_to_string('emails/password_reset.txt', context)
+    html_body = render_to_string('emails/password_reset.html', context)
+
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+    email.attach_alternative(html_body, 'text/html')
+    email.send(fail_silently=False)
+
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -54,8 +148,9 @@ def login_view(request):
     """
     try:
         data = json.loads(request.body)
-        email = data.get('email')
+        email = (data.get('email') or '').strip().lower()
         password = data.get('password')
+        remember_me = _as_bool(data.get('remember_me'))
         
         if not email or not password:
             return Response({
@@ -67,9 +162,15 @@ def login_view(request):
         
         if user is not None:
             login(request, user)
+            if remember_me:
+                request.session.set_expiry(settings.SESSION_COOKIE_AGE)
+            else:
+                request.session.set_expiry(0)
+            request.session.modified = True
             return Response({
                 'message': 'Login successful',
                 'user': UserMeSerializer(user).data,
+                'remember_me': remember_me,
             }, status=status.HTTP_200_OK)
         else:
             return Response({
@@ -80,7 +181,8 @@ def login_view(request):
         return Response({
             'error': 'Invalid JSON data'
         }, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
+    except Exception:
+        logger.exception('Unexpected error during login')
         return Response({
             'error': 'An error occurred during login'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -118,7 +220,7 @@ def forgot_password(request):
     """
     try:
         data = json.loads(request.body)
-        email = data.get('email')
+        email = (data.get('email') or '').strip().lower()
         
         if not email:
             return Response({
@@ -126,60 +228,38 @@ def forgot_password(request):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.get(email__iexact=email, is_active=True)
         except User.DoesNotExist:
             # Don't reveal if email exists or not for security
             return Response({
-                'message': 'If an account with that email exists, a password reset link has been sent.'
+                'message': PASSWORD_RESET_GENERIC_MESSAGE
             }, status=status.HTTP_200_OK)
         
         # Generate password reset token
         token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         
-        # Create reset URL (you'll need to update this with your frontend URL)
-        reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
-        
-        # Send email
-        subject = 'CFA SAT Tracker - Password Reset Request'
-        message = f"""
-        Hi {user.first_name},
-        
-        You requested a password reset for your CFA SAT Tracker account.
-        
-        Click the link below to reset your password:
-        {reset_url}
-        
-        If you didn't request this reset, please ignore this email.
-        
-        This link will expire in 24 hours.
-        
-        Best regards,
-        CFA SAT Tracker Team
-        """
+        reset_url = _build_frontend_url(f'/reset-password/{uid}/{token}/')
         
         try:
-            send_mail(
-                subject,
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                [email],
-                fail_silently=False,
-            )
-        except Exception as e:
+            _send_password_reset_email(user, reset_url)
+            _notify_password_reset_event(user, event='requested')
+        except Exception:
+            logger.exception('Failed to send password reset email for %s', user.email)
             return Response({
                 'error': 'Failed to send reset email. Please try again later.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response({
-            'message': 'If an account with that email exists, a password reset link has been sent.'
+            'message': PASSWORD_RESET_GENERIC_MESSAGE
         }, status=status.HTTP_200_OK)
         
     except json.JSONDecodeError:
         return Response({
             'error': 'Invalid JSON data'
         }, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
+    except Exception:
+        logger.exception('Unexpected error during forgot-password flow')
         return Response({
             'error': 'An error occurred processing your request'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -215,15 +295,18 @@ def reset_password(request):
                 'error': 'Invalid or expired reset link'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Validate password strength (basic validation)
-        if len(new_password) < 8:
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as exc:
             return Response({
-                'error': 'Password must be at least 8 characters long'
+                'error': exc.messages[0] if exc.messages else 'Password is not valid',
+                'details': exc.messages,
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Set new password
         user.set_password(new_password)
-        user.save()
+        user.save(update_fields=['password'])
+        _notify_password_reset_event(user, event='completed')
         
         return Response({
             'message': 'Password has been reset successfully'
@@ -233,7 +316,8 @@ def reset_password(request):
         return Response({
             'error': 'Invalid JSON data'
         }, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
+    except Exception:
+        logger.exception('Unexpected error during password reset')
         return Response({
             'error': 'An error occurred resetting your password'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -85,6 +85,35 @@ const leadershipService = {
     });
   },
 
+  // Bulk-reorder: send `{ track_ids: [...] }` in the new desired order.
+  // Backend recomputes the `order` integers server-side, so the FE never
+  // has to think about offsets.
+  async reorderTracks(trackIds) {
+    return apiService.request("/team-development/tracks/reorder/", {
+      method: "POST",
+      body: JSON.stringify({ track_ids: trackIds }),
+    });
+  },
+
+  // Store-wide Team Development settings (currently just the visibility
+  // toggle). GET returns the current state + `can_edit` flag.
+  async getDevelopmentSettings() {
+    return apiService.request("/team-development/settings/");
+  },
+
+  async updateDevelopmentSettings(patch) {
+    return apiService.request("/team-development/settings/", {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  // Per-user pathway: tracks (filtered by visibility) + this user's
+  // progress + `current_track_id` for the highlighted card.
+  async myPathway() {
+    return apiService.request("/team-development/my-pathway/");
+  },
+
   async listProgress({ scope = "all", position } = {}) {
     const params = new URLSearchParams();
     if (scope) params.set("scope", scope);

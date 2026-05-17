@@ -87,6 +87,13 @@ class StoreSettings(models.Model):
     waste_goal_monthly = models.DecimalField(
         max_digits=10, decimal_places=2, default=2500,
     )
+    # Team Development → Edit Tracks → "Development Tracks Visibility" toggle.
+    # When False the Career Path card is hidden from non-manager roles
+    # (managers/admins always see it so they can edit it).
+    dev_tracks_visible_to_team = models.BooleanField(
+        default=True,
+        help_text="When off, team-members can no longer see the Career Path on Team Development.",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -569,12 +576,43 @@ class SetupTask(models.Model):
 
 # Notifications System
 class Notification(models.Model):
-    """User notifications"""
+    """User notifications.
+
+    `target_kind` + `target_id` let the frontend route directly to the
+    specific item that triggered the notification (e.g. opening the Guest
+    Concern detail modal when a 'guest_concern' notification is clicked).
+    `requires_manager=True` hides the notification from team-member roles
+    — used for sensitive items like guest complaints, disciplinary docs,
+    and 360 results.
+    """
     NOTIFICATION_TYPES = [
         ('task_assigned', 'Task Assigned'),
         ('evaluation_due', 'Evaluation Due'),
         ('training_reminder', 'Training Reminder'),
         ('system_update', 'System Update'),
+        # Targeted notifications added in 0020:
+        ('guest_concern', 'Guest Concern'),
+        ('documentation', 'Team Documentation'),
+        ('evaluation_360', '360 Evaluation'),
+        ('survey', 'Team Survey'),
+        ('shift_summary', 'Shift Summary'),
+        ('calendar_deadline', 'Calendar Deadline'),
+        ('chat_mention', 'Chat Mention'),
+    ]
+
+    TARGET_KIND_CHOICES = [
+        ('guest_concern', 'Guest Concern'),
+        ('documentation', 'Documentation Record'),
+        ('evaluation_360', '360 Evaluation'),
+        ('survey', 'Survey'),
+        ('shift_summary', 'Shift Summary'),
+        ('calendar_event', 'Calendar Event'),
+        ('chat_channel', 'Chat Channel'),
+        ('foh_task', 'FOH Task'),
+        ('kitchen_task', 'Kitchen Task'),
+        ('cleaning_task', 'Cleaning Task'),
+        ('dev_plan', 'Development Plan'),
+        ('training', 'Training Assignment'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -584,6 +622,19 @@ class Notification(models.Model):
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     action_url = models.URLField(blank=True)
+
+    # Structured routing target (preferred over `action_url`).
+    target_kind = models.CharField(
+        max_length=30, choices=TARGET_KIND_CHOICES, blank=True,
+    )
+    target_id = models.PositiveIntegerField(null=True, blank=True)
+
+    # Hide from non-manager users when True.
+    requires_manager = models.BooleanField(
+        default=False,
+        help_text="When True, only manager-tier users (manager, shift_lead, "
+                  "director, admin, superuser) will see this notification.",
+    )
 
 
 # =============================================================================
@@ -1527,13 +1578,54 @@ class EvaluationEvaluator(models.Model):
 
 
 class PositionTrack(models.Model):
-    """Career progression track (team-member → trainer → zone-leader → shift-lead)."""
+    """Career progression track (team-member → trainer → zone-leader → shift-lead).
+
+    Each track is a card on the "Career Path" editor on Team Development. The
+    visual fields (`display_name`, `step_label`, `icon_key`, `color_key`) drive
+    how the card renders; `name` stays as the canonical identifier (slugified
+    for URL/filter use).
+    """
     store = models.ForeignKey(
         Store, on_delete=models.CASCADE, related_name='position_tracks'
     )
     name = models.CharField(
         max_length=60,
         help_text="e.g., 'team-member', 'trainer', 'zone-leader', 'shift-lead'",
+    )
+    # Short label rendered on the card itself (image 3 shows "Team Memb",
+    # "Trainer", etc.). Falls back to `name` when empty.
+    display_name = models.CharField(max_length=40, blank=True, default="")
+    # Subtitle shown beneath the card ("Starting Point", "Step 2",
+    # "Run Operations"). Empty means no subtitle is rendered.
+    step_label = models.CharField(max_length=40, blank=True, default="")
+    # Icon shown inside the card. Frontend maps this to a Lucide path; keep
+    # the set tightly enumerated so we can swap them for any role.
+    ICON_CHOICES = [
+        ("map-pin",         "Map Pin"),
+        ("graduation-cap",  "Graduation Cap"),
+        ("target",          "Target"),
+        ("award",           "Award"),
+        ("briefcase",       "Briefcase"),
+        ("users",           "Users"),
+        ("crown",           "Crown"),
+        ("star",            "Star"),
+    ]
+    icon_key = models.CharField(
+        max_length=32, choices=ICON_CHOICES, default="map-pin",
+    )
+    # Card color. The full set lives in the frontend tokens map; we keep
+    # this tightly typed so we never wind up with arbitrary hex codes that
+    # don't match the design system.
+    COLOR_CHOICES = [
+        ("red",     "Red"),
+        ("slate",   "Slate"),
+        ("blue",    "Blue"),
+        ("emerald", "Emerald"),
+        ("amber",   "Amber"),
+        ("violet",  "Violet"),
+    ]
+    color_key = models.CharField(
+        max_length=16, choices=COLOR_CHOICES, default="red",
     )
     description = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=0)
@@ -1872,7 +1964,21 @@ class ChatChannel(models.Model):
         max_length=30,
         help_text="URL-friendly identifier like 'general', 'operations', 'kitchen', 'foh'",
     )
+    description = models.CharField(
+        max_length=200, blank=True,
+        help_text="One-liner shown beneath the channel name in the sidebar.",
+    )
     is_default = models.BooleanField(default=False)
+    # When manager/admin creates a custom group, allowed_roles can restrict who
+    # may SEND messages. Empty list = unrestricted (default).
+    # Stored as list of role slugs ("team_member","trainer","leader","director",
+    # "manager","shift_lead","admin"). Reading is always open to members.
+    allowed_roles = models.JSONField(default=list, blank=True)
+    # `created_by` shows a crown next to the group name for "owner" UX.
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_chat_channels',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

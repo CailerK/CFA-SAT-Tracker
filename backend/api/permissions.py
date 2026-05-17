@@ -22,6 +22,20 @@ def is_manager_or_above(user) -> bool:
     return getattr(user, "role", "") in MANAGER_ROLES
 
 
+def is_admin_or_above(user) -> bool:
+    """True if the user is a superuser or has the admin badge.
+
+    Used to gate write-access to store-wide configuration like the Career
+    Path editor — managers can VIEW the path but only admins can mutate it.
+    Mirrors the frontend's `user?.isSuperuser || user?.isAdmin` check.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return bool(getattr(user, "is_admin", False))
+
+
 # ---------------------------------------------------------------------------
 # Role hierarchy
 # ---------------------------------------------------------------------------
@@ -100,6 +114,15 @@ class IsAdmin(BasePermission):
 
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_superuser)
+
+
+class IsAdminOrAbove(BasePermission):
+    """Allow only admins (is_admin=True) and superusers."""
+
+    message = "This action requires admin-level access."
+
+    def has_permission(self, request, view):
+        return is_admin_or_above(request.user)
 
 
 class IsSelfOrManager(BasePermission):

@@ -7,8 +7,9 @@ All viewsets inherit from StoreScopedViewSet to enforce multi-tenancy.
 from django.db import models
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import (
@@ -22,7 +23,7 @@ from .models import (
     TrackProgress,
     UserDevelopmentPlan,
 )
-from .permissions import IsManagerOrAbove, subordinate_roles
+from .permissions import IsAdminOrAbove, IsManagerOrAbove, subordinate_roles, is_admin_or_above
 from .serializers import (
     Evaluation360Serializer,
     Evaluation360TemplateSerializer,
@@ -157,23 +158,68 @@ class Evaluation360ViewSet(StoreScopedViewSet):
 
 class PositionTrackViewSet(StoreScopedViewSet):
     """
-    CRUD for position tracks (career progression paths).
-    Manager+ can create/edit; all authenticated users can read.
+    CRUD for position tracks (career progression paths) — backs the Career
+    Path editor on Team Development.
+
+    Permissions:
+      - Read: any authenticated user (subject to the store's
+        `dev_tracks_visible_to_team` toggle for non-managers).
+      - Write (create/update/destroy/reorder): admin (`is_admin=True`) or
+        superuser only. Managers explicitly do NOT get edit access here —
+        the Career Path is store-wide configuration, not a per-team list.
     """
     queryset = PositionTrack.objects.all()
     serializer_class = PositionTrackSerializer
 
     def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsManagerOrAbove()]
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'reorder']:
+            return [IsAdminOrAbove()]
         return super().get_permissions()
 
     def get_queryset(self):
-        return super().get_queryset().filter(archived_at__isnull=True).order_by("order", "id")
+        qs = super().get_queryset().filter(archived_at__isnull=True).order_by("order", "id")
+        # Hide the path entirely from team-members when the store has
+        # toggled visibility off. Managers/admins always see it.
+        user = self.request.user
+        if user.is_authenticated and not user.is_manager_or_above and not user.is_superuser:
+            settings = getattr(user.store, "settings", None) if getattr(user, "store", None) else None
+            if settings and not settings.dev_tracks_visible_to_team:
+                return qs.none()
+        return qs
 
     def perform_destroy(self, instance):
         instance.archived_at = timezone.now()
         instance.save(update_fields=["archived_at", "updated_at"])
+
+    @action(detail=False, methods=["post"], url_path="reorder")
+    def reorder(self, request):
+        """Bulk-update the `order` field for the user's store.
+
+        Body: `{"track_ids": [3, 1, 4, 2]}` — first id is order=0, etc. We
+        use a list rather than per-id offsets so the front end can just
+        send the dragged sequence; we recompute the offsets server-side.
+        """
+        track_ids = request.data.get("track_ids") or []
+        if not isinstance(track_ids, list):
+            raise ValidationError({"track_ids": "Must be a list of track ids."})
+
+        # Only update tracks in this store — silently drop foreign ids.
+        tracks = {
+            t.id: t for t in
+            PositionTrack.objects.filter(
+                store=request.user.store, archived_at__isnull=True,
+            )
+        }
+        updated = 0
+        for index, tid in enumerate(track_ids):
+            track = tracks.get(int(tid)) if str(tid).isdigit() or isinstance(tid, int) else None
+            if not track:
+                continue
+            if track.order != index:
+                track.order = index
+                track.save(update_fields=["order", "updated_at"])
+                updated += 1
+        return Response({"updated": updated})
 
 
 class TrackProgressViewSet(StoreScopedViewSet):
@@ -481,3 +527,104 @@ class LessonCompletionViewSet(StoreScopedViewSet):
         enrollment = instance.enrollment
         super().perform_destroy(instance)
         self._sync_enrollment(enrollment)
+
+
+# ============================================================================
+# Team Development → Edit Tracks page
+# ============================================================================
+
+@api_view(["GET", "PATCH"])
+@permission_classes([IsAuthenticated])
+def team_development_settings(request):
+    """Read or update store-wide Team Development settings.
+
+    GET: any authenticated user — returns the visibility flag so the UI
+         knows whether to render the Career Path card.
+    PATCH: admin or superuser only — updates the flag.
+
+    Body: `{"dev_tracks_visible_to_team": true|false}`.
+    """
+    user = request.user
+    store = getattr(user, "store", None)
+    if not store:
+        raise ValidationError({"store": "User has no store assigned."})
+
+    # `StoreSettings` is 1:1 with Store, but legacy stores may not have the
+    # row yet — auto-create on first access so reads don't 500.
+    from .models import StoreSettings
+    settings, _ = StoreSettings.objects.get_or_create(store=store)
+
+    if request.method == "PATCH":
+        if not is_admin_or_above(user):
+            raise PermissionDenied("Only admins can change Team Development settings.")
+        if "dev_tracks_visible_to_team" in request.data:
+            settings.dev_tracks_visible_to_team = bool(
+                request.data["dev_tracks_visible_to_team"]
+            )
+            settings.save(update_fields=["dev_tracks_visible_to_team", "updated_at"])
+
+    return Response({
+        "dev_tracks_visible_to_team": settings.dev_tracks_visible_to_team,
+        "can_edit": is_admin_or_above(user),
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_pathway(request):
+    """Per-user career pathway: the store's tracks + this user's progress.
+
+    Always scoped to `request.user`. Returns:
+      - `tracks`: every active PositionTrack in the user's store (ordered).
+      - `progress`: list of TrackProgress rows for *this user* keyed by
+                    track id, plus a `current_track_id` (the most-advanced
+                    in-progress track, or null) for highlighting.
+
+    Respects the store's visibility toggle: if the team has the path turned
+    off, returns empty `tracks`/`progress` so the UI can render an empty
+    state without leaking which roles exist.
+    """
+    user = request.user
+    store = getattr(user, "store", None)
+    if not store:
+        return Response({"tracks": [], "progress": [], "current_track_id": None})
+
+    # Visibility gate (managers/admins always see).
+    settings = getattr(store, "settings", None)
+    if (
+        settings
+        and not settings.dev_tracks_visible_to_team
+        and not user.is_manager_or_above
+        and not user.is_superuser
+    ):
+        return Response({
+            "tracks": [],
+            "progress": [],
+            "current_track_id": None,
+            "hidden_by_admin": True,
+        })
+
+    tracks = PositionTrack.objects.filter(
+        store=store, archived_at__isnull=True,
+    ).order_by("order", "id")
+
+    progress = TrackProgress.objects.filter(
+        user=user, track__in=tracks,
+    ).select_related("track")
+
+    # "Current" = the most-advanced in_progress row; falls back to the
+    # earliest not_started track if every row is fresh.
+    current_id = None
+    in_progress = sorted(
+        [p for p in progress if p.status == "in_progress"],
+        key=lambda p: p.track.order,
+        reverse=True,
+    )
+    if in_progress:
+        current_id = in_progress[0].track_id
+
+    return Response({
+        "tracks": PositionTrackSerializer(tracks, many=True).data,
+        "progress": TrackProgressSerializer(progress, many=True).data,
+        "current_track_id": current_id,
+    })

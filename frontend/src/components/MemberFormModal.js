@@ -2,10 +2,11 @@
  * <MemberFormModal> — Add / Edit a team member.
  *
  * Renders a <FormModal> with all the editable fields for a User. Used by
- * the Team Members page from two entry points:
+ * Team Members directly and by Settings/User Management for the create flow:
  *
- *   • Add Member  → `member` prop is null. Save POSTs to /team/members/.
- *   • Edit Member → `member` is the existing user shape. Save PATCHes.
+ *   • Add Member  → `member` prop is null. Default save POSTs to /team/members/.
+ *   • Edit Member → `member` is the existing user shape. Default save PATCHes.
+ *   • Admin Create → parent passes `onSavePayload` to save through /users/.
  *
  * Department slugs come from the model's DEPARTMENT_CHOICES list (stable
  * enums); shift preference is a 4-option slug (morning/midday/evening/flex).
@@ -50,7 +51,17 @@ const readShift = (raw) => {
   return 'flex';
 };
 
-const MemberFormModal = ({ isOpen, member, managers = [], onClose, onSaved }) => {
+const MemberFormModal = ({
+  isOpen,
+  member,
+  managers = [],
+  onClose,
+  onSaved,
+  onSavePayload,
+  canToggleAdmin = true,
+  title,
+  submitLabel,
+}) => {
   const isEdit = !!member;
 
   // Form state — initialized from the member prop or blank defaults.
@@ -77,7 +88,7 @@ const MemberFormModal = ({ isOpen, member, managers = [], onClose, onSaved }) =>
       setEmail(member.email || '');
       setPhone(member.phone || '');
       setRole(member.roleSlug || 'team_member');
-      setShift(readShift(member.shift_preference));
+      setShift(readShift(member.shiftPreference || member.shift_preference));
       setDepartments(
         Array.isArray(member.depts) ? member.depts.slice() : []
       );
@@ -127,9 +138,11 @@ const MemberFormModal = ({ isOpen, member, managers = [], onClose, onSaved }) =>
       is_active: !!isActive,
     };
     try {
-      const saved = isEdit
-        ? await teamService.updateMember(member.id, payload)
-        : await teamService.createMember(payload);
+      const saved = onSavePayload
+        ? await onSavePayload(payload, { member, isEdit })
+        : isEdit
+          ? await teamService.updateMember(member.id, payload)
+          : await teamService.createMember(payload);
       if (onSaved) await onSaved(saved);
     } catch (err) {
       // Surface server validation errors when possible (e.g. duplicate email).
@@ -144,8 +157,8 @@ const MemberFormModal = ({ isOpen, member, managers = [], onClose, onSaved }) =>
   return (
     <FormModal
       isOpen={isOpen}
-      title={isEdit ? 'Edit Team Member' : 'Add Team Member'}
-      submitLabel={isEdit ? 'Save Changes' : 'Add Member'}
+      title={title || (isEdit ? 'Edit Team Member' : 'Add Team Member')}
+      submitLabel={submitLabel || (isEdit ? 'Save Changes' : 'Add Member')}
       onClose={onClose}
       onSubmit={handleSubmit}
       submitDisabled={!isValid}
@@ -215,12 +228,14 @@ const MemberFormModal = ({ isOpen, member, managers = [], onClose, onSaved }) =>
         help="Pick every department this member works in."
       />
 
-      <Toggle
-        label="Admin badge"
-        value={isAdmin}
-        onChange={setIsAdmin}
-        help="Shows the Admin badge in the roster. Does NOT grant superuser access."
-      />
+      {canToggleAdmin && (
+        <Toggle
+          label="Admin access"
+          value={isAdmin}
+          onChange={setIsAdmin}
+          help="Allows this user to manage app settings and users."
+        />
+      )}
       {isEdit && (
         <Toggle
           label="Active"

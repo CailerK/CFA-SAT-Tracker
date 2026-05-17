@@ -1,7 +1,66 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import './UserManagement.css';
 import api from '../services/api';
 import { ConfirmDialog } from './ui';
+import MemberFormModal from './MemberFormModal';
+
+const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const MANAGER_ROLES = new Set(['shift_lead', 'shift_leader', 'manager', 'director', 'admin']);
+
+const createEmptyAvailability = () => WEEKDAYS.reduce((acc, day) => ({
+  ...acc,
+  [day]: { available: false, hours: '' },
+}), {});
+
+const normalizeAvailabilityForEdit = (value) => {
+  const base = createEmptyAvailability();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return base;
+
+  return WEEKDAYS.reduce((acc, day) => {
+    const existing = value[day];
+    if (!existing || typeof existing !== 'object') return acc;
+    return {
+      ...acc,
+      [day]: {
+        available: !!existing.available,
+        hours: existing.hours || '',
+      },
+    };
+  }, base);
+};
+
+const displayNameForUser = (user) => {
+  const firstName = user.firstName ?? user.first_name ?? '';
+  const lastName = user.lastName ?? user.last_name ?? '';
+  return user.fullName
+    || user.full_name
+    || `${firstName} ${lastName}`.trim()
+    || user.email
+    || 'Unnamed user';
+};
+
+const normalizeUser = (raw) => {
+  const firstName = raw.firstName ?? raw.first_name ?? '';
+  const lastName = raw.lastName ?? raw.last_name ?? '';
+  return {
+    ...raw,
+    firstName,
+    lastName,
+    fullName: displayNameForUser(raw),
+    isAdmin: Boolean(raw.isAdmin ?? raw.is_admin),
+    isSuperuser: Boolean(raw.isSuperuser ?? raw.is_superuser),
+    isStaff: Boolean(raw.isStaff ?? raw.is_staff),
+    isDemoUser: Boolean(raw.isDemoUser ?? raw.is_demo_user),
+    storeName: raw.storeName ?? raw.store_name,
+    storeNumber: raw.storeNumber ?? raw.store_number,
+    shiftPreference: raw.shiftPreference ?? raw.shift_preference ?? {},
+  };
+};
+
+const normalizeStore = (raw) => ({
+  ...raw,
+  storeNumber: raw.storeNumber ?? raw.store_number,
+});
 
 const UserManagement = ({ currentUser }) => {
   const [users, setUsers] = useState([]);
@@ -17,12 +76,19 @@ const UserManagement = ({ currentUser }) => {
   const [tempPassword, setTempPassword] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [showCreateUserForm, setShowCreateUserForm] = useState(false);
   // resetPwTarget: user | null — ConfirmDialog opens when set; replaces the
   // legacy window.confirm() prompt that asked "Reset password for X?".
   const [resetPwTarget, setResetPwTarget] = useState(null);
 
   const isSuperuser = currentUser?.isSuperuser;
   const isAdmin = currentUser?.isAdmin;
+
+  const managerOptions = useMemo(() => (
+    users
+      .filter((user) => user.isAdmin || user.isSuperuser || MANAGER_ROLES.has(user.role))
+      .map((user) => ({ id: user.id, name: displayNameForUser(user) }))
+  ), [users]);
 
   useEffect(() => {
     loadData();
@@ -36,9 +102,9 @@ const UserManagement = ({ currentUser }) => {
         api.request('/users/stores/'),
         api.request('/users/roles/'),
       ]);
-      setUsers(usersRes);
-      setStores(storesRes);
-      setRoles(rolesRes);
+      setUsers((usersRes || []).map(normalizeUser));
+      setStores((storesRes || []).map(normalizeStore));
+      setRoles(rolesRes || []);
       setError(null);
     } catch (err) {
       console.error('Failed to load user management data:', err);
@@ -49,46 +115,20 @@ const UserManagement = ({ currentUser }) => {
   };
 
   const handleCreateUser = () => {
-    setEditingUser({
-      email: '',
-      username: '',
-      firstName: '',
-      lastName: '',
-      role: '',
-      phone: '',
-      password: '',
-      isAdmin: false,
-      isSuperuser: false,
-      isStaff: false,
-      isDemoUser: false,
-      store: currentUser?.store?.id || null,
-      shiftPreference: {
-        monday: { available: false, hours: '' },
-        tuesday: { available: false, hours: '' },
-        wednesday: { available: false, hours: '' },
-        thursday: { available: false, hours: '' },
-        friday: { available: false, hours: '' },
-        saturday: { available: false, hours: '' },
-      },
+    setShowCreateUserForm(true);
+  };
+
+  const handleSharedCreateUser = async (payload) => {
+    const saved = await api.request('/users/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
-    setShowModal(true);
+    setShowCreateUserForm(false);
+    await loadData();
+    return saved;
   };
 
   const handleEditUser = (user) => {
-    // Parse shift preference - handle both old format (string) and new format (object)
-    let shiftPref = {
-      monday: { available: false, hours: '' },
-      tuesday: { available: false, hours: '' },
-      wednesday: { available: false, hours: '' },
-      thursday: { available: false, hours: '' },
-      friday: { available: false, hours: '' },
-      saturday: { available: false, hours: '' },
-    };
-    
-    if (user.shiftPreference && typeof user.shiftPreference === 'object') {
-      shiftPref = user.shiftPreference;
-    }
-
     setEditingUser({
       id: user.id,
       email: user.email,
@@ -103,7 +143,7 @@ const UserManagement = ({ currentUser }) => {
       isStaff: user.isStaff,
       isDemoUser: user.isDemoUser,
       store: user.store || currentUser?.store?.id,
-      shiftPreference: shiftPref,
+      shiftPreference: normalizeAvailabilityForEdit(user.shiftPreference),
     });
     setShowModal(true);
   };
@@ -353,8 +393,8 @@ const UserManagement = ({ currentUser }) => {
                 </td>
                 <td>{user.email}</td>
                 <td>
-                  <span className={`role-badge role-${user.role}`}>
-                    {user.role.replace('_', ' ')}
+                  <span className={`role-badge role-${user.role || 'team_member'}`}>
+                    {(user.role || 'team_member').replace('_', ' ')}
                   </span>
                   {user.isSuperuser && <span className="badge-superuser">Superuser</span>}
                   {user.isAdmin && !user.isSuperuser && <span className="badge-admin">Admin</span>}
@@ -412,6 +452,15 @@ const UserManagement = ({ currentUser }) => {
           </tbody>
         </table>
       </div>
+
+      <MemberFormModal
+        isOpen={showCreateUserForm}
+        member={null}
+        managers={managerOptions}
+        canToggleAdmin={isSuperuser || isAdmin}
+        onClose={() => setShowCreateUserForm(false)}
+        onSavePayload={handleSharedCreateUser}
+      />
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>

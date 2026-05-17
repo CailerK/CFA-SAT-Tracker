@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import teamService from '../services/team';
-import { isManagerOrAbove } from '../utils/access';
+import { isAdminOrAbove, isManagerOrAbove } from '../utils/access';
 import { ActionMenu, ConfirmDialog, FormModal, SelectField } from './ui';
 import MemberFormModal from './MemberFormModal';
 import './TeamMembers.css';
@@ -15,6 +15,14 @@ const DEPARTMENT_FILTERS = [
   { value: 'catering',   label: 'Catering' },
 ];
 
+const DEPARTMENT_LABELS = {
+  foh: 'Front of House',
+  kitchen: 'Kitchen',
+  management: 'Management',
+  facilities: 'Facilities',
+  catering: 'Catering',
+};
+
 const SORT_OPTIONS = [
   { value: 'name',   label: 'Sort: Name (A–Z)' },
   { value: '-name',  label: 'Sort: Name (Z–A)' },
@@ -27,6 +35,13 @@ const SORT_OPTIONS = [
 const formatRole = (slug) => {
   if (!slug) return 'Team Member';
   return slug
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+const formatDepartment = (slug) => {
+  if (!slug) return 'No department';
+  return DEPARTMENT_LABELS[slug] || slug
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 };
@@ -57,8 +72,9 @@ const normalizeMember = (raw) => ({
   isActive: Boolean(raw.is_active),
   role: formatRole(raw.role),
   roleSlug: raw.role || 'team_member',
-  depts: (raw.departments || []).map((d) => d.name),
+  depts: (raw.departments || []).map((d) => d.slug || d.name).filter(Boolean),
   shift: formatShiftPreference(raw.shift_preference),
+  shiftPreference: raw.shift_preference,
   managerId: raw.manager || '',
   manager: raw.manager_name || null,
 });
@@ -69,13 +85,13 @@ const IconSearch = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 
 const IconChevronDown = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m6 9 6 6 6-6"/></svg>);
 const IconChevronRight = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m9 18 6-6-6-6"/></svg>);
 const IconChevronLeft = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m15 18-6-6 6-6"/></svg>);
-const IconMoreHorizontal = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>);
 const IconMoreVertical = (p) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>);
 
 const ITEMS_PER_PAGE = 10;
 
 const TeamMembers = ({ user, onBack, onNavigate }) => {
   const canManage = isManagerOrAbove(user);
+  const canSetAdmin = isAdminOrAbove(user);
   const [activeTab, setActiveTab] = useState('active');
   const [managersOpen, setManagersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -223,7 +239,7 @@ const TeamMembers = ({ user, onBack, onNavigate }) => {
                 className="tm-add-btn"
                 onClick={openCreate}
               >
-                <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}>+</span>
+                <span className="tm-add-icon" aria-hidden="true">+</span>
                 <span>Add Member</span>
               </button>
             </div>
@@ -377,7 +393,7 @@ const TeamMembers = ({ user, onBack, onNavigate }) => {
                 <div className="tm-cell-role">
                   <p className="tm-role">{m.role}</p>
                   <div className="tm-role-meta">
-                    <span className="tm-dept">{m.depts[0]}</span>
+                    <span className="tm-dept">{formatDepartment(m.depts[0])}</span>
                     {m.depts.length > 1 && (
                       <span className="tm-dept-extra">+{m.depts.length - 1}</span>
                     )}
@@ -473,13 +489,13 @@ const TeamMembers = ({ user, onBack, onNavigate }) => {
                     <p className="tm-card-label">Department</p>
                     <div className="tm-dept-chips">
                       {m.depts.map((d) => (
-                        <span key={d} className="tm-dept-chip">{d}</span>
+                        <span key={d} className="tm-dept-chip">{formatDepartment(d)}</span>
                       ))}
                     </div>
                   </div>
                   <div>
                     <p className="tm-card-label">Contact</p>
-                    <p className="tm-card-empty">No phone</p>
+                    <p className="tm-card-empty">{m.phone || 'No phone'}</p>
                   </div>
                 </div>
               </div>
@@ -536,6 +552,7 @@ const TeamMembers = ({ user, onBack, onNavigate }) => {
         isOpen={!!memberForm}
         member={memberForm?.member || null}
         managers={managers}
+        canToggleAdmin={canSetAdmin}
         onClose={() => setMemberForm(null)}
         onSaved={async () => { setMemberForm(null); await refresh(); }}
       />

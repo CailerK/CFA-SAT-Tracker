@@ -34,6 +34,8 @@ from .views_leadership import (
     PositionTrackViewSet,
     TrackProgressViewSet,
     UserDevelopmentPlanViewSet,
+    my_pathway,
+    team_development_settings,
 )
 from .views_phase8 import (
     CalendarEventViewSet,
@@ -47,6 +49,7 @@ from .views_phase9 import (
     NotificationViewSet,
     dashboard_insights_catalog,
     dashboard_insights_values,
+    dashboard_priorities,
     weekly_digest,
 )
 from .views_setup_sheets import SetupSheetTemplateViewSet, SetupSheetViewSet
@@ -58,6 +61,7 @@ from .views_team import (
     TeamMemberViewSet,
     TraineeAssignmentViewSet,
     TrainingPlanViewSet,
+    documentation_analytics,
     documentation_employees,
     documentation_stats,
     employee_records,
@@ -267,6 +271,10 @@ urlpatterns = [
         documentation_stats, name="documentation_stats",
     ),
     path(
+        "team/documentation/analytics/",
+        documentation_analytics, name="documentation_analytics",
+    ),
+    path(
         "team/documentation/employees/",
         documentation_employees, name="documentation_employees",
     ),
@@ -290,9 +298,20 @@ urlpatterns = [
     path("kitchen/waste/top-items/", waste_top_items, name="waste_top_items"),
     path("kitchen/waste/goals/", waste_goals, name="waste_goals"),
 
+    # Team Development → Edit Tracks page
+    path(
+        "team-development/settings/",
+        team_development_settings, name="team_development_settings",
+    ),
+    path(
+        "team-development/my-pathway/",
+        my_pathway, name="my_pathway",
+    ),
+
     # Phase 9: Dashboard insights + weekly digest
     path("dashboard/insights/catalog/", dashboard_insights_catalog, name="dashboard_insights_catalog"),
     path("dashboard/insights/values/", dashboard_insights_values, name="dashboard_insights_values"),
+    path("dashboard/priorities/", dashboard_priorities, name="dashboard_priorities"),
     path("weekly-digest/", weekly_digest, name="weekly_digest"),
 
     # Router-managed (Phase 1-8 viewsets)

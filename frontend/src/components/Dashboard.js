@@ -5,6 +5,8 @@ import QuickActions from './QuickActions';
 import CustomizeInsightsModal, { AVAILABLE_INSIGHT_CARDS, getInsightById } from './CustomizeInsightsModal';
 import CustomizeActionsModal from './CustomizeActionsModal';
 import NotificationDropdown from './NotificationDropdown';
+import MyPriorities from './MyPriorities';
+import { isAdminOrAbove, isManagerOrAbove } from '../utils/access';
 import notificationService from '../services/notifications';
 import preferencesService from '../services/preferences';
 import dashboardService from '../services/dashboard';
@@ -31,11 +33,14 @@ import KitchenChecklists from './KitchenChecklists';
 import KitchenWasteTracker from './KitchenWasteTracker';
 import TeamMembers from './TeamMembers';
 import TeamDocumentation from './TeamDocumentation';
+import TeamDocumentationAnalytics from './TeamDocumentationAnalytics';
 import TeamEvaluations from './TeamEvaluations';
 import TeamSurveys from './TeamSurveys';
 import TeamTraining from './TeamTraining';
 import TeamQuickLinks from './TeamQuickLinks';
 import TeamDevelopment from './TeamDevelopment';
+import TeamDevelopmentEditTracks from './TeamDevelopmentEditTracks';
+import TeamDevelopmentMyPathway from './TeamDevelopmentMyPathway';
 import LeadershipDevelopment from './LeadershipDevelopment';
 import LeadershipDevPlans from './LeadershipDevPlans';
 import LeadershipPlanDetail from './LeadershipPlanDetail';
@@ -221,6 +226,12 @@ const Dashboard = ({ user, onLogout }) => {
         <div className="nav-content">
           <div className="nav-left">
             <button className="company-button" onClick={() => setCurrentPage('dashboard')}>
+              <span className="company-logo" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+                  <polyline points="16 7 22 7 22 13"/>
+                </svg>
+              </span>
               <div className="company-info">
                 <span className="company-name">CFA I-410 & Rigsby</span>
               </div>
@@ -259,16 +270,18 @@ const Dashboard = ({ user, onLogout }) => {
               </button>
               {profileDropdownOpen && (
                 <div className="profile-dropdown">
-                  <div className="dropdown-item" onClick={() => { setCurrentPage('weekly-digest'); setProfileDropdownOpen(false); }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                      <polyline points="14,2 14,8 20,8"/>
-                      <line x1="16" y1="13" x2="8" y2="13"/>
-                      <line x1="16" y1="17" x2="8" y2="17"/>
-                      <polyline points="10,9 9,9 8,9"/>
-                    </svg>
-                    Weekly Digest
-                  </div>
+                  {isAdminOrAbove(user) && (
+                    <div className="dropdown-item" onClick={() => { setCurrentPage('weekly-digest'); setProfileDropdownOpen(false); }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14,2 14,8 20,8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10,9 9,9 8,9"/>
+                      </svg>
+                      Operator Overview
+                    </div>
+                  )}
                   <div className="dropdown-item" onClick={() => { setCurrentPage('team-chat'); setProfileDropdownOpen(false); }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -284,12 +297,14 @@ const Dashboard = ({ user, onLogout }) => {
                     </svg>
                     Calendar
                   </div>
-                  <div className="dropdown-item" onClick={() => { setCurrentPage('guest-recovery'); setProfileDropdownOpen(false); }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                    </svg>
-                    Guest Recovery
-                  </div>
+                  {isManagerOrAbove(user) && (
+                    <div className="dropdown-item" onClick={() => { setCurrentPage('guest-recovery'); setProfileDropdownOpen(false); }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                      </svg>
+                      Guest Recovery
+                    </div>
+                  )}
                   <div className="dropdown-item" onClick={() => { setCurrentPage('vendors'); setProfileDropdownOpen(false); }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -372,7 +387,7 @@ const Dashboard = ({ user, onLogout }) => {
           <TeamChat user={user} onBack={() => setCurrentPage('dashboard')} />
         ) : currentPage === 'calendar' ? (
           <Calendar user={user} onBack={() => setCurrentPage('dashboard')} />
-        ) : currentPage === 'guest-recovery' ? (
+        ) : currentPage === 'guest-recovery' && isManagerOrAbove(user) ? (
           <GuestRecovery onBack={() => setCurrentPage('dashboard')} />
         ) : currentPage === 'vendors' ? (
           <Vendors onBack={() => setCurrentPage('dashboard')} />
@@ -459,6 +474,13 @@ const Dashboard = ({ user, onLogout }) => {
           <TeamDocumentation 
             user={user}
             onBack={() => setCurrentPage('dashboard')}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'team-documentation-analytics' ? (
+          <TeamDocumentationAnalytics
+            user={user}
+            onBack={() => setCurrentPage('team-documentation')}
+            onNavigate={(page) => setCurrentPage(page)}
           />
         ) : currentPage === 'team-evaluations' ? (
           <TeamEvaluations 
@@ -522,31 +544,28 @@ const Dashboard = ({ user, onLogout }) => {
         ) : currentPage === 'team-development' ? (
           <TeamDevelopment 
             user={user}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'team-development-edit-tracks' ? (
+          <TeamDevelopmentEditTracks
+            user={user}
+            onBack={() => setCurrentPage('team-development')}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
+        ) : currentPage === 'team-development-my-pathway' ? (
+          <TeamDevelopmentMyPathway
+            user={user}
+            onBack={() => setCurrentPage('team-development')}
+            onNavigate={(page) => setCurrentPage(page)}
           />
         ) : (
         <div className="content-wrapper">
           <div className="dashboard-sections">
             {/* LEFT COLUMN: All Caught Up + Dashboard Insights */}
             <div className="dashboard-main-col">
-              {/* All Caught Up Status Card */}
-              <div className="status-message">
-                <div className="status-inner">
-                  <div className="status-bg-blur status-bg-blur-1" aria-hidden="true"></div>
-                  <div className="status-bg-blur status-bg-blur-2" aria-hidden="true"></div>
-                  <div className="status-content-wrapper">
-                    <div className="status-icon">
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="m9 12 2 2 4-4"/>
-                      </svg>
-                    </div>
-                    <h3 className="status-title">All Caught Up! 🎉</h3>
-                    <p className="status-description">
-                      You have no urgent priorities at the moment. Great job staying on top of things!
-                    </p>
-                  </div>
-                </div>
-              </div>
+              {/* My Priorities — backend-driven; falls back to "All Caught Up" when empty */}
+              <MyPriorities onNavigate={setCurrentPage} />
+
 
               {/* Dashboard Insights */}
               <div className="dashboard-insights">

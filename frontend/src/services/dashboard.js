@@ -31,6 +31,16 @@ const dashboardService = {
     const response = await apiService.request(url);
     return response;
   },
+
+  /**
+   * Get the user's "My Priorities" — open items aggregated from
+   * development plans, training assignments, calendar deadlines, and 360
+   * evaluations.
+   * @returns {Promise<{count: number, items: Array}>}
+   */
+  async getPriorities() {
+    return apiService.request('/dashboard/priorities/');
+  },
 };
 
 export default dashboardService;

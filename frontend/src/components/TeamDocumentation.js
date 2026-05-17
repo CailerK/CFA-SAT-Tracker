@@ -27,7 +27,7 @@ const FILTERS = [
   { id: 'admin',        label: 'Admin' },
 ];
 
-const TeamDocumentation = ({ onNavigate, user }) => {
+const TeamDocumentation = ({ onNavigate, onBack, user }) => {
   const canManage = isManagerOrAbove(user);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
@@ -121,10 +121,9 @@ const TeamDocumentation = ({ onNavigate, user }) => {
                     className="td-banner-icon-btn"
                     aria-label="View Analytics"
                     title="View Analytics"
-                    onClick={() => setNotImplemented({
-                      title: 'Analytics — coming soon',
-                      message: 'Documentation analytics (trends, by-department breakdowns, risk scoring) is on the roadmap. Watch this space.',
-                    })}
+                    onClick={() => {
+                      if (onNavigate) onNavigate('team-documentation-analytics');
+                    }}
                   >
                     <IconBarChart className="td-banner-icon" />
                   </button>
