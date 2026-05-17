@@ -299,6 +299,27 @@
   border-color: #E51636;
 }
 
+/* Initials pill — shows who completed a task, sits between the checkbox
+   and the task text. Hidden when initials are blank. */
+.foh-task-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 32px;
+  height: 22px;
+  padding: 0 8px;
+  background: #fff1f2;
+  color: #E51636;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
 /* Task text */
 .foh-task-text-wrap {
   flex: 1;

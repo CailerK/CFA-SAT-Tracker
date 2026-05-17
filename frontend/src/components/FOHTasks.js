@@ -10,14 +10,23 @@ import { FormModal, TextField } from './ui';
 // Normalize backend task to {id, text, completed}. The backend returns
 // `today_completion` as either null (not done today) or an object (done) —
 // presence/absence drives the checkbox state.
-const normalizeTask = (raw) => ({
-  id: raw.id,
-  text: raw.text,
-  order: raw.order,
-  completed: Boolean(raw.today_completion),
-  completedAt: raw.today_completion?.completed_at || null,
-  completedBy: raw.today_completion?.completed_by_name || null,
-});
+//
+// Initials: prefer the per-completion initials the team member typed in the
+// prompt (`today_completion.initials`); fall back to the completer's user
+// profile initials so we always identify who did it, even when the store
+// has require-initials turned off.
+const normalizeTask = (raw) => {
+  const comp = raw.today_completion;
+  return {
+    id: raw.id,
+    text: raw.text,
+    order: raw.order,
+    completed: Boolean(comp),
+    completedAt: comp?.completed_at || null,
+    completedBy: comp?.completed_by_name || null,
+    completedByInitials: (comp?.initials || comp?.completed_by_initials || '').toUpperCase(),
+  };
+};
 
 const withSequentialOrder = (list) => (
   list.map((task, index) => ({ ...task, order: index }))
@@ -145,15 +154,37 @@ const FOHTasks = ({ user }) => {
     }
 
     // Optimistic update — flip the checkbox immediately, then sync to server.
+    // When completing without an initials prompt, fall back to the current
+    // user's profile initials so the row shows attribution right away.
+    const fallbackInitials = (
+      (user?.firstName?.[0] || '') + (user?.lastName?.[0] || '')
+    ).toUpperCase();
     setTasks(prev => ({
       ...prev,
       [activeTab]: prev[activeTab].map(t =>
-        t.id === taskId ? { ...t, completed: willBeCompleted } : t
+        t.id === taskId
+          ? {
+              ...t,
+              completed: willBeCompleted,
+              completedByInitials: willBeCompleted ? fallbackInitials : '',
+            }
+          : t
       ),
     }));
     try {
       if (willBeCompleted) {
-        await fohService.completeTask(taskId);
+        const saved = await fohService.completeTask(taskId);
+        // Sync optimistic state with the server's canonical initials so the
+        // pill matches what got stored.
+        const serverInitials = (
+          saved?.initials || saved?.completed_by_initials || fallbackInitials
+        ).toUpperCase();
+        setTasks(prev => ({
+          ...prev,
+          [activeTab]: prev[activeTab].map(t =>
+            t.id === taskId ? { ...t, completedByInitials: serverInitials } : t
+          ),
+        }));
       } else {
         await fohService.uncompleteTask(taskId);
       }
@@ -194,7 +225,9 @@ const FOHTasks = ({ user }) => {
     setTasks(prev => ({
       ...prev,
       [activeTab]: prev[activeTab].map(t =>
-        t.id === taskId ? { ...t, completed: true } : t
+        t.id === taskId
+          ? { ...t, completed: true, completedByInitials: trimmed }
+          : t
       ),
     }));
     try {
@@ -530,6 +563,16 @@ const FOHTasks = ({ user }) => {
                     </svg>
                   )}
                 </button>
+                {task.completed && task.completedByInitials && (
+                  <span
+                    className="foh-task-initials"
+                    title={task.completedBy
+                      ? `Completed by ${task.completedBy}`
+                      : 'Initials of the team member who completed this task'}
+                  >
+                    {task.completedByInitials}
+                  </span>
+                )}
                 <div className="foh-task-text-wrap">
                   <span className="foh-task-text">{task.text}</span>
                 </div>

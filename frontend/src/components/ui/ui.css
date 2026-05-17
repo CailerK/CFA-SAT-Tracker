@@ -406,3 +406,154 @@
 }
 .ui-save-status.success { color: #16a34a; }
 .ui-save-status.error   { color: #dc2626; }
+
+/* ===== Weekly availability editor (WeeklyAvailabilityEditor.js) ===== */
+.wa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.wa-day {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.wa-day:hover:not(.is-open) { border-color: #d1d5db; }
+.wa-day.is-open {
+  grid-column: 1 / -1;
+  border-color: #E51636;
+  box-shadow: 0 0 0 3px rgba(229, 22, 54, 0.12);
+}
+
+.wa-day-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: #111827;
+  font: inherit;
+}
+.wa-day-head:disabled { cursor: default; }
+.wa-day-head:not(:disabled):hover { background: #f9fafb; }
+
+.wa-day-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.wa-day-summary {
+  flex: 1;
+  font-size: 13px;
+  color: #4b5563;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wa-day.is-unavailable .wa-day-summary { color: #9ca3af; }
+
+.wa-chevron {
+  color: #9ca3af;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+.wa-chevron.is-open { transform: rotate(180deg); }
+
+.wa-day-body {
+  padding: 12px 14px 14px;
+  border-top: 1px solid #f3f4f6;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wa-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+}
+.wa-toggle input[type="checkbox"] {
+  accent-color: #E51636;
+  width: 16px;
+  height: 16px;
+}
+
+.wa-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wa-slot {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.wa-slot .ui-field { margin: 0; }
+
+.wa-slot-dash {
+  font-size: 18px;
+  color: #9ca3af;
+  padding-bottom: 10px;
+  align-self: end;
+}
+
+.wa-slot-remove {
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #6b7280;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  align-self: end;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.wa-slot-remove:hover {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.wa-add-slot {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #E51636;
+  background: #fff1f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.wa-add-slot:hover { background: #ffe4e6; }
+
+/* Read-only flavor — dims hover/click affordances. */
+.wa-grid.is-readonly .wa-day-head { cursor: default; }
+.wa-grid.is-readonly .wa-day:hover { border-color: #e5e7eb; }

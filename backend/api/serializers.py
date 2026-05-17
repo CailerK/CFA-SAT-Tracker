@@ -262,6 +262,11 @@ class UserManagementDetailSerializer(serializers.ModelSerializer):
         Admins can:
         - Create new admins (is_admin=True on new users)
         - NOT change is_admin on existing admins (can only modify non-admins)
+
+        Only superusers may change `shift_preference` (weekly availability).
+        The field is editable in the UI for superusers; for everyone else
+        the editor renders read-only and the backend rejects any attempt to
+        change it as a safety net.
         """
         request = self.context.get('request')
         if request and not request.user.is_superuser:
@@ -273,7 +278,17 @@ class UserManagementDetailSerializer(serializers.ModelSerializer):
                     })
             
             # For CREATES: Admins CAN create new admins (no restriction)
-        
+
+            # Block shift_preference (weekly availability) edits unless the
+            # incoming value is identical to what's already stored — that
+            # way Save on an otherwise-unchanged form still works.
+            if 'shift_preference' in data:
+                current = self.instance.shift_preference if self.instance else {}
+                if data['shift_preference'] != current:
+                    raise serializers.ValidationError({
+                        'shift_preference': "Only superusers can change weekly availability."
+                    })
+
         return data
 
     def validate_username(self, value):
@@ -993,6 +1008,15 @@ class TeamMemberSerializer(serializers.ModelSerializer):
                     "is_admin": "Only admins can change admin access."
                 })
 
+        # Only superusers can change `shift_preference` (weekly availability).
+        # See UserManagementDetailSerializer.validate for the rationale.
+        if actor and not actor.is_superuser and "shift_preference" in data:
+            current = self.instance.shift_preference if self.instance else {}
+            if data["shift_preference"] != current:
+                raise serializers.ValidationError({
+                    "shift_preference": "Only superusers can change weekly availability."
+                })
+
         return data
 
     def get_name(self, obj):
@@ -1305,14 +1329,14 @@ class LeadershipAreaSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeadershipArea
         fields = ["id", "user", "area_key", "created_at"]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "user", "created_at"]
 
 
 class LeadershipNoteSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeadershipNote
         fields = ["id", "user", "text", "created_at"]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "user", "created_at"]
 
 
 class LessonCompletionSerializer(serializers.ModelSerializer):

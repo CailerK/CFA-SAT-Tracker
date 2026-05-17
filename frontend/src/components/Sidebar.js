@@ -45,10 +45,14 @@ const Sidebar = ({ currentPage, onPageChange }) => {
       active: currentPage === 'setup-sheet',
       hasDropdown: true,
       dropdownItems: [
-        { id: 'setup-sheet-templates', label: 'Templates' },
+        {
+          id: 'setup-sheet-templates',
+          label: 'Templates',
+          aliases: ['setup-sheet-template-edit', 'setup-sheet-template-new'],
+        },
         { id: 'setup-sheet-builder', label: 'New Setup' },
         { id: 'saved-setups', label: 'Saved Setups' },
-        { id: 'shift-summary', label: 'Shift Summary' }
+        { id: 'shift-summary', label: 'Shift Summary', aliases: ['shift-summary-history'] }
       ]
     },
     {
@@ -75,7 +79,11 @@ const Sidebar = ({ currentPage, onPageChange }) => {
       hasDropdown: true,
       dropdownItems: [
         { id: 'team-members', label: 'View All' },
-        { id: 'team-documentation', label: 'Documentation' },
+        {
+          id: 'team-documentation',
+          label: 'Documentation',
+          aliases: ['team-documentation-analytics'],
+        },
         { id: 'team-evaluations', label: 'Evaluations' },
         { id: 'team-surveys', label: 'Team Surveys' },
         { id: 'team-training', label: 'Training' },
@@ -89,12 +97,28 @@ const Sidebar = ({ currentPage, onPageChange }) => {
       active: currentPage === 'development',
       hasDropdown: true,
       dropdownItems: [
-        { id: 'leadership', label: 'Leadership' },
-        { id: 'leadership-360', label: '360° Evaluations' },
-        { id: 'team-development', label: 'Team Development' }
+        {
+          id: 'leadership',
+          label: 'Leadership',
+          aliases: ['dev-plans', 'dev-plan-detail', 'culture-leadership-plan-template'],
+        },
+        { id: 'leadership-360', label: '360° Evaluations', aliases: ['new-360-evaluation'] },
+        {
+          id: 'team-development',
+          label: 'Team Development',
+          aliases: ['team-development-edit-tracks', 'team-development-my-pathway'],
+        }
       ]
     }
   ];
+
+  const isDropdownItemActive = (dropdownItem) => (
+    dropdownItem.id === currentPage || dropdownItem.aliases?.includes(currentPage)
+  );
+
+  const isNavItemActive = (item) => (
+    item.id === currentPage || item.dropdownItems?.some(isDropdownItemActive)
+  );
 
   const toggleDropdown = (itemId) => {
     setOpenDropdown(openDropdown === itemId ? null : itemId);
@@ -117,7 +141,8 @@ const Sidebar = ({ currentPage, onPageChange }) => {
         <div key={item.id} className="nav-item-container">
           <button
             onClick={() => handleItemClick(item)}
-            className={`nav-button ${item.active ? 'active' : ''}`}
+            className={`nav-button ${isNavItemActive(item) ? 'active' : ''}`}
+            aria-current={isNavItemActive(item) ? 'page' : undefined}
           >
             <span className="nav-icon">{item.icon}</span>
             <span className="nav-text">{item.label}</span>
@@ -134,7 +159,8 @@ const Sidebar = ({ currentPage, onPageChange }) => {
                 <button
                   key={dropdownItem.id}
                   onClick={() => handleItemClick(item, dropdownItem)}
-                  className="dropdown-item"
+                  className={`dropdown-item ${isDropdownItemActive(dropdownItem) ? 'active' : ''}`}
+                  aria-current={isDropdownItemActive(dropdownItem) ? 'page' : undefined}
                 >
                   {dropdownItem.label}
                 </button>

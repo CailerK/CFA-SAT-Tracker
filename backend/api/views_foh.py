@@ -11,6 +11,7 @@ Mutations:
   DELETE /api/foh/tasks/:id/                 soft-archive        (manager+)
   POST  /api/foh/tasks/:id/complete/         mark done today     (anyone)
   POST  /api/foh/tasks/:id/uncomplete/       undo today          (anyone)
+  POST  /api/foh/tasks/:id/history_completion/ set done/undone for date
   POST  /api/foh/tasks/reorder/              bulk order update   (manager+)
   GET   /api/foh/tasks/history/?range=7d     completion rollup
 """
@@ -58,7 +59,7 @@ class FOHTaskTemplateViewSet(StoreScopedViewSet):
     # still check things off. Template CRUD + reorder stays manager-gated via
     # the class-level ReadAllWriteManager.
     def get_permissions(self):
-        if self.action in {"complete", "uncomplete", "history"}:
+        if self.action in {"complete", "uncomplete", "history", "history_completion"}:
             return [IsAuthenticated()]
         return super().get_permissions()
 
@@ -114,6 +115,72 @@ class FOHTaskTemplateViewSet(StoreScopedViewSet):
             template=template, date=_today()
         ).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"], url_path="history_completion")
+    def history_completion(self, request, pk=None):
+        """Set completion for a specific historical date.
+
+        Body: {"date": "YYYY-MM-DD", "completed": true|false, "initials": ""}
+        This intentionally uses the logged-in user's store/session rather than
+        trusting any client-sent ownership fields.
+        """
+        try:
+            template = FOHTaskTemplate.objects.get(pk=pk, store=request.user.store)
+        except FOHTaskTemplate.DoesNotExist:
+            raise ValidationError({"task": "Task not found for your store."})
+
+        raw_date = request.data.get("date")
+        try:
+            target_date = _date_cls.fromisoformat(raw_date or "")
+        except ValueError:
+            raise ValidationError({"date": "Expected YYYY-MM-DD."})
+
+        today = _today()
+        if target_date > today:
+            raise ValidationError({"date": "Future task history cannot be changed."})
+
+        created_on = _local_date(template.created_at)
+        archived_on = _local_date(template.archived_at) if template.archived_at else None
+        if created_on and target_date < created_on:
+            raise ValidationError({"date": "This task did not exist on that date."})
+        if archived_on and target_date > archived_on:
+            raise ValidationError({"date": "This task was archived before that date."})
+
+        completed = request.data.get("completed")
+        if isinstance(completed, bool):
+            should_complete = completed
+        elif isinstance(completed, str):
+            should_complete = completed.lower() in {"1", "true", "yes", "on"}
+        else:
+            raise ValidationError({"completed": "Expected true or false."})
+
+        if should_complete:
+            completion, created = FOHTaskCompletion.objects.get_or_create(
+                template=template,
+                date=target_date,
+                defaults={
+                    "completed_by": request.user,
+                    "initials": (request.data.get("initials") or "").strip()[:4],
+                },
+            )
+            if not created and request.data.get("initials"):
+                completion.initials = request.data["initials"].strip()[:4]
+                completion.save(update_fields=["initials"])
+            return Response(
+                FOHTaskCompletionSerializer(completion).data,
+                status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+            )
+
+        deleted, _ = FOHTaskCompletion.objects.filter(
+            template=template,
+            date=target_date,
+        ).delete()
+        return Response({
+            "id": template.id,
+            "date": target_date.isoformat(),
+            "completed": False,
+            "deleted": deleted,
+        })
 
     # ---------- bulk reorder ----------
 
@@ -212,6 +279,13 @@ class FOHTaskTemplateViewSet(StoreScopedViewSet):
             if shift in day:
                 day[shift]["done"] += 1
             day["completed_template_ids"].add(c.template_id)
+            # Prefer the per-completion initials the team member typed at
+            # complete time; fall back to the user-profile initials so the
+            # history pill always identifies who did it, even when the
+            # store has require-initials turned off.
+            profile_initials = (
+                c.completed_by.initials if c.completed_by else ""
+            )
             day["completed"].append({
                 "id": c.template_id,
                 "text": c.template.text,
@@ -221,6 +295,8 @@ class FOHTaskTemplateViewSet(StoreScopedViewSet):
                     f"{c.completed_by.first_name} {c.completed_by.last_name}".strip()
                     if c.completed_by else None
                 ) or (c.completed_by.email if c.completed_by else None),
+                "initials": c.initials or "",
+                "completed_by_initials": profile_initials or "",
             })
 
         result = []

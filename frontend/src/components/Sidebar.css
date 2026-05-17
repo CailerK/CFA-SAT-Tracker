@@ -34,12 +34,16 @@
 }
 
 .nav-button.active {
-  background: #E51636;
-  color: white;
+  background: #fff1f2;
+  color: #c41230;
+  box-shadow:
+    inset 0 -2px 0 #E51636,
+    0 0 0 1px rgba(229, 22, 54, 0.14);
 }
 
 .nav-button.active:hover {
-  background: #b91c1c;
+  background: #ffe4e8;
+  color: #9f1239;
 }
 
 .nav-icon {
@@ -101,6 +105,18 @@
 .dropdown-item:hover {
   background: #f3f4f6;
   color: #111827;
+}
+
+.dropdown-menu .dropdown-item.active {
+  background: #fff1f2;
+  color: #c41230;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 #E51636;
+}
+
+.dropdown-menu .dropdown-item.active:hover {
+  background: #ffe4e8;
+  color: #9f1239;
 }
 
 .dropdown-item:before {

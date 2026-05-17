@@ -553,6 +553,7 @@ const TeamMembers = ({ user, onBack, onNavigate }) => {
         member={memberForm?.member || null}
         managers={managers}
         canToggleAdmin={canSetAdmin}
+        canEditAvailability={!!user?.isSuperuser}
         onClose={() => setMemberForm(null)}
         onSaved={async () => { setMemberForm(null); await refresh(); }}
       />

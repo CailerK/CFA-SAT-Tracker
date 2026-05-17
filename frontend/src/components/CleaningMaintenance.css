@@ -33,7 +33,6 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  flex: 1;
 }
 
 .cleaning-title {
@@ -42,9 +41,6 @@
   color: #111827;
   margin: 0;
   letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .cleaning-header-actions {
@@ -58,13 +54,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   border: none;
   background: transparent;
   color: #6b7280;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -74,26 +70,17 @@
   color: #374151;
 }
 
-.cleaning-add-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: none;
+.cleaning-icon-btn-primary {
   background: #E51636;
   color: #ffffff;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.15s ease;
 }
 
-.cleaning-add-btn:hover {
+.cleaning-icon-btn-primary:hover {
   background: #E51636;
+  color: #ffffff;
 }
 
-.cleaning-add-btn:active {
+.cleaning-icon-btn-primary:active {
   transform: scale(0.95);
 }
 
@@ -101,19 +88,16 @@
 .cleaning-main {
   max-width: 42rem;
   margin: 0 auto;
-  padding: 0;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 /* Frequency Tabs */
 /* Frequency tabs — FOH-pill style for visual consistency */
 .frequency-tabs-wrap {
-  background: transparent;
-  border-bottom: none;
-  padding: 12px 16px 0;
-  max-width: 42rem;
-  margin: 0 auto;
   width: 100%;
-  box-sizing: border-box;
 }
 
 .frequency-tabs {
@@ -159,6 +143,55 @@
   line-height: 1;
 }
 
+.freq-calendar-icon {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #111827;
+  line-height: 1;
+  overflow: hidden;
+  box-shadow: 0 1px 1px rgba(17, 24, 39, 0.08);
+}
+
+.freq-calendar-rings {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  right: 4px;
+  height: 3px;
+  border-left: 2px solid #9ca3af;
+  border-right: 2px solid #9ca3af;
+}
+
+.freq-calendar-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: #ef4444;
+}
+
+.freq-calendar-day {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 2px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.frequency-tab.active .freq-calendar-icon {
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow: none;
+}
+
 .freq-label {
   display: block;
   font-size: 14px;
@@ -184,8 +217,6 @@
 
 /* Tasks card — wraps the list with progress bar at top */
 .tasks-card {
-  max-width: 42rem;
-  margin: 12px auto 0;
   background: #ffffff;
   border-radius: 16px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -207,7 +238,21 @@
 
 /* Tasks List */
 .tasks-list {
+  display: flex;
+  flex-direction: column;
   background: #ffffff;
+}
+
+.tasks-empty,
+.tasks-error {
+  padding: 24px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.tasks-error {
+  color: #dc2626;
 }
 
 /* Task row — mirrors .foh-task-row exactly */
@@ -278,6 +323,25 @@
   font-weight: 500;
 }
 
+.task-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 32px;
+  height: 22px;
+  padding: 0 8px;
+  background: #fff1f2;
+  color: #E51636;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
 .task-item.completed .task-text {
   color: #9ca3af;
   text-decoration: line-through;
@@ -305,33 +369,23 @@
 
 /* Tasks Footer */
 .tasks-footer {
-  background: #ffffff;
+  background: rgba(249, 250, 251, 0.8);
   padding: 12px 16px;
   border-top: 1px solid #f3f4f6;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
 }
 
 .footer-text {
   font-size: 12px;
   color: #6b7280;
+}
+
+.footer-percent {
+  font-size: 12px;
+  color: #9ca3af;
   font-weight: 500;
-  min-width: max-content;
-}
-
-.progress-bar {
-  flex: 1;
-  height: 6px;
-  background: #e5e7eb;
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #E51636 0%, #E51636 100%);
-  transition: width 0.3s ease;
 }
 
 /* Responsive */

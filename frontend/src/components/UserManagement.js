@@ -1,33 +1,14 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import './UserManagement.css';
 import api from '../services/api';
-import { ConfirmDialog } from './ui';
+import {
+  ConfirmDialog,
+  WeeklyAvailabilityEditor,
+  normalizeWeeklyAvailability,
+} from './ui';
 import MemberFormModal from './MemberFormModal';
 
-const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const MANAGER_ROLES = new Set(['shift_lead', 'shift_leader', 'manager', 'director', 'admin']);
-
-const createEmptyAvailability = () => WEEKDAYS.reduce((acc, day) => ({
-  ...acc,
-  [day]: { available: false, hours: '' },
-}), {});
-
-const normalizeAvailabilityForEdit = (value) => {
-  const base = createEmptyAvailability();
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return base;
-
-  return WEEKDAYS.reduce((acc, day) => {
-    const existing = value[day];
-    if (!existing || typeof existing !== 'object') return acc;
-    return {
-      ...acc,
-      [day]: {
-        available: !!existing.available,
-        hours: existing.hours || '',
-      },
-    };
-  }, base);
-};
 
 const displayNameForUser = (user) => {
   const firstName = user.firstName ?? user.first_name ?? '';
@@ -143,7 +124,7 @@ const UserManagement = ({ currentUser }) => {
       isStaff: user.isStaff,
       isDemoUser: user.isDemoUser,
       store: user.store || currentUser?.store?.id,
-      shiftPreference: normalizeAvailabilityForEdit(user.shiftPreference),
+      shiftPreference: normalizeWeeklyAvailability(user.shiftPreference),
     });
     setShowModal(true);
   };
@@ -160,8 +141,13 @@ const UserManagement = ({ currentUser }) => {
         phone: editingUser.phone,
         is_admin: editingUser.isAdmin,
         store: editingUser.store,
-        shift_preference: editingUser.shiftPreference,
       };
+      // Only send shift_preference when the viewer is allowed to change it
+      // (super-admin only). Backend would reject it anyway, but skipping the
+      // field avoids a confusing 400 on an otherwise-valid save.
+      if (isSuperuser) {
+        payload.shift_preference = editingUser.shiftPreference;
+      }
 
       // Only include password if it's set
       if (editingUser.password) {
@@ -278,19 +264,6 @@ const UserManagement = ({ currentUser }) => {
     if (!isAdmin) return false;
     // Admins can't delete other admins or superusers
     return !user.isSuperuser && !user.isAdmin;
-  };
-
-  const updateShiftDay = (day, field, value) => {
-    setEditingUser({
-      ...editingUser,
-      shiftPreference: {
-        ...editingUser.shiftPreference,
-        [day]: {
-          ...editingUser.shiftPreference[day],
-          [field]: value,
-        },
-      },
-    });
   };
 
   const isFormValid = () => {
@@ -458,6 +431,7 @@ const UserManagement = ({ currentUser }) => {
         member={null}
         managers={managerOptions}
         canToggleAdmin={isSuperuser || isAdmin}
+        canEditAvailability={!!isSuperuser}
         onClose={() => setShowCreateUserForm(false)}
         onSavePayload={handleSharedCreateUser}
       />
@@ -549,30 +523,15 @@ const UserManagement = ({ currentUser }) => {
                 </div>
 
                 <div className="form-group">
-                  <label>Weekly Availability</label>
-                  <div className="shift-calendar">
-                    {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].map(day => (
-                      <div key={day} className="shift-day">
-                        <label className="shift-day-header">
-                          <input
-                            type="checkbox"
-                            checked={editingUser.shiftPreference[day].available}
-                            onChange={(e) => updateShiftDay(day, 'available', e.target.checked)}
-                          />
-                          <span>{day.charAt(0).toUpperCase() + day.slice(1)}</span>
-                        </label>
-                        {editingUser.shiftPreference[day].available && (
-                          <input
-                            type="text"
-                            className="shift-hours"
-                            placeholder="e.g., 9am-5pm"
-                            value={editingUser.shiftPreference[day].hours}
-                            onChange={(e) => updateShiftDay(day, 'hours', e.target.value)}
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <WeeklyAvailabilityEditor
+                    label="Weekly Availability"
+                    value={editingUser.shiftPreference}
+                    onChange={(next) => setEditingUser({ ...editingUser, shiftPreference: next })}
+                    readOnly={!isSuperuser}
+                    help={isSuperuser
+                      ? 'Tap a day to set the hours this person is available. Add multiple time blocks for split shifts.'
+                      : undefined}
+                  />
                 </div>
 
                 {stores.length > 1 && isSuperuser && (

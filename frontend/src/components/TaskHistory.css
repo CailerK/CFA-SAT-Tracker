@@ -355,6 +355,17 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
+.history-inline-error {
+  margin: -6px 0 12px;
+  padding: 10px 14px;
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .history-day-card {
   background: white;
   border-radius: 16px;
@@ -474,6 +485,10 @@
   opacity: 0.7;
 }
 
+.day-task-item.is-pending {
+  opacity: 0.55;
+}
+
 .day-task-checkbox {
   position: relative;
   display: flex;
@@ -485,6 +500,10 @@
   position: absolute;
   opacity: 0;
   cursor: pointer;
+}
+
+.day-task-checkbox input:disabled + .day-checkmark {
+  cursor: progress;
 }
 
 .day-checkmark {
@@ -527,6 +546,26 @@
 .day-task-text-block {
   flex: 1;
   min-width: 0;
+}
+
+/* Initials pill — shows who completed each task in the history list. */
+.day-task-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 32px;
+  height: 22px;
+  padding: 0 8px;
+  background: #fff1f2;
+  color: #E51636;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  user-select: none;
 }
 
 .day-task-item.missed .day-task-text {

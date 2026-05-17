@@ -63,6 +63,14 @@ const fohService = {
     });
   },
 
+  /** POST: mark/unmark a task for a specific history date. */
+  async setHistoryCompletion(id, { date, completed, initials = "" }) {
+    return apiService.request(`/foh/tasks/${id}/history_completion/`, {
+      method: "POST",
+      body: JSON.stringify({ date, completed, initials }),
+    });
+  },
+
   /** POST: bulk reorder (manager+). Items shape: [{id, order}]. */
   async reorderTasks(items) {
     return apiService.request("/foh/tasks/reorder/", {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import fohService from '../services/foh';
 import { FormModal, DatePicker } from './ui';
 import './TaskHistory.css';
@@ -48,6 +48,66 @@ const normalizeTaskEntry = (task) => (
     : task
 );
 
+const historyTaskKey = (date, taskId) => `${date}:${taskId}`;
+
+const withCountDelta = (day, shift, delta) => {
+  const next = { ...day };
+  if (['opening', 'transition', 'closing'].includes(shift)) {
+    next[shift] = {
+      ...next[shift],
+      done: Math.max(0, (next[shift]?.done || 0) + delta),
+    };
+  }
+  next.total = {
+    ...next.total,
+    done: Math.max(0, (next.total?.done || 0) + delta),
+  };
+  return next;
+};
+
+const applyHistoryCompletion = (days, { date, task, completed }) => (
+  days.map((day) => {
+    if (day.date !== date) return day;
+
+    const normalized = normalizeTaskEntry(task);
+    const completedTasks = (day.completed || []).map(normalizeTaskEntry);
+    const missedTasks = (day.missed || []).map(normalizeTaskEntry);
+    const isAlreadyCompleted = completedTasks.some((item) => item.id === normalized.id);
+
+    if (completed) {
+      if (isAlreadyCompleted) return day;
+      const next = withCountDelta(day, normalized.shift, 1);
+      return {
+        ...next,
+        completed: [
+          ...completedTasks,
+          {
+            ...normalized,
+            completed_at: new Date().toISOString(),
+            completed_by_name: normalized.completed_by_name || 'You',
+          },
+        ],
+        missed: missedTasks.filter((item) => item.id !== normalized.id),
+      };
+    }
+
+    if (!isAlreadyCompleted) return day;
+    const next = withCountDelta(day, normalized.shift, -1);
+    return {
+      ...next,
+      completed: completedTasks.filter((item) => item.id !== normalized.id),
+      missed: [
+        ...missedTasks,
+        {
+          id: normalized.id,
+          text: normalized.text,
+          shift: normalized.shift,
+        },
+      ],
+    };
+  })
+);
+
 const getShiftLabel = (shift) => {
   if (shift === 'opening') return 'Opening';
   if (shift === 'transition') return 'Transition';
@@ -74,26 +134,29 @@ const TaskHistory = ({ onBack }) => {
   const [rangeError, setRangeError] = useState('');
   const [historyData, setHistoryData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [historyError, setHistoryError] = useState('');
+  const [pendingHistoryEdits, setPendingHistoryEdits] = useState(new Set());
+
+  const loadHistory = useCallback(async ({ showSpinner = true } = {}) => {
+    try {
+      if (showSpinner) setIsLoading(true);
+      const res = dateRange === 'custom' && customRange?.start && customRange?.end
+        ? await fohService.getHistory({ start: customRange.start, end: customRange.end })
+        : await fohService.getHistory({ range: dateRange });
+      setHistoryData(res.days || []);
+      setHistoryError('');
+    } catch (err) {
+      console.error('Failed to load FOH task history:', err);
+      setHistoryData([]);
+      setHistoryError(err.message || 'Could not load task history.');
+    } finally {
+      if (showSpinner) setIsLoading(false);
+    }
+  }, [dateRange, customRange]);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setIsLoading(true);
-        const res = dateRange === 'custom' && customRange?.start && customRange?.end
-          ? await fohService.getHistory({ start: customRange.start, end: customRange.end })
-          : await fohService.getHistory({ range: dateRange });
-        if (cancelled) return;
-        setHistoryData(res.days || []);
-      } catch (err) {
-        console.error('Failed to load FOH task history:', err);
-        if (!cancelled) setHistoryData([]);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [dateRange, customRange]);
+    loadHistory();
+  }, [loadHistory]);
 
   // ---- Custom date range modal handlers ----
   const openRangeModal = () => {
@@ -164,6 +227,41 @@ const TaskHistory = ({ onBack }) => {
   }, [historyData, dateRange]);
 
   const isCustom = dateRange === 'custom';
+
+  const toggleHistoryTask = async ({ day, task, completed }) => {
+    const normalized = normalizeTaskEntry(task);
+    if (!normalized.id) return;
+
+    const key = historyTaskKey(day.date, normalized.id);
+    if (pendingHistoryEdits.has(key)) return;
+
+    const previousHistory = historyData;
+    setPendingHistoryEdits((prev) => new Set(prev).add(key));
+    setHistoryError('');
+    setHistoryData((prev) => applyHistoryCompletion(prev, {
+      date: day.date,
+      task: normalized,
+      completed,
+    }));
+
+    try {
+      await fohService.setHistoryCompletion(normalized.id, {
+        date: day.date,
+        completed,
+      });
+      await loadHistory({ showSpinner: false });
+    } catch (err) {
+      console.error('Failed to update historical task:', err);
+      setHistoryData(previousHistory);
+      setHistoryError(err.message || 'Could not update task history.');
+    } finally {
+      setPendingHistoryEdits((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
 
   return (
     <div className="task-history-page">
@@ -268,6 +366,12 @@ const TaskHistory = ({ onBack }) => {
         ))}
       </div>
 
+      {historyError && (
+        <div className="history-inline-error" role="alert">
+          {historyError}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="history-empty-state">
           <p>Loading task history…</p>
@@ -317,11 +421,36 @@ const TaskHistory = ({ onBack }) => {
                       </div>
                     ) : (
                       completedTasks.map((task, index) => (
-                        <div key={`${day.date}-done-${index}`} className="day-task-item">
+                        <div
+                          key={`${day.date}-done-${task.id || index}`}
+                          className={`day-task-item ${pendingHistoryEdits.has(historyTaskKey(day.date, task.id)) ? 'is-pending' : ''}`}
+                        >
                           <label className="day-task-checkbox">
-                            <input type="checkbox" checked readOnly />
+                            <input
+                              type="checkbox"
+                              checked
+                              disabled={pendingHistoryEdits.has(historyTaskKey(day.date, task.id))}
+                              onChange={() => toggleHistoryTask({ day, task, completed: false })}
+                            />
                             <span className="day-checkmark" />
                           </label>
+                          {(() => {
+                            // Prefer the initials typed at completion time;
+                            // fall back to the completer's profile initials.
+                            const initials = (
+                              task.initials || task.completed_by_initials || ''
+                            ).toUpperCase();
+                            return initials ? (
+                              <span
+                                className="day-task-initials"
+                                title={task.completed_by_name
+                                  ? `Completed by ${task.completed_by_name}`
+                                  : 'Initials of the team member who completed this task'}
+                              >
+                                {initials}
+                              </span>
+                            ) : null;
+                          })()}
                           <div className="day-task-text-block">
                             <span className="day-task-text">{task.text}</span>
                             <div className="day-task-meta">
@@ -350,9 +479,17 @@ const TaskHistory = ({ onBack }) => {
                         <span>{missedTasks.length}</span>
                       </div>
                       {missedTasks.map((task, index) => (
-                        <div key={`${day.date}-missed-${index}`} className="day-task-item missed">
+                        <div
+                          key={`${day.date}-missed-${task.id || index}`}
+                          className={`day-task-item missed ${pendingHistoryEdits.has(historyTaskKey(day.date, task.id)) ? 'is-pending' : ''}`}
+                        >
                           <label className="day-task-checkbox">
-                            <input type="checkbox" checked={false} readOnly />
+                            <input
+                              type="checkbox"
+                              checked={false}
+                              disabled={pendingHistoryEdits.has(historyTaskKey(day.date, task.id))}
+                              onChange={() => toggleHistoryTask({ day, task, completed: true })}
+                            />
                             <span className="day-checkmark" />
                           </label>
                           <div className="day-task-text-block">

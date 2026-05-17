@@ -9,13 +9,18 @@
  *   • Admin Create → parent passes `onSavePayload` to save through /users/.
  *
  * Department slugs come from the model's DEPARTMENT_CHOICES list (stable
- * enums); shift preference is a 4-option slug (morning/midday/evening/flex).
+ * enums); weekly availability is a Mon-Sat schedule of time slots (see
+ * <WeeklyAvailabilityEditor> for the data shape). The schedule is only
+ * editable when `canEditAvailability` is true — the backend mirrors the
+ * same rule and rejects writes from non-superusers.
  * Manager list is the `managers` prop so the parent can pre-load it once.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import teamService from '../services/team';
 import {
   FormModal, TextField, SelectField, ChipMultiSelect, Toggle, FieldRow,
+  WeeklyAvailabilityEditor, createEmptyWeeklyAvailability,
+  normalizeWeeklyAvailability,
 } from './ui';
 
 // Stable enums that map to the backend (see models.py:Department.DEPARTMENT_CHOICES
@@ -35,21 +40,6 @@ const ROLE_OPTIONS = [
   { value: 'director',     label: 'Director' },
 ];
 
-const SHIFT_OPTIONS = [
-  { value: 'flex',    label: 'Flex' },
-  { value: 'morning', label: 'Morning' },
-  { value: 'midday',  label: 'Midday' },
-  { value: 'evening', label: 'Evening' },
-];
-
-// Pull the shift preference string out of the JSONField if present.
-// We support both legacy string values and objects with a `preferred` key.
-const readShift = (raw) => {
-  if (!raw) return 'flex';
-  if (typeof raw === 'string') return raw;
-  if (typeof raw === 'object' && raw.preferred) return raw.preferred;
-  return 'flex';
-};
 
 const MemberFormModal = ({
   isOpen,
@@ -59,6 +49,7 @@ const MemberFormModal = ({
   onSaved,
   onSavePayload,
   canToggleAdmin = true,
+  canEditAvailability = false,
   title,
   submitLabel,
 }) => {
@@ -70,7 +61,10 @@ const MemberFormModal = ({
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('team_member');
-  const [shift, setShift] = useState('flex');
+  // Weekly availability — recurring Mon-Sat schedule with one or more time
+  // slots per day. Initialized to all-unavailable; backfilled from `member`
+  // when editing an existing user.
+  const [availability, setAvailability] = useState(() => createEmptyWeeklyAvailability());
   const [departments, setDepartments] = useState([]);
   const [managerId, setManagerId] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
@@ -88,7 +82,11 @@ const MemberFormModal = ({
       setEmail(member.email || '');
       setPhone(member.phone || '');
       setRole(member.roleSlug || 'team_member');
-      setShift(readShift(member.shiftPreference || member.shift_preference));
+      setAvailability(
+        normalizeWeeklyAvailability(
+          member.shiftPreference ?? member.shift_preference
+        )
+      );
       setDepartments(
         Array.isArray(member.depts) ? member.depts.slice() : []
       );
@@ -101,7 +99,7 @@ const MemberFormModal = ({
       setEmail('');
       setPhone('');
       setRole('team_member');
-      setShift('flex');
+      setAvailability(createEmptyWeeklyAvailability());
       setDepartments([]);
       setManagerId('');
       setIsAdmin(false);
@@ -131,12 +129,17 @@ const MemberFormModal = ({
       email: email.trim(),
       phone: phone.trim(),
       role,
-      shift_preference: { preferred: shift },
       department_slugs: departments,
       manager: managerId ? Number(managerId) : null,
       is_admin: !!isAdmin,
       is_active: !!isActive,
     };
+    // Only send shift_preference when the viewer is allowed to change it.
+    // Backend would reject it anyway (see serializers.py), but skipping the
+    // field avoids a confusing error on the otherwise-valid save.
+    if (canEditAvailability) {
+      payload.shift_preference = availability;
+    }
     try {
       const saved = onSavePayload
         ? await onSavePayload(payload, { member, isEdit })
@@ -197,20 +200,22 @@ const MemberFormModal = ({
         />
       </FieldRow>
 
-      <FieldRow>
-        <SelectField
-          label="Role"
-          value={role}
-          onChange={setRole}
-          options={ROLE_OPTIONS}
-        />
-        <SelectField
-          label="Shift Preference"
-          value={shift}
-          onChange={setShift}
-          options={SHIFT_OPTIONS}
-        />
-      </FieldRow>
+      <SelectField
+        label="Role"
+        value={role}
+        onChange={setRole}
+        options={ROLE_OPTIONS}
+      />
+
+      <WeeklyAvailabilityEditor
+        label="Weekly Availability"
+        value={availability}
+        onChange={setAvailability}
+        readOnly={!canEditAvailability}
+        help={canEditAvailability
+          ? 'Tap a day to set the hours this person is available. Add multiple time blocks for split shifts.'
+          : undefined}
+      />
 
       <SelectField
         label="Reports To"

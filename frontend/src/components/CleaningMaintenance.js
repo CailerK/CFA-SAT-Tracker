@@ -8,6 +8,21 @@ import { ConfirmDialog, HistoryDrawer } from './ui';
 
 const SCOPE = 'foh';
 
+const initialsFromName = (name) => {
+  if (!name) return '';
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0] || '')
+    .join('')
+    .toUpperCase();
+};
+
+const initialsFromUser = (user) => (
+  `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`.toUpperCase()
+);
+
 // Normalize a backend task to the row shape this UI was built around.
 const normalizeRow = (raw) => {
   const comp = raw.today_completion;
@@ -24,6 +39,7 @@ const normalizeRow = (raw) => {
     text: raw.name,
     completed: Boolean(comp),
     completedBy: comp?.completed_by_name || null,
+    completedByInitials: initialsFromName(comp?.completed_by_name),
     completedAt: timeStr,
   };
 };
@@ -111,13 +127,20 @@ const CleaningMaintenance = ({ user }) => {
 
   const frequencies = [
     { id: 'daily',     label: 'Daily',     emoji: '☀️', count: counts.daily.done,     total: counts.daily.total },
-    { id: 'weekly',    label: 'Weekly',    emoji: '📅', count: counts.weekly.done,    total: counts.weekly.total },
+    { id: 'weekly',    label: 'Weekly',    emoji: 'calendar', count: counts.weekly.done,    total: counts.weekly.total },
     { id: 'monthly',   label: 'Monthly',   emoji: '🌙', count: counts.monthly.done,   total: counts.monthly.total },
     { id: 'quarterly', label: 'Quarterly', emoji: '⭐', count: counts.quarterly.done, total: counts.quarterly.total },
   ];
 
   const currentTasks = tasks[activeFrequency] || [];
   const currentFreq = frequencies.find(f => f.id === activeFrequency) || { count: 0, total: 0 };
+  const currentDayNumber = new Intl.DateTimeFormat('en-US', {
+    day: 'numeric',
+    timeZone: 'America/Chicago',
+  }).format(new Date());
+  const currentProgress = currentFreq.total
+    ? Math.round((currentFreq.count / currentFreq.total) * 100)
+    : 0;
 
   // Optimistic toggle.
   const toggleTask = async (taskId) => {
@@ -125,12 +148,14 @@ const CleaningMaintenance = ({ user }) => {
     const target = list.find(t => t.id === taskId);
     if (!target) return;
     const willBeCompleted = !target.completed;
+    const fallbackInitials = initialsFromUser(user);
     setTasks(prev => ({
       ...prev,
       [activeFrequency]: prev[activeFrequency].map(t =>
         t.id === taskId
           ? { ...t, completed: willBeCompleted,
               completedBy: willBeCompleted ? 'You' : null,
+              completedByInitials: willBeCompleted ? fallbackInitials : '',
               completedAt: willBeCompleted ? 'just now' : null }
           : t
       ),
@@ -143,8 +168,24 @@ const CleaningMaintenance = ({ user }) => {
       },
     }));
     try {
-      if (willBeCompleted) await cleaningService.complete(taskId);
-      else await cleaningService.uncomplete(taskId);
+      if (willBeCompleted) {
+        const saved = await cleaningService.complete(taskId);
+        const serverInitials = initialsFromName(saved?.completed_by_name) || fallbackInitials;
+        setTasks(prev => ({
+          ...prev,
+          [activeFrequency]: prev[activeFrequency].map(t =>
+            t.id === taskId
+              ? {
+                  ...t,
+                  completedBy: saved?.completed_by_name || t.completedBy,
+                  completedByInitials: serverInitials,
+                }
+              : t
+          ),
+        }));
+      } else {
+        await cleaningService.uncomplete(taskId);
+      }
     } catch (err) {
       console.error('Cleaning toggle failed:', err);
       setErrorMsg('Could not save — refreshing.');
@@ -203,18 +244,6 @@ const CleaningMaintenance = ({ user }) => {
             <h1 className="cleaning-title">Cleaning & Maintenance</h1>
           </div>
           <div className="cleaning-header-actions">
-            {/* History (clock icon) — opens HistoryDrawer with last 30 days of completions. */}
-            <button
-              className="cleaning-icon-btn"
-              type="button"
-              aria-label="View cleaning history"
-              onClick={openHistory}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12,6 12,12 16,14"/>
-              </svg>
-            </button>
             {/* Settings (gear icon) — sentinel until a proper Cleaning settings UI ships. */}
             <button
               className="cleaning-icon-btn"
@@ -227,8 +256,21 @@ const CleaningMaintenance = ({ user }) => {
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
               </svg>
             </button>
+            {/* History (clock icon) — opens HistoryDrawer with last 30 days of completions. */}
+            <button
+              className="cleaning-icon-btn"
+              type="button"
+              aria-label="View cleaning history"
+              onClick={openHistory}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+                <path d="M12 7v5l4 2"/>
+              </svg>
+            </button>
             {canManageTasks && (
-              <button className="cleaning-add-btn" aria-label="Add task" onClick={() => setShowAddTask(true)}>
+              <button className="cleaning-icon-btn cleaning-icon-btn-primary" aria-label="Add task" onClick={() => setShowAddTask(true)}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
@@ -250,7 +292,15 @@ const CleaningMaintenance = ({ user }) => {
                 className={`frequency-tab ${activeFrequency === freq.id ? 'active' : ''}`}
                 onClick={() => setActiveFrequency(freq.id)}
               >
-                <span className="freq-emoji" role="img" aria-hidden="true">{freq.emoji}</span>
+                {freq.emoji === 'calendar' ? (
+                  <span className="freq-calendar-icon" aria-hidden="true">
+                    <span className="freq-calendar-rings" />
+                    <span className="freq-calendar-top" />
+                    <span className="freq-calendar-day">{currentDayNumber}</span>
+                  </span>
+                ) : (
+                  <span className="freq-emoji" role="img" aria-hidden="true">{freq.emoji}</span>
+                )}
                 <span className="freq-label">{freq.label}</span>
                 <span className="freq-count">{freq.count}/{freq.total}</span>
               </button>
@@ -263,65 +313,68 @@ const CleaningMaintenance = ({ user }) => {
           <div className="tasks-progress-track">
             <div
               className="tasks-progress-fill"
-              style={{ width: `${currentFreq.total ? (currentFreq.count / currentFreq.total) * 100 : 0}%` }}
+              style={{ width: `${currentProgress}%` }}
             />
           </div>
-        <div className="tasks-list">
-          {isLoading && <div style={{ padding: 24, color: '#6b7280' }}>Loading tasks…</div>}
-          {!isLoading && errorMsg && <div style={{ padding: 12, color: '#dc2626', fontSize: 14 }}>{errorMsg}</div>}
-          {!isLoading && currentTasks.length === 0 && (
-            <div style={{ padding: 24, color: '#6b7280' }}>No {activeFrequency} cleaning tasks yet.</div>
-          )}
-          {currentTasks.map(task => (
-            <div
-              key={task.id}
-              className={`task-item ${task.completed ? 'completed' : ''}`}
-            >
-              <button
-                type="button"
-                className={`task-checkbox ${task.completed ? 'checked' : ''}`}
-                onClick={() => toggleTask(task.id)}
-                role="checkbox"
-                aria-checked={task.completed}
-                aria-label={`${task.text} - Mark as ${task.completed ? 'incomplete' : 'complete'}`}
+          <div className="tasks-list">
+            {isLoading && <div className="tasks-empty">Loading tasks…</div>}
+            {!isLoading && errorMsg && <div className="tasks-error">{errorMsg}</div>}
+            {!isLoading && currentTasks.length === 0 && (
+              <div className="tasks-empty">No {activeFrequency} cleaning tasks yet.</div>
+            )}
+            {currentTasks.map(task => (
+              <div
+                key={task.id}
+                className={`task-item ${task.completed ? 'completed' : ''}`}
               >
-                {task.completed && (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                )}
-              </button>
-              <div className="task-text-wrap">
-                <span className="task-text">{task.text}</span>
-              </div>
-              {canManageTasks && (
                 <button
-                  className="task-delete"
-                  aria-label={`Delete task: ${task.text}`}
-                  onClick={() => deleteTask(task.id)}
+                  type="button"
+                  className={`task-checkbox ${task.completed ? 'checked' : ''}`}
+                  onClick={() => toggleTask(task.id)}
+                  role="checkbox"
+                  aria-checked={task.completed}
+                  aria-label={`${task.text} - Mark as ${task.completed ? 'incomplete' : 'complete'}`}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 6h18"/>
-                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-                    <line x1="10" x2="10" y1="11" y2="17"/>
-                    <line x1="14" x2="14" y1="11" y2="17"/>
-                  </svg>
+                  {task.completed && (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  )}
                 </button>
-              )}
-            </div>
-          ))}
-        </div>
-        </div>
-
-        {/* Progress Footer */}
-        <div className="tasks-footer">
-          <span className="footer-text">{currentFreq.count} of {currentFreq.total} completed</span>
-          <div className="progress-bar">
-            <div
-              className="progress-fill"
-              style={{ width: `${currentFreq.total ? (currentFreq.count / currentFreq.total) * 100 : 0}%` }}
-            />
+                {task.completed && task.completedByInitials && (
+                  <span
+                    className="task-initials"
+                    title={task.completedBy
+                      ? `Completed by ${task.completedBy}`
+                      : 'Initials of the team member who completed this task'}
+                  >
+                    {task.completedByInitials}
+                  </span>
+                )}
+                <div className="task-text-wrap">
+                  <span className="task-text">{task.text}</span>
+                </div>
+                {canManageTasks && (
+                  <button
+                    className="task-delete"
+                    aria-label={`Delete task: ${task.text}`}
+                    onClick={() => deleteTask(task.id)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18"/>
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                      <line x1="10" x2="10" y1="11" y2="17"/>
+                      <line x1="14" x2="14" y1="11" y2="17"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="tasks-footer">
+            <span className="footer-text">{currentFreq.count} of {currentFreq.total} completed</span>
+            <span className="footer-percent">{currentProgress}%</span>
           </div>
         </div>
       </main>

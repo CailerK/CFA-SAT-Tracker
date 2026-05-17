@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import './LeadershipDevelopment.css';
 import leadershipService from '../services/leadership';
 import { ConfirmDialog, HistoryDrawer, FormModal } from './ui';
@@ -20,6 +20,8 @@ const LeadershipDevelopment = ({ user, onNavigate }) => {
   const [showAllNotes, setShowAllNotes] = useState(false); // notes drawer
   // Manage Areas modal (the gear icon).
   const [areasModalOpen, setAreasModalOpen] = useState(false);
+  const [pendingAreaIds, setPendingAreaIds] = useState(new Set());
+  const pendingAreaIdsRef = useRef(new Set());
   // Local completion state for today's leadership tasks (UI-only for now).
   const [completedTaskIds, setCompletedTaskIds] = useState(() => new Set());
   // Show all today's tasks vs collapsed (5 + "+N more").
@@ -59,7 +61,10 @@ const LeadershipDevelopment = ({ user, onNavigate }) => {
   }, [user]);
 
   const toggleArea = async (areaKey) => {
+    if (pendingAreaIdsRef.current.has(areaKey)) return;
     const isSelected = selectedAreaIds.has(areaKey);
+    pendingAreaIdsRef.current = new Set(pendingAreaIdsRef.current).add(areaKey);
+    setPendingAreaIds(new Set(pendingAreaIdsRef.current));
     // Optimistic update.
     setSelectedAreaIds((prev) => {
       const next = new Set(prev);
@@ -87,6 +92,11 @@ const LeadershipDevelopment = ({ user, onNavigate }) => {
         else next.delete(areaKey);
         return next;
       });
+    } finally {
+      const nextPending = new Set(pendingAreaIdsRef.current);
+      nextPending.delete(areaKey);
+      pendingAreaIdsRef.current = nextPending;
+      setPendingAreaIds(nextPending);
     }
   };
 
@@ -712,12 +722,15 @@ const LeadershipDevelopment = ({ user, onNavigate }) => {
         <div className="ld-modal-areas-grid">
           {ALL_AREAS.map((area) => {
             const isSelected = selectedAreaIds.has(area.id);
+            const isPending = pendingAreaIds.has(area.id);
             return (
               <button
                 key={area.id}
                 type="button"
-                className={`ld-modal-area-card ${isSelected ? 'is-selected' : ''}`}
+                className={`ld-modal-area-card ${isSelected ? 'is-selected' : ''} ${isPending ? 'is-pending' : ''}`}
                 onClick={() => toggleArea(area.id)}
+                disabled={isPending}
+                aria-pressed={isSelected}
               >
                 <span className="ld-modal-area-icon">{area.icon}</span>
                 <span className="ld-modal-area-name">{area.name}</span>

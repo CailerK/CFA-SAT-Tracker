@@ -293,6 +293,19 @@ class LeadershipAreaViewSet(StoreScopedViewSet):
         # Users can only see/manage their own leadership areas.
         return LeadershipArea.objects.filter(user=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        area, created = LeadershipArea.objects.get_or_create(
+            user=request.user,
+            area_key=serializer.validated_data['area_key'],
+        )
+        data = self.get_serializer(area).data
+        return Response(
+            data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
     def perform_create(self, serializer):
         # Auto-set the user to the current user.
         serializer.save(user=self.request.user)

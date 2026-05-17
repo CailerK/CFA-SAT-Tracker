@@ -12,6 +12,12 @@ export { default as HistoryDrawer } from './HistoryDrawer';
 export { default as ChipMultiSelect } from './ChipMultiSelect';
 export { default as UserPicker } from './UserPicker';
 export {
+  default as WeeklyAvailabilityEditor,
+  WEEKDAYS as WEEKLY_AVAILABILITY_DAYS,
+  createEmptyWeeklyAvailability,
+  normalizeWeeklyAvailability,
+} from './WeeklyAvailabilityEditor';
+export {
   TextField,
   TextArea,
   SelectField,

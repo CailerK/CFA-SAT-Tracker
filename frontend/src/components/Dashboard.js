@@ -219,6 +219,11 @@ const Dashboard = ({ user, onLogout }) => {
     return 'Good evening';
   };
 
+  const getGreetingEmoji = () => {
+    const hour = new Date().getHours();
+    return hour >= 18 ? { emoji: '🌙', label: 'moon' } : { emoji: '☀️', label: 'sun' };
+  };
+
   return (
     <div className="dashboard-container">
       {/* Navigation Header */}
@@ -354,7 +359,10 @@ const Dashboard = ({ user, onLogout }) => {
               <div className="banner-blur" aria-hidden="true"></div>
               <div className="banner-content">
                 <div className="banner-top">
-                  <span className="banner-emoji" role="img" aria-label="sun">☀️</span>
+                  {(() => {
+                    const g = getGreetingEmoji();
+                    return <span className="banner-emoji" role="img" aria-label={g.label}>{g.emoji}</span>;
+                  })()}
                   <div className="banner-text">
                     <h1 className="banner-greeting">
                       {getGreeting()}, <span className="banner-name">{user?.firstName || 'Demo User'}!</span>
