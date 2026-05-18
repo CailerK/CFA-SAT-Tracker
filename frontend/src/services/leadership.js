@@ -259,6 +259,24 @@ const leadershipService = {
       },
     );
   },
+
+  // ===== Manage Development Tracks (DevelopmentTrackPlan) =====
+  async listPlans(fromPosition = null) {
+    const qs = fromPosition
+      ? `?from_position=${encodeURIComponent(fromPosition)}`
+      : '';
+    return apiService.request(`/team-development/plans/${qs}`);
+  },
+  async getPlan(id)        { return apiService.request(`/team-development/plans/${id}/`); },
+  async createPlan(body)   { return apiService.request('/team-development/plans/', { method: 'POST',  body: JSON.stringify(body) }); },
+  async updatePlan(id, p)  { return apiService.request(`/team-development/plans/${id}/`, { method: 'PATCH', body: JSON.stringify(p) }); },
+  async deletePlan(id)     { return apiService.request(`/team-development/plans/${id}/`, { method: 'DELETE' }); },
+  async reorderPlans(fromPosition, planIds) {
+    return apiService.request('/team-development/plans/reorder/', {
+      method: 'POST',
+      body: JSON.stringify({ from_position: fromPosition, plan_ids: planIds }),
+    });
+  },
 };
 
 export default leadershipService;

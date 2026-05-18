@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import leadershipService from '../services/leadership';
+import ManageDevelopmentTracks from './ManageDevelopmentTracks';
 import './TeamDevelopment.css';
 import { isAdminOrAbove, isManagerOrAbove } from '../utils/access';
 import {
@@ -401,6 +402,9 @@ const TeamDevelopment = ({ user, onNavigate }) => {
           </div>
         )}
       </section>
+
+      {/* ---- LD Growth-style Manage Development Tracks (per-position plans) ---- */}
+      <ManageDevelopmentTracks user={user} />
 
       {/* ---- Manage Tracks list modal ---- */}
       <FormModal

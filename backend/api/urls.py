@@ -26,6 +26,7 @@ from .views_kitchen import (
     waste_trend,
 )
 from .views_leadership import (
+    DevelopmentTrackPlanViewSet,
     Evaluation360TemplateViewSet,
     Evaluation360ViewSet,
     LeadershipAreaViewSet,
@@ -153,6 +154,11 @@ router.register(
     r"team-development/tracks",
     PositionTrackViewSet,
     basename="position-track",
+)
+router.register(
+    r"team-development/plans",
+    DevelopmentTrackPlanViewSet,
+    basename="development-track-plan",
 )
 router.register(
     r"team-development/progress",

@@ -1305,6 +1305,43 @@ class PositionTrackSerializer(serializers.ModelSerializer):
         return slugify(obj.name or "")
 
 
+class DevelopmentTrackPlanSerializer(serializers.ModelSerializer):
+    """Track plans on the Manage Development Tracks editor."""
+    step_count = serializers.SerializerMethodField()
+
+    class Meta:
+        from .models import DevelopmentTrackPlan as _DTP
+        model = _DTP
+        fields = [
+            "id", "from_position", "target_role", "name", "description",
+            "is_default", "steps", "step_count", "order",
+            "archived_at", "created_by", "created_at", "updated_at",
+        ]
+        read_only_fields = [
+            "id", "step_count", "archived_at",
+            "created_by", "created_at", "updated_at",
+        ]
+
+    def get_step_count(self, obj):
+        return len(obj.steps or [])
+
+    def validate_steps(self, value):
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError("steps must be a list.")
+        cleaned = []
+        for i, s in enumerate(value):
+            if not isinstance(s, dict):
+                raise serializers.ValidationError(f"Step {i} must be an object.")
+            title = (s.get("title") or "").strip()
+            if not title:
+                raise serializers.ValidationError(f"Step {i+1} needs a title.")
+            kind = (s.get("kind") or "other").strip()
+            cleaned.append({"title": title[:200], "kind": kind[:32]})
+        return cleaned
+
+
 class TrackProgressSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
     user_initials = serializers.CharField(source="user.initials", read_only=True)

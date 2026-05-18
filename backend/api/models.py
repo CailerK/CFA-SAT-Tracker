@@ -1675,6 +1675,68 @@ class TrackProgress(models.Model):
         return f"{self.user.get_full_name()} - {self.track.name}"
 
 
+class DevelopmentTrackPlan(models.Model):
+    """A specific certification/training plan for a career transition.
+
+    Lives under the "Manage Development Tracks" section on Team Development.
+    Each plan belongs to a `from_position` (the role a team member is in
+    today) and has a `target_role` they're working toward. `steps` is a
+    JSON list of {title, kind} dicts so the editor can add/reorder/remove
+    rows without spinning up a child table.
+
+    Example:
+      from_position = 'team-member'
+      target_role   = 'Trainer'
+      name          = 'Trainer Certification (Calhoun)'
+      is_default    = True
+      steps = [
+        {"title": "Master all FOH or BOH positions", "kind": "mastery"},
+        {"title": "Read the Certified Trainer workbook", "kind": "dual_check"},
+        ...
+      ]
+    """
+    STEP_KIND_CHOICES = [
+        ('mastery',          'Mastery Check'),
+        ('dual_check',       'Dual Check'),
+        ('training_session', 'Training Sessions'),
+        ('feedback',         'Feedback'),
+        ('approval',         'Approval'),
+        ('other',            'Other'),
+    ]
+
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name='development_track_plans'
+    )
+    from_position = models.CharField(
+        max_length=60,
+        help_text="Slug of the PositionTrack this plan starts from "
+                  "('team-member', 'trainer', 'zone-leader', 'shift-lead').",
+    )
+    target_role = models.CharField(max_length=60)
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    is_default = models.BooleanField(default=False)
+    # List of {"title": str, "kind": str}. Ordered as-is.
+    steps = models.JSONField(default=list, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_dev_track_plans',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['from_position', 'order', 'id']
+        indexes = [
+            models.Index(fields=['store', 'from_position']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.from_position} → {self.target_role})"
+
+
 class LeadershipArea(models.Model):
     """A user's selected leadership focus area (e.g., 'kitchen', 'drive-thru')."""
     user = models.ForeignKey(

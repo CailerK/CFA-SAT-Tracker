@@ -363,6 +363,19 @@ const LeadershipDevelopment = ({ user, onNavigate }) => {
     ? 0
     : Math.round((completedCount / todaysTasks.length) * 100);
 
+  // Keep unfinished tasks in the visible slots before completed tasks.
+  const orderedTodaysTasks = useMemo(() => {
+    return todaysTasks
+      .map((task, index) => ({ task, index }))
+      .sort((a, b) => {
+        const aDone = completedTaskIds.has(a.task.id);
+        const bDone = completedTaskIds.has(b.task.id);
+        if (aDone !== bDone) return aDone ? 1 : -1;
+        return a.index - b.index;
+      })
+      .map(({ task }) => task);
+  }, [todaysTasks, completedTaskIds]);
+
   const toggleTask = (id) => {
     setCompletedTaskIds((prev) => {
       const next = new Set(prev);
@@ -389,8 +402,8 @@ const LeadershipDevelopment = ({ user, onNavigate }) => {
   }));
 
   // Show first 5 tasks in collapsed mode (LD Growth shows 5 + "+N more").
-  const visibleTasks = tasksExpanded ? todaysTasks : todaysTasks.slice(0, 5);
-  const remainingTaskCount = Math.max(0, todaysTasks.length - 5);
+  const visibleTasks = tasksExpanded ? orderedTodaysTasks : orderedTodaysTasks.slice(0, 5);
+  const remainingTaskCount = Math.max(0, orderedTodaysTasks.length - 5);
 
   return (
     <div className="ld-page">

@@ -13,6 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import (
+    DevelopmentTrackPlan,
     Evaluation360,
     Evaluation360Template,
     EvaluationEvaluator,
@@ -25,6 +26,7 @@ from .models import (
 )
 from .permissions import IsAdminOrAbove, IsManagerOrAbove, subordinate_roles, is_admin_or_above
 from .serializers import (
+    DevelopmentTrackPlanSerializer,
     Evaluation360Serializer,
     Evaluation360TemplateSerializer,
     EvaluationEvaluatorSerializer,
@@ -641,3 +643,69 @@ def my_pathway(request):
         "progress": TrackProgressSerializer(progress, many=True).data,
         "current_track_id": current_id,
     })
+
+
+# =============================================================================
+# Manage Development Tracks (per-position certification/training plans)
+# =============================================================================
+
+class DevelopmentTrackPlanViewSet(StoreScopedViewSet):
+    """CRUD for the "Manage Development Tracks" section on Team Development.
+
+    Manager+ may create/edit/delete; all members may read so trainees can
+    see what's expected of them. Filter by `?from_position=team-member` to
+    fetch only the tracks for one career step.
+    """
+    queryset = DevelopmentTrackPlan.objects.all()
+    serializer_class = DevelopmentTrackPlanSerializer
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update',
+                           'destroy', 'reorder']:
+            return [IsManagerOrAbove()]
+        return super().get_permissions()
+
+    def get_queryset(self):
+        qs = (super().get_queryset()
+              .filter(archived_at__isnull=True)
+              .order_by('from_position', 'order', 'id'))
+        position = self.request.query_params.get('from_position')
+        if position:
+            qs = qs.filter(from_position=position)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        instance.archived_at = timezone.now()
+        instance.save(update_fields=['archived_at', 'updated_at'])
+
+    @action(detail=False, methods=['post'], url_path='reorder')
+    def reorder(self, request):
+        """Re-order plans within a single `from_position` bucket."""
+        position = request.data.get('from_position')
+        ids = request.data.get('plan_ids') or []
+        if not position or not isinstance(ids, list):
+            raise ValidationError(
+                {"detail": "Need from_position + plan_ids list."}
+            )
+        plans = {
+            p.id: p for p in DevelopmentTrackPlan.objects.filter(
+                store=request.user.store,
+                from_position=position,
+                archived_at__isnull=True,
+            )
+        }
+        updated = 0
+        for i, pid in enumerate(ids):
+            try:
+                pid_int = int(pid)
+            except (TypeError, ValueError):
+                continue
+            p = plans.get(pid_int)
+            if p and p.order != i:
+                p.order = i
+                p.save(update_fields=['order', 'updated_at'])
+                updated += 1
+        return Response({"updated": updated})
