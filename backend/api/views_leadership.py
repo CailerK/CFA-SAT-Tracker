@@ -655,9 +655,9 @@ def my_pathway(request):
 class DevelopmentTrackPlanViewSet(StoreScopedViewSet):
     """CRUD for the "Manage Development Tracks" section on Team Development.
 
-    Manager+ may create/edit/delete; all members may read so trainees can
-    see what's expected of them. Filter by `?from_position=team-member` to
-    fetch only the tracks for one career step.
+    Admins/superusers may create/edit/delete. All authenticated store members
+    may read so trainees can see what's expected of them. Filter by
+    `?from_position=team-member` to fetch only the tracks for one career step.
     """
     queryset = DevelopmentTrackPlan.objects.all()
     serializer_class = DevelopmentTrackPlanSerializer
@@ -665,7 +665,7 @@ class DevelopmentTrackPlanViewSet(StoreScopedViewSet):
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update',
                            'destroy', 'reorder']:
-            return [IsManagerOrAbove()]
+            return [IsAdminOrAbove()]
         return super().get_permissions()
 
     def get_queryset(self):
@@ -678,7 +678,26 @@ class DevelopmentTrackPlanViewSet(StoreScopedViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        store = getattr(self.request.user, "store", None)
+        if store is None:
+            raise PermissionDenied(
+                "You must be assigned to a store before creating development tracks."
+            )
+        position = serializer.validated_data.get("from_position")
+        save_kwargs = {"store": store, "created_by": self.request.user}
+        if position and "order" not in self.request.data:
+            max_order = (
+                DevelopmentTrackPlan.objects
+                .filter(
+                    store=store,
+                    from_position=position,
+                    archived_at__isnull=True,
+                )
+                .aggregate(models.Max("order"))
+                .get("order__max")
+            )
+            save_kwargs["order"] = 0 if max_order is None else max_order + 1
+        serializer.save(**save_kwargs)
 
     def perform_destroy(self, instance):
         instance.archived_at = timezone.now()

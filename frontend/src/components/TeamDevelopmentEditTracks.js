@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import leadershipService from '../services/leadership';
 import { isAdminOrAbove } from '../utils/access';
 import { ConfirmDialog, FormModal, TextField, SelectField } from './ui';
+import ManageDevelopmentTracks from './ManageDevelopmentTracks';
 import './TeamDevelopmentEditTracks.css';
 
 /* ===== Inline icons (Lucide-style; never import from lucide-react) ===== */
@@ -369,6 +370,10 @@ const TeamDevelopmentEditTracks = ({ user, onBack, onNavigate }) => {
             </div>
           )}
         </section>
+
+        {canEdit && (
+          <ManageDevelopmentTracks user={user} />
+        )}
       </div>
 
       {/* Edit role modal */}

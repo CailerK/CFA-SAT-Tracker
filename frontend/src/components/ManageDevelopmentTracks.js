@@ -17,7 +17,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import leadershipService from '../services/leadership';
-import { isManagerOrAbove } from '../utils/access';
+import { isAdminOrAbove } from '../utils/access';
 import { FormModal, ConfirmDialog, TextField, TextArea, SelectField } from './ui';
 import './ManageDevelopmentTracks.css';
 
@@ -60,7 +60,7 @@ const IconDrag   = (p) => <I {...p}><circle cx="9" cy="5" r="1"/><circle cx="9" 
 const ICONS = { pin: IconPin, cap: IconCap, target: IconTarget, award: IconAward };
 
 const ManageDevelopmentTracks = ({ user }) => {
-  const canManage = isManagerOrAbove(user);
+  const canManage = isAdminOrAbove(user);
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
