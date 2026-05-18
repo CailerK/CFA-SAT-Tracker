@@ -1241,8 +1241,8 @@ class QuickLinkSerializer(serializers.ModelSerializer):
 class Evaluation360TemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Evaluation360Template
-        fields = ["id", "name", "description", "sections_count", "is_active",
-                  "created_at", "updated_at"]
+        fields = ["id", "name", "description", "sections_count", "sections",
+                  "is_active", "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
@@ -1572,13 +1572,22 @@ class ChatMembershipSerializer(serializers.ModelSerializer):
 class ChatMessageSerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
     author_initials = serializers.SerializerMethodField()
+    reactions = serializers.SerializerMethodField()
+    pinned_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatMessage
-        fields = ["id", "channel", "author", "author_name", "author_initials",
-                  "body", "created_at", "edited_at"]
-        read_only_fields = ["id", "author", "author_name", "author_initials",
-                            "created_at"]
+        fields = [
+            "id", "channel", "author", "author_name", "author_initials",
+            "body", "created_at", "edited_at",
+            "pinned_at", "pinned_by", "pinned_by_name",
+            "reactions",
+        ]
+        read_only_fields = [
+            "id", "author", "author_name", "author_initials",
+            "created_at", "pinned_at", "pinned_by", "pinned_by_name",
+            "reactions",
+        ]
 
     def get_author_name(self, obj):
         u = obj.author
@@ -1586,6 +1595,34 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
     def get_author_initials(self, obj):
         return obj.author.initials if obj.author else "?"
+
+    def get_pinned_by_name(self, obj):
+        u = obj.pinned_by
+        if not u:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.email
+
+    def get_reactions(self, obj):
+        # Group reactions by emoji: [{emoji, count, user_ids, user_names, mine}].
+        request = self.context.get("request")
+        current_uid = getattr(getattr(request, "user", None), "id", None)
+        buckets = {}
+        for r in obj.reactions.select_related("user").all():
+            b = buckets.setdefault(r.emoji, {
+                "emoji": r.emoji,
+                "count": 0,
+                "user_ids": [],
+                "user_names": [],
+                "mine": False,
+            })
+            b["count"] += 1
+            b["user_ids"].append(r.user_id)
+            b["user_names"].append(
+                f"{r.user.first_name} {r.user.last_name}".strip() or r.user.email
+            )
+            if current_uid and r.user_id == current_uid:
+                b["mine"] = True
+        return list(buckets.values())
 
 
 # ============================================================================

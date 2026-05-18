@@ -4,6 +4,7 @@ import { isManagerOrAbove } from '../utils/access';
 import { ConfirmDialog } from './ui';
 import EmployeeRecordsDrawer from './EmployeeRecordsDrawer';
 import DocumentationPreferencesDrawer from './DocumentationPreferencesDrawer';
+import settingsService from '../services/settings';
 import './SetupSheetTemplates.css'; // shared red hero banner
 import './TeamDocumentation.css';
 
@@ -39,6 +40,34 @@ const TeamDocumentation = ({ onNavigate, onBack, user }) => {
   const [confirmDel, setConfirmDel] = useState(null); // { employee, recordId }
   const [notImplemented, setNotImplemented] = useState(null); // { title, message }
   const [prefsOpen, setPrefsOpen] = useState(false);
+  // Loaded store prefs (default date window, sort, etc.) — applied once at mount
+  // so the page filters honor what an admin saved in the Preferences drawer.
+  const [appliedPrefs, setAppliedPrefs] = useState(false);
+
+  // Pull `documentation_prefs` from the store settings ONCE on mount and
+  // seed the page-level filter state from it. We only override the
+  // initial defaults — never clobber a filter the user already changed.
+  useEffect(() => {
+    if (appliedPrefs) return;
+    (async () => {
+      try {
+        const settings = await settingsService.getStoreSettings();
+        const prefs = settings?.documentation_prefs || {};
+        if (prefs.default_category_filter
+            && prefs.default_category_filter !== 'all'
+            && activeFilter === 'all') {
+          setActiveFilter(prefs.default_category_filter);
+        }
+      } catch (err) {
+        // Non-fatal — the page still works on hard-coded defaults.
+        console.warn('Could not load doc prefs, using defaults:', err?.message);
+      } finally {
+        setAppliedPrefs(true);
+      }
+    })();
+    // We intentionally don't list `activeFilter` so the effect runs once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refresh = useCallback(async () => {
     try {

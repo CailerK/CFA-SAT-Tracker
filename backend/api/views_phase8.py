@@ -16,6 +16,7 @@ from .models import (
     ChatChannel,
     ChatMembership,
     ChatMessage,
+    ChatMessageReaction,
     GuestComplaint,
     Survey,
     SurveyAnswer,
@@ -369,6 +370,65 @@ class ChatMessageViewSet(StoreScopedViewSet):
         qs = qs[:100]
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='react')
+    def react(self, request, pk=None):
+        """
+        POST /api/chat/messages/:id/react/  body: {"emoji": "heart"}
+        Toggle the current user's reaction on a message — adds if missing,
+        removes if already present. Returns the updated message.
+        """
+        message = self.get_object()
+        emoji = (request.data.get('emoji') or '').strip()
+        valid = {c[0] for c in ChatMessageReaction.EMOJI_CHOICES}
+        if emoji not in valid:
+            return Response(
+                {"detail": f"Invalid emoji. Allowed: {sorted(valid)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        existing = ChatMessageReaction.objects.filter(
+            message=message, user=request.user, emoji=emoji,
+        ).first()
+        if existing:
+            existing.delete()
+        else:
+            ChatMessageReaction.objects.create(
+                message=message, user=request.user, emoji=emoji,
+            )
+        return Response(self.get_serializer(message).data)
+
+    @action(detail=True, methods=['post'], url_path='pin')
+    def pin(self, request, pk=None):
+        """
+        POST /api/chat/messages/:id/pin/  manager-only. Toggles pinned state.
+        """
+        from .permissions import is_manager_or_above
+        if not is_manager_or_above(request.user):
+            return Response({"detail": "Manager role required."},
+                            status=status.HTTP_403_FORBIDDEN)
+        message = self.get_object()
+        if message.pinned_at:
+            message.pinned_at = None
+            message.pinned_by = None
+        else:
+            message.pinned_at = timezone.now()
+            message.pinned_by = request.user
+        message.save(update_fields=['pinned_at', 'pinned_by'])
+        return Response(self.get_serializer(message).data)
+
+    def get_permissions(self):
+        # Authors may delete their own message; managers may delete any.
+        if self.action == 'destroy':
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
+    def perform_destroy(self, instance):
+        from .permissions import is_manager_or_above
+        from rest_framework.exceptions import PermissionDenied
+        u = self.request.user
+        if instance.author_id != u.id and not is_manager_or_above(u):
+            raise PermissionDenied("You can only delete your own messages.")
+        instance.delete()
 
 
 # =============================================================================

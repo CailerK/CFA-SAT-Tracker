@@ -69,6 +69,26 @@ const chatService = {
       { method: "DELETE" },
     );
   },
+
+  // ---- Reactions / pins / delete on messages ----
+  async toggleReaction(messageId, emoji) {
+    return apiService.request(`/chat/messages/${messageId}/react/`, {
+      method: "POST",
+      body: JSON.stringify({ emoji }),
+    });
+  },
+
+  async togglePin(messageId) {
+    return apiService.request(`/chat/messages/${messageId}/pin/`, {
+      method: "POST",
+    });
+  },
+
+  async deleteMessage(messageId) {
+    return apiService.request(`/chat/messages/${messageId}/`, {
+      method: "DELETE",
+    });
+  },
 };
 
 export default chatService;

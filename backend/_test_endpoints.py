@@ -407,6 +407,267 @@ if iso_c:
 
 
 # ---------------------------------------------------------------------------
+hdr("Dashboard priorities + Operator Overview (Weekly Digest)")
+# ---------------------------------------------------------------------------
+if mgr_c:
+    r = mgr_c.get("/api/dashboard/priorities/")
+    expect("Dashboard priorities returns 200 for manager",
+           r.status_code == 200,
+           fail_msg=f"status={r.status_code} body={r.content[:200]!r}")
+    if r.status_code == 200:
+        data = r.json()
+        expect("Priorities payload has count + items",
+               "count" in data and isinstance(data.get("items"), list),
+               fail_msg=f"keys={list(data.keys())}")
+
+if mgr_c:
+    r = mgr_c.get("/api/weekly-digest/")
+    expect("Operator Overview blocks non-admin manager",
+           r.status_code == 403,
+           fail_msg=f"got {r.status_code}; manager should be 403")
+
+if tm_c:
+    r = tm_c.get("/api/weekly-digest/")
+    expect("Operator Overview blocks team_member",
+           r.status_code == 403,
+           fail_msg=f"got {r.status_code}")
+
+if super_c:
+    r = super_c.get("/api/weekly-digest/")
+    expect("Operator Overview returns 200 for superuser",
+           r.status_code == 200,
+           fail_msg=f"got {r.status_code}")
+    if r.status_code == 200:
+        body = r.json()
+        for section in ("hero", "range", "evaluations", "documentation",
+                        "training", "leadership", "team_overview"):
+            expect(f"  digest has '{section}' section",
+                   section in body,
+                   fail_msg=f"missing key, got {list(body.keys())}")
+
+
+# ---------------------------------------------------------------------------
+hdr("Notifications — targeting + role-based visibility")
+# ---------------------------------------------------------------------------
+if tm_c:
+    r = tm_c.get("/api/notifications/")
+    expect("Team member lists own notifications", r.status_code == 200,
+           fail_msg=f"status={r.status_code}")
+    if r.status_code == 200:
+        rows = r.json()
+        if isinstance(rows, dict):
+            rows = rows.get("results", [])
+        # All returned rows must have requires_manager=False for a team member.
+        ok = all(not row.get("requires_manager") for row in rows)
+        expect("Team member never sees requires_manager=True notifications", ok,
+               fail_msg="leaked a manager-only notification")
+
+
+# ---------------------------------------------------------------------------
+hdr("Employee Record acknowledgement")
+# ---------------------------------------------------------------------------
+if mgr_c and tm_c:
+    # Manager creates a warning record on the team member.
+    tm_id = tm_c.get("/api/auth/me/").json().get("user", {}).get("id")
+    if tm_id:
+        import json as _json
+        r = mgr_c.post(
+            f"/api/team/documentation/employees/{tm_id}/records/",
+            data=_json.dumps({
+                "kind": "warning",
+                "title": "Smoke-test warning",
+                "body": "Auto-created by smoke test.",
+                "status": "documented",
+            }),
+            content_type="application/json",
+        )
+        expect("Manager creates warning record on team member",
+               r.status_code in (200, 201),
+               fail_msg=f"status={r.status_code} body={r.content[:200]!r}")
+        rec = r.json() if r.status_code in (200, 201) else {}
+        if rec.get("id"):
+            expect("Warning record auto-flagged requires_acknowledgement",
+                   rec.get("requires_acknowledgement") is True,
+                   fail_msg=f"got {rec.get('requires_acknowledgement')!r}")
+            # Team member acknowledges their own record.
+            r2 = tm_c.post(f"/api/team/documentation/records/{rec['id']}/acknowledge/")
+            expect("Team member can acknowledge their own record",
+                   r2.status_code == 200,
+                   fail_msg=f"status={r2.status_code}")
+            if r2.status_code == 200:
+                ack = r2.json()
+                expect("acknowledged_at stamp set after POST",
+                       ack.get("acknowledged_at") is not None,
+                       fail_msg="acknowledged_at still null")
+            # Clean up.
+            mgr_c.delete(f"/api/team/documentation/records/{rec['id']}/")
+
+
+# ---------------------------------------------------------------------------
+hdr("Chat — reactions + pin + members")
+# ---------------------------------------------------------------------------
+if tm_c:
+    r = tm_c.get("/api/chat/channels/")
+    if r.status_code == 200:
+        chans = r.json()
+        if isinstance(chans, dict):
+            chans = chans.get("results", [])
+        if chans:
+            channel_id = chans[0]["id"]
+            # Members endpoint
+            r2 = tm_c.get(f"/api/chat/channels/{channel_id}/members/")
+            expect("Channel members endpoint returns list",
+                   r2.status_code == 200 and isinstance(r2.json(), list),
+                   fail_msg=f"status={r2.status_code}")
+
+            # Post a message, then react / pin / delete it.
+            import json as _json
+            r3 = tm_c.post(
+                "/api/chat/messages/",
+                data=_json.dumps({"channel": channel_id, "body": "smoke-test msg"}),
+                content_type="application/json",
+            )
+            expect("Team member can post a chat message",
+                   r3.status_code in (200, 201),
+                   fail_msg=f"status={r3.status_code} body={r3.content[:200]!r}")
+            if r3.status_code in (200, 201):
+                msg = r3.json()
+                msg_id = msg.get("id")
+                # React with heart
+                r4 = tm_c.post(
+                    f"/api/chat/messages/{msg_id}/react/",
+                    data=_json.dumps({"emoji": "heart"}),
+                    content_type="application/json",
+                )
+                expect("Toggle reaction returns 200",
+                       r4.status_code == 200,
+                       fail_msg=f"status={r4.status_code}")
+                if r4.status_code == 200:
+                    updated = r4.json()
+                    rxs = updated.get("reactions") or []
+                    has_heart = any(r.get("emoji") == "heart" and r.get("mine") for r in rxs)
+                    expect("Heart reaction appears with mine=True", has_heart,
+                           fail_msg=f"reactions={rxs}")
+
+                # Team member cannot pin (manager-only).
+                r5 = tm_c.post(f"/api/chat/messages/{msg_id}/pin/")
+                expect("Team member is blocked from pinning",
+                       r5.status_code == 403,
+                       fail_msg=f"got {r5.status_code}")
+
+                if mgr_c:
+                    r6 = mgr_c.post(f"/api/chat/messages/{msg_id}/pin/")
+                    expect("Manager can pin a message",
+                           r6.status_code == 200,
+                           fail_msg=f"status={r6.status_code}")
+
+                # Author deletes own message.
+                r7 = tm_c.delete(f"/api/chat/messages/{msg_id}/")
+                expect("Author can delete their own message",
+                       r7.status_code in (200, 204),
+                       fail_msg=f"status={r7.status_code}")
+
+
+# ---------------------------------------------------------------------------
+hdr("Development Track Plans (Manage Tracks)")
+# ---------------------------------------------------------------------------
+if mgr_c:
+    r = mgr_c.get("/api/team-development/plans/")
+    expect("Plans list returns 200 for manager",
+           r.status_code == 200,
+           fail_msg=f"status={r.status_code}")
+
+if tm_c:
+    # Team member can read but not write.
+    import json as _json
+    r = tm_c.post(
+        "/api/team-development/plans/",
+        data=_json.dumps({
+            "from_position": "team-member",
+            "target_role": "Trainer",
+            "name": "Should not be created",
+        }),
+        content_type="application/json",
+    )
+    expect("Team member is blocked from creating dev plans",
+           r.status_code == 403,
+           fail_msg=f"got {r.status_code}")
+
+
+# ---------------------------------------------------------------------------
+hdr("Documentation Preferences (JSON field on StoreSettings)")
+# ---------------------------------------------------------------------------
+if mgr_c:
+    r = mgr_c.get("/api/stores/me/settings/")
+    expect("Store settings returns 200", r.status_code == 200,
+           fail_msg=f"status={r.status_code}")
+    if r.status_code == 200:
+        body = r.json()
+        expect("documentation_prefs key exists",
+               "documentation_prefs" in body,
+               fail_msg=f"keys={list(body.keys())[:10]}")
+
+    # PATCH the prefs.
+    import json as _json
+    r2 = mgr_c.patch(
+        "/api/stores/me/settings/",
+        data=_json.dumps({
+            "documentation_prefs": {
+                "default_date_window_days": 30,
+                "default_view_mode": "list",
+                "default_sort_by": "name",
+                "default_sort_order": "asc",
+                "default_category_filter": "warning",
+                "orange_threshold_count": 5,
+                "red_card_action_kinds": ["termination"],
+                "disciplinary_templates": [],
+            },
+        }),
+        content_type="application/json",
+    )
+    expect("Manager can PATCH documentation_prefs",
+           r2.status_code == 200,
+           fail_msg=f"status={r2.status_code}")
+
+
+# ---------------------------------------------------------------------------
+hdr("360 Template sections field")
+# ---------------------------------------------------------------------------
+if mgr_c:
+    r = mgr_c.get("/api/leadership/360/templates/")
+    if r.status_code == 200:
+        templates = r.json()
+        if isinstance(templates, dict):
+            templates = templates.get("results", [])
+        if templates:
+            tid = templates[0]["id"]
+            import json as _json
+            r2 = mgr_c.patch(
+                f"/api/leadership/360/templates/{tid}/",
+                data=_json.dumps({
+                    "sections": [{
+                        "title": "Communication",
+                        "description": "Smoke test section",
+                        "questions": [
+                            {"text": "Speaks up", "kind": "rating",
+                             "scale_min": 1, "scale_max": 5},
+                            {"text": "Anything else?", "kind": "text"},
+                        ],
+                    }],
+                }),
+                content_type="application/json",
+            )
+            expect("Template sections PATCH returns 200",
+                   r2.status_code == 200,
+                   fail_msg=f"status={r2.status_code} body={r2.content[:200]!r}")
+            if r2.status_code == 200:
+                got = r2.json().get("sections") or []
+                expect("Saved sections round-trip with 2 questions",
+                       len(got) == 1 and len(got[0].get("questions") or []) == 2,
+                       fail_msg=f"got={got}")
+
+
+# ---------------------------------------------------------------------------
 hdr("Summary")
 # ---------------------------------------------------------------------------
 print(f"PASS: {PASS}")

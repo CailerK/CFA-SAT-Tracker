@@ -1528,7 +1528,21 @@ class QuickLink(models.Model):
 # =============================================================================
 
 class Evaluation360Template(models.Model):
-    """A reusable template for 360 evaluations with sections/questions."""
+    """A reusable template for 360 evaluations with sections/questions.
+
+    `sections` is a JSON list:
+      [
+        {
+          "title": "Communication",
+          "description": "...",
+          "questions": [
+            {"text": "Speaks up in meetings", "kind": "rating", "scale_min": 1, "scale_max": 5},
+            {"text": "Anything else?",         "kind": "text"},
+          ],
+        },
+        ...
+      ]
+    """
     store = models.ForeignKey(
         Store, on_delete=models.CASCADE, related_name='evaluation_360_templates'
     )
@@ -1538,6 +1552,7 @@ class Evaluation360Template(models.Model):
         default=0,
         help_text="Number of sections/question groups in this template.",
     )
+    sections = models.JSONField(default=list, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -2135,6 +2150,12 @@ class ChatMessage(models.Model):
     body = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     edited_at = models.DateTimeField(null=True, blank=True)
+    # When a manager pins a message it stays at the top of the channel.
+    pinned_at = models.DateTimeField(null=True, blank=True)
+    pinned_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='pinned_chat_messages',
+    )
 
     class Meta:
         ordering = ['created_at', 'id']
@@ -2146,6 +2167,43 @@ class ChatMessage(models.Model):
         author_name = self.author.get_full_name() if self.author else "Unknown"
         preview = self.body[:50] + "..." if len(self.body) > 50 else self.body
         return f"{author_name}: {preview}"
+
+
+class ChatMessageReaction(models.Model):
+    """A single user's emoji reaction on a chat message.
+
+    Constraint: one (message, user, emoji) triple — clicking the same emoji
+    twice toggles it off, clicking a different one adds another row.
+    """
+    EMOJI_CHOICES = [
+        ('heart',     '❤️'),
+        ('thumbs_up', '👍'),
+        ('thumbs_dn', '👎'),
+        ('party',     '🎉'),
+        ('eyes',      '👀'),
+        ('check',     '✅'),
+    ]
+    message = models.ForeignKey(
+        ChatMessage, on_delete=models.CASCADE, related_name='reactions',
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='chat_reactions',
+    )
+    emoji = models.CharField(max_length=20, choices=EMOJI_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['message', 'user', 'emoji'],
+                name='unique_reaction_per_user_message_emoji',
+            ),
+        ]
+        indexes = [models.Index(fields=['message'])]
+
+    def __str__(self):
+        return f"{self.user} {self.emoji} on msg {self.message_id}"
 
 
 # =============================================================================

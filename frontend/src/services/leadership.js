@@ -55,6 +55,19 @@ const leadershipService = {
     });
   },
 
+  // Alias used by TakeEvaluationModal — keep both names so old call-sites
+  // don't break.
+  async respondToEvaluation360(id, responses) {
+    return apiService.request(`/leadership/360/${id}/respond/`, {
+      method: "POST",
+      body: JSON.stringify({ responses }),
+    });
+  },
+
+  async getEvaluationTemplate(id) {
+    return apiService.request(`/leadership/360/templates/${id}/`);
+  },
+
   async getEvaluationStats() {
     return apiService.request("/leadership/360/stats/");
   },

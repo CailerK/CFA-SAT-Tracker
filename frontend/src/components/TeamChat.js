@@ -50,6 +50,17 @@ const slugifyChannelName = (name) => (name || '')
   .replace(/^-+|-+$/g, '')
   .slice(0, 40);
 
+// Map backend reaction slugs → glyphs rendered in the bubble + hover toolbar.
+// Must mirror ChatMessageReaction.EMOJI_CHOICES on the backend.
+const EMOJI_GLYPHS = {
+  heart:     '❤️',
+  thumbs_up: '👍',
+  thumbs_dn: '👎',
+  party:     '🎉',
+  eyes:      '👀',
+  check:     '✅',
+};
+
 // Lucide-style inline icons
 const I = ({ size = 16, children, ...p }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -118,11 +129,15 @@ const TeamChat = ({ onBack, user }) => {
       const rows = res.results || res || [];
       setMessages(rows.map((m) => ({
         id: m.id,
+        authorId: m.author,
         user: m.author_name || 'Anonymous',
         avatar: m.author_initials || '??',
         message: m.body || '',
         time: formatTime(m.created_at),
         isOwn: user && m.author === user.id,
+        reactions: Array.isArray(m.reactions) ? m.reactions : [],
+        pinnedAt: m.pinned_at || null,
+        pinnedByName: m.pinned_by_name || null,
       })));
       await chatService.markRead(selectedChat);
     } catch (err) {
@@ -344,14 +359,90 @@ const TeamChat = ({ onBack, user }) => {
                   </div>
                 )}
                 {messages.map(m => (
-                  <div key={m.id} className={`tc-msg ${m.isOwn ? 'is-own' : ''}`}>
+                  <div key={m.id} className={`tc-msg ${m.isOwn ? 'is-own' : ''} ${m.pinnedAt ? 'is-pinned' : ''}`}>
                     <div className="tc-msg-avatar" aria-hidden="true">{m.avatar}</div>
                     <div className="tc-msg-body">
+                      {m.pinnedAt && (
+                        <div className="tc-msg-pin-banner">📌 Pinned{m.pinnedByName ? ` by ${m.pinnedByName}` : ''}</div>
+                      )}
                       <div className="tc-msg-meta">
                         <span className="tc-msg-user">{m.user}</span>
                         <span className="tc-msg-time">{m.time}</span>
                       </div>
                       <div className="tc-msg-text">{m.message}</div>
+
+                      {/* Reaction bubble row (only shown if any reactions exist) */}
+                      {(m.reactions || []).length > 0 && (
+                        <div className="tc-msg-reactions">
+                          {m.reactions.map(r => (
+                            <button
+                              key={r.emoji}
+                              type="button"
+                              className={`tc-reaction ${r.mine ? 'is-mine' : ''}`}
+                              onClick={async () => {
+                                try {
+                                  await chatService.toggleReaction(m.id, r.emoji);
+                                  await loadMessages();
+                                } catch (e) { console.error('react failed', e); }
+                              }}
+                              title={(r.user_names || []).join(', ')}
+                            >
+                              {EMOJI_GLYPHS[r.emoji] || '·'} {r.count}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Hover toolbar — appears top-right of each message */}
+                      <div className="tc-msg-tools" role="toolbar">
+                        {Object.entries(EMOJI_GLYPHS).slice(0, 4).map(([key, glyph]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            className="tc-tool-btn"
+                            title={key.replace('_', ' ')}
+                            onClick={async () => {
+                              try {
+                                await chatService.toggleReaction(m.id, key);
+                                await loadMessages();
+                              } catch (e) { console.error('react failed', e); }
+                            }}
+                          >
+                            <span aria-hidden="true">{glyph}</span>
+                          </button>
+                        ))}
+                        {canManage && (
+                          <button
+                            type="button"
+                            className={`tc-tool-btn ${m.pinnedAt ? 'is-active' : ''}`}
+                            title={m.pinnedAt ? 'Unpin' : 'Pin'}
+                            onClick={async () => {
+                              try {
+                                await chatService.togglePin(m.id);
+                                await loadMessages();
+                              } catch (e) { console.error('pin failed', e); }
+                            }}
+                          >
+                            <span aria-hidden="true">📌</span>
+                          </button>
+                        )}
+                        {(m.isOwn || canManage) && (
+                          <button
+                            type="button"
+                            className="tc-tool-btn tc-tool-danger"
+                            title="Delete"
+                            onClick={async () => {
+                              if (!window.confirm('Delete this message?')) return;
+                              try {
+                                await chatService.deleteMessage(m.id);
+                                await loadMessages();
+                              } catch (e) { console.error('delete failed', e); }
+                            }}
+                          >
+                            <span aria-hidden="true">🗑️</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import leadershipService from '../services/leadership';
+import TakeEvaluationModal from './TakeEvaluationModal';
 import './Leadership360Evaluations.css';
 import { isManagerOrAbove } from '../utils/access';
 import {
@@ -82,6 +83,9 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
   const [deleteTemplate, setDeleteTemplate] = useState(null); // template record
   // evalSentinel: { title, message } | null — for not-implemented Take/View Evaluation flow.
   const [evalSentinel, setEvalSentinel] = useState(null);
+  // takingEvaluation: the Evaluation360 record being filled out, or null.
+  const [takingEvaluation, setTakingEvaluation] = useState(null);
+  const [takingTemplate, setTakingTemplate] = useState(null);
 
   const displayName = user?.firstName || user?.name || 'Demo User';
 
@@ -141,8 +145,46 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
       name: template.name || '',
       description: template.description || '',
       sections_count: template.sections_count ?? 0,
+      sections: Array.isArray(template.sections) ? template.sections : [],
     });
   };
+
+  // ---- Section + question editing inside the template modal ----
+  // We treat sections as a flat list of {title, description?, questions:[]}.
+  // sections_count auto-derives from sections.length on save.
+  const addSection = () => setTemplateModal(m => m && ({
+    ...m,
+    sections: [...(m.sections || []), { title: '', description: '', questions: [] }],
+  }));
+  const updateSection = (sIdx, patch) => setTemplateModal(m => m && ({
+    ...m,
+    sections: (m.sections || []).map((s, i) => i === sIdx ? { ...s, ...patch } : s),
+  }));
+  const removeSection = (sIdx) => setTemplateModal(m => m && ({
+    ...m,
+    sections: (m.sections || []).filter((_, i) => i !== sIdx),
+  }));
+  const addQuestion = (sIdx) => setTemplateModal(m => m && ({
+    ...m,
+    sections: (m.sections || []).map((s, i) => i === sIdx ? {
+      ...s,
+      questions: [...(s.questions || []), { text: '', kind: 'rating', scale_min: 1, scale_max: 5 }],
+    } : s),
+  }));
+  const updateQuestion = (sIdx, qIdx, patch) => setTemplateModal(m => m && ({
+    ...m,
+    sections: (m.sections || []).map((s, i) => i === sIdx ? {
+      ...s,
+      questions: (s.questions || []).map((q, j) => j === qIdx ? { ...q, ...patch } : q),
+    } : s),
+  }));
+  const removeQuestion = (sIdx, qIdx) => setTemplateModal(m => m && ({
+    ...m,
+    sections: (m.sections || []).map((s, i) => i === sIdx ? {
+      ...s,
+      questions: (s.questions || []).filter((_, j) => j !== qIdx),
+    } : s),
+  }));
 
   const submitTemplate = async () => {
     if (!templateModal) return;
@@ -152,10 +194,27 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
       throw new Error('Missing name');
     }
     try {
+      // Clean sections — drop empty section titles / empty questions / blank text.
+      const cleanedSections = (templateModal.sections || [])
+        .map(s => ({
+          title: (s.title || '').trim(),
+          description: (s.description || '').trim(),
+          questions: (s.questions || [])
+            .filter(q => (q.text || '').trim())
+            .map(q => ({
+              text: q.text.trim(),
+              kind: q.kind || 'rating',
+              scale_min: Number(q.scale_min) || 1,
+              scale_max: Number(q.scale_max) || 5,
+            })),
+        }))
+        .filter(s => s.title);
+
       const payload = {
         name: name.trim(),
         description: (description || '').trim(),
-        sections_count: Number(sections_count) || 0,
+        sections_count: cleanedSections.length || Number(sections_count) || 0,
+        sections: cleanedSections,
       };
       if (id) {
         await leadershipService.updateTemplate(id, payload);
@@ -187,13 +246,20 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
   // The full take/view-evaluation UI is significant work and is tracked
   // separately on the wiring plan; surface a sentinel so users see why
   // nothing happens on click.
-  const handleEvaluationClick = (evaluation) => {
-    setEvalSentinel({
-      title: 'Take / View Evaluation — coming soon',
-      message:
-        `“${evaluation.name}”’s 360° review opens here. The full take-evaluation flow `
-        + `(rating form, evaluator selection, results dashboard) is on the roadmap. `
-        + `Backend endpoints ("respondToEvaluation", "getEvaluation") are already live.`,
+  const handleEvaluationClick = async (evaluation) => {
+    // Fetch the template so the modal can render its sections. We look up
+    // by name first since the eval row carries `template_name`, then fall
+    // back to the existing templates list by ID if present.
+    let templateRecord = templates.find(t => t.name === evaluation.template);
+    if (!templateRecord && evaluation.templateId) {
+      try {
+        templateRecord = await leadershipService.getEvaluationTemplate(evaluation.templateId);
+      } catch (_) { /* swallow — modal still opens with empty-state */ }
+    }
+    setTakingTemplate(templateRecord || null);
+    setTakingEvaluation({
+      id: evaluation.id,
+      evaluatee_name: evaluation.name,
     });
   };
 
@@ -453,7 +519,7 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
         isOpen={!!templateModal}
         title={templateModal?.id ? 'Edit 360° Template' : 'Create 360° Template'}
         submitLabel={templateModal?.id ? 'Save Template' : 'Create Template'}
-        size="sm"
+        size="lg"
         onClose={() => setTemplateModal(null)}
         onSubmit={submitTemplate}
         submitDisabled={!templateModal?.name?.trim()}
@@ -474,14 +540,131 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
           placeholder="Briefly describe when this template should be used."
           rows={3}
         />
-        <NumberField
-          label="Sections Count"
-          value={templateModal?.sections_count ?? ''}
-          onChange={(v) => setTemplateModal((m) => m && ({ ...m, sections_count: v }))}
-          placeholder="e.g. 6"
-          step="1"
-          required
-        />
+
+        {/* ---- Sections + questions editor ---- */}
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+            <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#111827' }}>
+              Sections ({(templateModal?.sections || []).length})
+            </h4>
+            <span style={{ flex: 1 }} />
+            <button
+              type="button"
+              onClick={addSection}
+              style={{
+                appearance: 'none', background: '#E51636', color: '#fff', border: 0,
+                fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 8,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >+ Add Section</button>
+          </div>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#6b7280' }}>
+            Each section groups related questions. Evaluators see them in order.
+          </p>
+
+          {(templateModal?.sections || []).length === 0 && (
+            <div style={{
+              padding: 16, textAlign: 'center', fontSize: 13, color: '#6b7280',
+              border: '2px dashed #e5e7eb', borderRadius: 10,
+            }}>
+              No sections yet. Click "+ Add Section" to start.
+            </div>
+          )}
+
+          {(templateModal?.sections || []).map((sec, sIdx) => (
+            <div key={sIdx} style={{
+              background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: 10,
+              padding: 12, marginBottom: 10,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{
+                  width: 24, height: 24, borderRadius: 999, background: '#E51636',
+                  color: '#fff', display: 'inline-flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: 11, fontWeight: 700,
+                }}>{sIdx + 1}</span>
+                <input
+                  type="text"
+                  value={sec.title || ''}
+                  placeholder="Section title"
+                  onChange={(e) => updateSection(sIdx, { title: e.target.value })}
+                  style={{
+                    flex: 1, border: '1px solid #d1d5db', borderRadius: 8,
+                    padding: '6px 10px', fontSize: 13, fontFamily: 'inherit',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeSection(sIdx)}
+                  style={{
+                    appearance: 'none', background: 'transparent', border: 0,
+                    color: '#9ca3af', cursor: 'pointer', fontSize: 18, padding: '0 6px',
+                  }}
+                  title="Remove section"
+                >🗑️</button>
+              </div>
+
+              <textarea
+                value={sec.description || ''}
+                placeholder="Optional section description"
+                onChange={(e) => updateSection(sIdx, { description: e.target.value })}
+                rows={2}
+                style={{
+                  width: '100%', border: '1px solid #d1d5db', borderRadius: 8,
+                  padding: '6px 10px', fontSize: 12, fontFamily: 'inherit',
+                  resize: 'vertical', marginBottom: 8, boxSizing: 'border-box',
+                }}
+              />
+
+              {(sec.questions || []).map((q, qIdx) => (
+                <div key={qIdx} style={{
+                  display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6,
+                }}>
+                  <input
+                    type="text"
+                    value={q.text || ''}
+                    placeholder="Question text"
+                    onChange={(e) => updateQuestion(sIdx, qIdx, { text: e.target.value })}
+                    style={{
+                      flex: 1, border: '1px solid #d1d5db', borderRadius: 8,
+                      padding: '6px 10px', fontSize: 12, fontFamily: 'inherit',
+                    }}
+                  />
+                  <select
+                    value={q.kind || 'rating'}
+                    onChange={(e) => updateQuestion(sIdx, qIdx, { kind: e.target.value })}
+                    style={{
+                      border: '1px solid #d1d5db', borderRadius: 8,
+                      padding: '6px 8px', fontSize: 12, fontFamily: 'inherit',
+                    }}
+                  >
+                    <option value="rating">Rating 1–{q.scale_max || 5}</option>
+                    <option value="text">Free text</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeQuestion(sIdx, qIdx)}
+                    style={{
+                      appearance: 'none', background: 'transparent', border: 0,
+                      color: '#9ca3af', cursor: 'pointer', fontSize: 16, padding: '0 4px',
+                    }}
+                    title="Remove question"
+                  >×</button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => addQuestion(sIdx)}
+                style={{
+                  appearance: 'none', background: '#fff1f2', color: '#E51636',
+                  border: '1px solid #fecaca', fontSize: 12, fontWeight: 600,
+                  padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+                  fontFamily: 'inherit', marginTop: 4,
+                }}
+              >+ Add Question</button>
+            </div>
+          ))}
+        </div>
       </FormModal>
 
       {/* ---- Delete template confirm ---- */}
@@ -506,6 +689,15 @@ const Leadership360Evaluations = ({ user, onNavigate }) => {
         cancelLabel="Close"
         onConfirm={() => setEvalSentinel(null)}
         onClose={() => setEvalSentinel(null)}
+      />
+
+      {/* Take Evaluation modal — opens on evaluation-card click. */}
+      <TakeEvaluationModal
+        isOpen={!!takingEvaluation}
+        evaluation={takingEvaluation}
+        template={takingTemplate}
+        onClose={() => { setTakingEvaluation(null); setTakingTemplate(null); }}
+        onSubmitted={refresh}
       />
     </div>
   );

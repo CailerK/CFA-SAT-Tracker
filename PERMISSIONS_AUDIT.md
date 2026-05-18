@@ -167,23 +167,39 @@ const canAdmin  = isAdminOrAbove(user);
 
 ---
 
-## 5. Known gaps / TODO
+## 5. Closed gaps (was "Known gaps / TODO" — now historical)
 
-- **Task #48 (still open):** Separate demo + test users into different
-  stores so cross-tenant isolation can be smoke-tested in production.
-- **Chat reactions** (heart/thumbs/pin per LD Growth screenshot): model +
-  endpoints not yet built. Will need its own ChatMessageReaction model
-  with `IsAuthenticated` for create + same-author-or-manager for delete.
-- **Documentation Preferences drawer** (per `/team-documentation`
-  Settings gear): UI spec captured; backend uses
-  `StoreSettings.documentation_prefs` JSONField (not yet added).
-- **Pending Acknowledgment** flow on employee records (Operator Overview
-  surfaces the count, but there's no UI for an employee to actually
-  acknowledge a record yet).
-- **360 Take Evaluation / Results view**: backend `respond()` action
-  exists; the rating UI is still a sentinel modal.
+All previously-tracked gaps have shipped:
 
-When any of these ships, update this matrix.
+- **Task #48** ✓ Demo + test users split into a separate sandbox store
+  (number `00000`); `init_railway_users.py` migrates legacy users on
+  every deploy.
+- **Chat reactions** ✓ `ChatMessageReaction` model + `POST
+  /chat/messages/:id/react/` (toggle) + `POST /chat/messages/:id/pin/`
+  (manager+) + `DELETE /chat/messages/:id/` (author or manager+). Hover
+  toolbar + inline reaction-bubble row + pinned banner all wired.
+- **Documentation Preferences drawer** ✓ `StoreSettings.documentation_prefs`
+  JSONField + slide-out drawer (date filter, view mode, sort, card
+  highlights, disciplinary templates). Manager-only write.
+  `TeamDocumentation.js` reads `default_category_filter` on mount as
+  initial filter state.
+- **Pending Acknowledgment** ✓ `EmployeeRecord.{requires_acknowledgement,
+  acknowledged_at, acknowledged_by}` + `POST
+  /team/documentation/records/:id/acknowledge/` (subject or manager+).
+  UI: amber "Awaiting acknowledgement" banner with Acknowledge button →
+  emerald "✓ Acknowledged by …" banner on success.
+- **360 Take Evaluation / Results view** ✓ `Evaluation360Template.sections`
+  JSON list of `{title, description, questions: [{text, kind,
+  scale_min, scale_max}]}`. `TakeEvaluationModal` renders rating buttons
+  + text areas + validates all rating questions before submit. Wired to
+  existing `POST /leadership/360/:id/respond/`.
+- **Documentation Analytics** ✓ Already built end-to-end — backend
+  `documentation_analytics()` + frontend `TeamDocumentationAnalytics.js`
+  with 3 tabs (Overview / Attention Needed / All Employees) and bar
+  chart over 7 risk buckets. Routed from the analytics icon on the
+  Documentation banner.
+
+If you find a NEW gap, add it here.
 
 ---
 
