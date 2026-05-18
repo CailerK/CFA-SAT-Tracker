@@ -74,6 +74,13 @@ const teamService = {
     });
   },
 
+  async acknowledgeRecord(recordId) {
+    return apiService.request(
+      `/team/documentation/records/${recordId}/acknowledge/`,
+      { method: "POST" },
+    );
+  },
+
   // ---------------- Training ----------------
 
   async listPlans() {

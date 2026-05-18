@@ -81,6 +81,8 @@ class StoreSettingsSerializer(serializers.ModelSerializer):
             "waste_goal_daily",
             "waste_goal_weekly",
             "waste_goal_monthly",
+            "dev_tracks_visible_to_team",
+            "documentation_prefs",
             "updated_at",
         ]
         read_only_fields = ["updated_at"]
@@ -1104,6 +1106,7 @@ class TeamMemberSerializer(serializers.ModelSerializer):
 class EmployeeRecordSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
     recorded_by_name = serializers.SerializerMethodField()
+    acknowledged_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = EmployeeRecord
@@ -1112,9 +1115,14 @@ class EmployeeRecordSerializer(serializers.ModelSerializer):
             "recorded_by", "recorded_by_name",
             "kind", "title", "body", "status",
             "recorded_at", "resolved_at",
+            "requires_acknowledgement",
+            "acknowledged_at", "acknowledged_by", "acknowledged_by_name",
         ]
-        read_only_fields = ["id", "user_name", "recorded_by", "recorded_by_name",
-                            "recorded_at"]
+        read_only_fields = [
+            "id", "user_name", "recorded_by", "recorded_by_name",
+            "recorded_at",
+            "acknowledged_at", "acknowledged_by", "acknowledged_by_name",
+        ]
 
     def _name(self, u):
         if not u:
@@ -1126,6 +1134,9 @@ class EmployeeRecordSerializer(serializers.ModelSerializer):
 
     def get_recorded_by_name(self, obj):
         return self._name(obj.recorded_by)
+
+    def get_acknowledged_by_name(self, obj):
+        return self._name(obj.acknowledged_by)
 
 
 # ============================================================================

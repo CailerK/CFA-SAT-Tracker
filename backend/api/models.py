@@ -66,6 +66,32 @@ def _default_cleaning_settings():
     }
 
 
+def _default_documentation_prefs():
+    """Defaults for the Team Documentation preferences drawer.
+
+    Mirrors LD Growth's "Documentation Preferences" panel: how the
+    documentation page filters/sorts by default + which discipline actions
+    paint the employee card red + the editable disciplinary template list.
+    """
+    return {
+        "default_date_window_days": 60,
+        "default_view_mode": "card",          # "card" | "list"
+        "default_sort_by": "date",            # "date" | "name"
+        "default_sort_order": "desc",         # "desc" | "asc"
+        "default_category_filter": "all",     # "all" | "warning" | "pip" | "admin"
+        # Threshold above which an employee card flashes orange.
+        "orange_threshold_count": 3,
+        # Disciplinary kinds that make an employee card flash red.
+        "red_card_action_kinds": [
+            "written_warning", "final_warning", "suspension",
+            "termination", "pip",
+        ],
+        # Manager-editable shortcut templates rendered in the "+ Add Record"
+        # picker. Each entry: {category, label, document_type|null}.
+        "disciplinary_templates": [],
+    }
+
+
 class StoreSettings(models.Model):
     """Per-store toggles and configuration. 1:1 with Store."""
     store = models.OneToOneField(
@@ -93,6 +119,14 @@ class StoreSettings(models.Model):
     dev_tracks_visible_to_team = models.BooleanField(
         default=True,
         help_text="When off, team-members can no longer see the Career Path on Team Development.",
+    )
+    # Team Documentation → Preferences drawer (gear icon on hero banner).
+    # JSON blob so the drawer can evolve without further migrations.
+    # Default value comes from `_default_documentation_prefs()` below.
+    documentation_prefs = models.JSONField(
+        default=lambda: _default_documentation_prefs(),
+        blank=True,
+        help_text="See _default_documentation_prefs() for shape.",
     )
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1341,6 +1375,15 @@ class EmployeeRecord(models.Model):
     )
     recorded_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
+    # When the employee acknowledges seeing the record (signs off on it).
+    # `requires_acknowledgement` flips True for warnings / PIPs at creation
+    # time; the employee then sees a banner + an Acknowledge button.
+    requires_acknowledgement = models.BooleanField(default=False)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    acknowledged_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='records_acknowledged',
+    )
 
     class Meta:
         ordering = ['-recorded_at', '-id']

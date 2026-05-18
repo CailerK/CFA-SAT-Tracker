@@ -42,11 +42,37 @@ const formatDate = (iso) => {
   }
 };
 
-const EmployeeRecordsDrawer = ({ isOpen, employee, canManage, onClose, onChanged }) => {
+const EmployeeRecordsDrawer = ({ isOpen, employee, canManage, currentUser, onClose, onChanged }) => {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(null); // { record }
+  // Track per-row acknowledge in-flight so the button can show "Signing…"
+  const [ackingId, setAckingId] = useState(null);
+
+  // Optimistic acknowledge — flip the row immediately, roll back on error.
+  const handleAcknowledge = async (record) => {
+    setAckingId(record.id);
+    const prev = records;
+    const stampedBy = currentUser
+      ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim()
+        || currentUser.email
+      : 'You';
+    setRecords(rs => rs.map(r => r.id === record.id ? {
+      ...r,
+      acknowledged_at: new Date().toISOString(),
+      acknowledged_by_name: stampedBy,
+    } : r));
+    try {
+      await teamService.acknowledgeRecord(record.id);
+      if (onChanged) await onChanged();
+    } catch (err) {
+      console.error('Acknowledge failed:', err);
+      setRecords(prev);
+    } finally {
+      setAckingId(null);
+    }
+  };
 
   const refresh = useCallback(async () => {
     if (!employee?.id) return;
@@ -156,6 +182,34 @@ const EmployeeRecordsDrawer = ({ isOpen, employee, canManage, onClose, onChanged
               </div>
 
               {r.body && <p className="erd-record-body">{r.body}</p>}
+
+              {/* Acknowledgement banner — only shown when this record needs
+                  an employee sign-off. Subject + managers can press the
+                  button; everyone else sees the status read-only. */}
+              {r.requires_acknowledgement && (
+                <div className={`erd-ack ${r.acknowledged_at ? 'is-ackd' : 'is-pending'}`}>
+                  {r.acknowledged_at ? (
+                    <span className="erd-ack-text">
+                      ✓ Acknowledged {formatDate(r.acknowledged_at)}
+                      {r.acknowledged_by_name ? ` by ${r.acknowledged_by_name}` : ''}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="erd-ack-text">Awaiting acknowledgement</span>
+                      {(canManage || (currentUser && currentUser.id === employee.id)) && (
+                        <button
+                          type="button"
+                          className="erd-ack-btn"
+                          disabled={ackingId === r.id}
+                          onClick={() => handleAcknowledge(r)}
+                        >
+                          {ackingId === r.id ? 'Signing…' : 'Acknowledge'}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </article>
           ))}
         </div>

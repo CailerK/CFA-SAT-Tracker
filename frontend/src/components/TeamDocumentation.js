@@ -3,6 +3,7 @@ import teamService from '../services/team';
 import { isManagerOrAbove } from '../utils/access';
 import { ConfirmDialog } from './ui';
 import EmployeeRecordsDrawer from './EmployeeRecordsDrawer';
+import DocumentationPreferencesDrawer from './DocumentationPreferencesDrawer';
 import './SetupSheetTemplates.css'; // shared red hero banner
 import './TeamDocumentation.css';
 
@@ -37,6 +38,7 @@ const TeamDocumentation = ({ onNavigate, onBack, user }) => {
   const [drawerEmployee, setDrawerEmployee] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null); // { employee, recordId }
   const [notImplemented, setNotImplemented] = useState(null); // { title, message }
+  const [prefsOpen, setPrefsOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -132,10 +134,7 @@ const TeamDocumentation = ({ onNavigate, onBack, user }) => {
                     className="td-banner-icon-btn"
                     aria-label="Documentation Preferences"
                     title="Documentation Preferences"
-                    onClick={() => setNotImplemented({
-                      title: 'Preferences — coming soon',
-                      message: 'Documentation preferences (default record templates, escalation rules, retention policy) is on the roadmap.',
-                    })}
+                    onClick={() => setPrefsOpen(true)}
                   >
                     <IconSettings className="td-banner-icon" />
                   </button>
@@ -299,8 +298,16 @@ const TeamDocumentation = ({ onNavigate, onBack, user }) => {
         isOpen={!!drawerEmployee}
         employee={drawerEmployee}
         canManage={canManage}
+        currentUser={user}
         onClose={() => setDrawerEmployee(null)}
         onChanged={refresh}
+      />
+
+      {/* Store-wide Documentation Preferences (gear icon on hero). */}
+      <DocumentationPreferencesDrawer
+        isOpen={prefsOpen}
+        canManage={canManage}
+        onClose={() => setPrefsOpen(false)}
       />
 
       {/* Delete-latest confirmation (from card trash button). */}

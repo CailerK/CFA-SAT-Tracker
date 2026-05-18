@@ -179,8 +179,14 @@ const ManageDevelopmentTracks = ({ user }) => {
   return (
     <section className="mdt">
       <header className="mdt-head">
-        <h2 className="mdt-title">Manage Development Tracks</h2>
-        <p className="mdt-sub">Configure the requirements for each career transition</p>
+        <h2 className="mdt-title">
+          {canManage ? 'Manage Development Tracks' : 'Development Tracks'}
+        </h2>
+        <p className="mdt-sub">
+          {canManage
+            ? 'Configure the requirements for each career transition'
+            : 'See what it takes to grow into the next role'}
+        </p>
       </header>
 
       <div className="mdt-buckets">
@@ -231,20 +237,30 @@ const ManageDevelopmentTracks = ({ user }) => {
                         </div>
                       </div>
                       <div className="mdt-card-actions">
-                        <button
-                          className="mdt-edit-btn"
-                          onClick={() => openEdit(p)}
-                          disabled={!canManage}
-                        >
-                          <IconEdit size={14} /> Edit
-                        </button>
-                        <button
-                          className="mdt-icon-btn"
-                          aria-label="Expand"
-                          onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
-                        >
-                          <IconChevD size={14} />
-                        </button>
+                        {canManage ? (
+                          <button
+                            className="mdt-edit-btn"
+                            onClick={() => openEdit(p)}
+                          >
+                            <IconEdit size={14} /> Edit
+                          </button>
+                        ) : (
+                          <button
+                            className="mdt-edit-btn"
+                            onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
+                          >
+                            <IconChevD size={14} /> View steps
+                          </button>
+                        )}
+                        {canManage && (
+                          <button
+                            className="mdt-icon-btn"
+                            aria-label="Expand"
+                            onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
+                          >
+                            <IconChevD size={14} />
+                          </button>
+                        )}
                         {canManage && (
                           <button
                             className="mdt-icon-btn mdt-icon-btn-danger"

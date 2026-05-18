@@ -187,13 +187,56 @@ def employee_records(request, user_id):
 
 
 class EmployeeRecordViewSet(StoreScopedViewSet):
-    """Standalone CRUD on individual records (edit/delete)."""
+    """Standalone CRUD on individual records (edit/delete).
+
+    Plus an `acknowledge` action that's open to the record's subject (the
+    user named in `record.user`) so employees can sign off on their own
+    warnings / PIPs. Managers can also acknowledge on behalf of someone
+    when needed.
+    """
     serializer_class = EmployeeRecordSerializer
     queryset = EmployeeRecord.objects.all()
     permission_classes = [IsAuthenticated, ReadAllWriteManager]
 
     def get_queryset(self):
         return super().get_queryset().order_by("-recorded_at")
+
+    def perform_create(self, serializer):
+        # Auto-flag warnings + PIPs as needing employee acknowledgement.
+        kind = serializer.validated_data.get("kind", "")
+        requires = serializer.validated_data.get("requires_acknowledgement")
+        if requires is None:
+            requires = kind in {"warning", "pip"}
+        serializer.save(
+            recorded_by=self.request.user,
+            requires_acknowledgement=requires,
+        )
+
+    def get_permissions(self):
+        if self.action == "acknowledge":
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
+    @action(detail=True, methods=["post"], url_path="acknowledge")
+    def acknowledge(self, request, pk=None):
+        """
+        POST /api/team/documentation/records/:id/acknowledge/
+        The record's subject (or a manager+) marks the record acknowledged.
+        Returns the updated record.
+        """
+        from .permissions import is_manager_or_above
+        record = self.get_object()
+        is_subject = record.user_id == request.user.id
+        if not (is_subject or is_manager_or_above(request.user)):
+            return Response(
+                {"detail": "Only the employee named in the record (or a manager) can acknowledge."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if record.acknowledged_at is None:
+            record.acknowledged_at = timezone.now()
+            record.acknowledged_by = request.user
+            record.save(update_fields=["acknowledged_at", "acknowledged_by"])
+        return Response(self.get_serializer(record).data)
 
 
 @api_view(["GET"])

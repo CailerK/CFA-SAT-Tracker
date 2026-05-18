@@ -488,7 +488,16 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
   // Free-text filter so a director with 30 reports can find one quickly.
   const [teamProgressQuery, setTeamProgressQuery] = useState('');
 
-  // Mirror the backend's `is_manager_or_above` rule.
+  // Mirror the backend rule for assigning a development plan to someone
+  // else: admin-tier only (admin role, is_admin flag, or superuser).
+  // Managers/shift-leads CAN view their team's progress but cannot assign
+  // new plans — that's a director-level decision.
+  const canAssignPlans = !!(
+    user?.isSuperuser
+    || user?.isAdmin
+    || (user?.role && ['director', 'admin'].includes(user.role))
+  );
+  // Manager-tier still gates "see team progress" — kept for the table.
   const isManagerOrAbove = !!(
     user?.isSuperuser
     || user?.isAdmin
@@ -880,37 +889,41 @@ const LeadershipDevPlans = ({ user, onNavigate }) => {
               up on your Leadership dashboard.
             </p>
           </div>
-          {isManagerOrAbove && (
+          {(isManagerOrAbove || canAssignPlans) && (
             <div className="ldp-header-mgr-actions">
-              <button
-                type="button"
-                className={`ldp-assign-btn ${teamProgressOpen ? 'is-active' : ''}`}
-                onClick={() => setTeamProgressOpen((v) => !v)}
-                title="See plan progress for everyone below you in the org"
-                aria-pressed={teamProgressOpen}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
-                Team Progress
-              </button>
-              <button
-                type="button"
-                className="ldp-assign-btn"
-                onClick={openAssignModal}
-                title="Assign a plan to a team member with an optional deadline"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M3 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/>
-                  <line x1="19" x2="19" y1="8" y2="14"/>
-                  <line x1="22" x2="16" y1="11" y2="11"/>
-                </svg>
-                Assign to team member
-              </button>
+              {isManagerOrAbove && (
+                <button
+                  type="button"
+                  className={`ldp-assign-btn ${teamProgressOpen ? 'is-active' : ''}`}
+                  onClick={() => setTeamProgressOpen((v) => !v)}
+                  title="See plan progress for everyone below you in the org"
+                  aria-pressed={teamProgressOpen}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                  Team Progress
+                </button>
+              )}
+              {canAssignPlans && (
+                <button
+                  type="button"
+                  className="ldp-assign-btn"
+                  onClick={openAssignModal}
+                  title="Assign a plan to a team member with an optional deadline"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M3 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/>
+                    <line x1="19" x2="19" y1="8" y2="14"/>
+                    <line x1="22" x2="16" y1="11" y2="11"/>
+                  </svg>
+                  Assign to team member
+                </button>
+              )}
             </div>
           )}
         </div>

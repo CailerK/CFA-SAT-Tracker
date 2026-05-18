@@ -312,44 +312,48 @@ def weekly_digest(request):
     recent_disciplinary = [
         {
             "id": r.id,
-            "name": r.employee.get_full_name() or r.employee.email,
-            "role": (getattr(r.employee, 'role', '') or 'Team Member').replace('_', ' ').title(),
+            "name": r.user.get_full_name() or r.user.email,
+            "role": (getattr(r.user, 'role', '') or 'Team Member').replace('_', ' ').title(),
             "label": (r.title or 'Warning'),
         }
         for r in records.filter(kind='warning')
-                       .select_related('employee')
-                       .order_by('-created_at')[:5]
+                       .select_related('user')
+                       .order_by('-recorded_at')[:5]
     ]
     recent_admin = [
         {
             "id": r.id,
-            "name": r.employee.get_full_name() or r.employee.email,
-            "role": (getattr(r.employee, 'role', '') or 'Team Member').replace('_', ' ').title(),
+            "name": r.user.get_full_name() or r.user.email,
+            "role": (getattr(r.user, 'role', '') or 'Team Member').replace('_', ' ').title(),
             "label": (r.title or 'Admin'),
         }
         for r in records.filter(kind='admin')
-                       .select_related('employee')
-                       .order_by('-created_at')[:5]
+                       .select_related('user')
+                       .order_by('-recorded_at')[:5]
     ]
     active_perf_plans = [
         {
             "id": r.id,
-            "name": r.employee.get_full_name() or r.employee.email,
+            "name": r.user.get_full_name() or r.user.email,
             "goals_text": "Pending Acknowledgment",
         }
-        for r in records.filter(kind='pip', status='active')
-                       .select_related('employee')
-                       .order_by('-created_at')[:10]
+        for r in records.filter(kind='pip')
+                       .exclude(status='resolved')
+                       .select_related('user')
+                       .order_by('-recorded_at')[:10]
     ]
-    pending_ack_qs = records.filter(status='active', acknowledged_at__isnull=True)
+    pending_ack_qs = records.filter(
+        requires_acknowledgement=True,
+        acknowledged_at__isnull=True,
+    )
     pending_ack_total = pending_ack_qs.count()
     pending_ack_items = [
         {
             "id": r.id,
-            "name": r.employee.get_full_name() or r.employee.email,
-            "role": (getattr(r.employee, 'role', '') or 'Team Member').replace('_', ' ').title(),
+            "name": r.user.get_full_name() or r.user.email,
+            "role": (getattr(r.user, 'role', '') or 'Team Member').replace('_', ' ').title(),
         }
-        for r in pending_ack_qs.select_related('employee').order_by('-created_at')[:10]
+        for r in pending_ack_qs.select_related('user').order_by('-recorded_at')[:10]
     ]
 
     # ---------- Training ----------

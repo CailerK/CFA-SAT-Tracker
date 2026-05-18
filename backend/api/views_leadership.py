@@ -366,15 +366,18 @@ class UserDevelopmentPlanViewSet(StoreScopedViewSet):
 
     def perform_create(self, serializer):
         requester = self.request.user
-        # Default the enrollment to the requester. Managers may pass a
+        # Default the enrollment to the requester. Admins+ may pass a
         # different `user` to assign to a team member.
         target_user = serializer.validated_data.get('user') or requester
         is_assignment = target_user.id != requester.id
         if is_assignment:
-            # Only managers/admins can create an enrollment for someone else.
-            if not getattr(requester, 'is_manager_or_above', False):
+            # Assigning a development plan to someone else is reserved for
+            # admin-tier (admin role, is_admin flag, or superuser). Shift
+            # leads / managers can monitor progress but cannot enroll
+            # another user — that's an admin/director-level decision.
+            if not is_admin_or_above(requester):
                 raise ValidationError(
-                    {'user': 'Only managers can assign plans to other users.'}
+                    {'user': 'Only admins or superusers can assign plans to other users.'}
                 )
             # Same-store guard: a manager can only assign to users in their
             # own store (multi-tenancy invariant).

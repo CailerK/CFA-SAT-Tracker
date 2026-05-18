@@ -36,15 +36,21 @@ DEFAULT_STORE_NAME = os.environ.get(
     "DEFAULT_STORE_NAME", "CFA I-410 & Rigsby"
 )
 
+# A second "sandbox" store used ONLY for the public-facing test/demo users
+# (demouser, admin@gmail.com). Splitting these out of the real store proves
+# multi-tenant isolation in production: writes from demouser must NEVER show
+# up to the real I-410 team and vice versa.
+TEST_STORE_NUMBER = os.environ.get("TEST_STORE_NUMBER", "00000")
+TEST_STORE_NAME = os.environ.get("TEST_STORE_NAME", "Sandbox / Demo Store")
 
-def upsert_default_store():
-    """Create the seed Store + StoreSettings if they don't already exist."""
+
+def _upsert_store(number, name, address="", timezone_name="America/Chicago"):
     store, created = Store.objects.get_or_create(
-        store_number=DEFAULT_STORE_NUMBER,
+        store_number=number,
         defaults={
-            "name": DEFAULT_STORE_NAME,
-            "timezone_name": "America/Chicago",
-            "address": "2203 SE Loop 410, San Antonio, TX",
+            "name": name,
+            "timezone_name": timezone_name,
+            "address": address,
         },
     )
     StoreSettings.objects.get_or_create(store=store)
@@ -53,6 +59,22 @@ def upsert_default_store():
     else:
         print(f"  - Store {store} already exists, skipping.")
     return store
+
+
+def upsert_default_store():
+    """Create the seed Store + StoreSettings if they don't already exist."""
+    return _upsert_store(
+        DEFAULT_STORE_NUMBER, DEFAULT_STORE_NAME,
+        address="2203 SE Loop 410, San Antonio, TX",
+    )
+
+
+def upsert_test_store():
+    """Create the sandbox/demo Store separate from the real one."""
+    return _upsert_store(
+        TEST_STORE_NUMBER, TEST_STORE_NAME,
+        address="Sandbox — public demo accounts only",
+    )
 
 
 def upsert_user(*, email, username, password, first_name, last_name, role,
@@ -103,12 +125,27 @@ def upsert_user(*, email, username, password, first_name, last_name, role,
     return user
 
 
+def _ensure_user_in_store(user, target_store):
+    """Move an existing user to `target_store` if they're not there yet.
+
+    Used to migrate demouser/admin@gmail.com out of the real store on the
+    first deploy where this split takes effect. After that it's a no-op.
+    """
+    if user and target_store and user.store_id != target_store.id:
+        old_store = user.store
+        user.store = target_store
+        user.save(update_fields=["store"])
+        print(f"  ! Moved {user.email}: {old_store} → {target_store}")
+
+
 def main():
     print("Initializing users on Railway database...")
 
-    # ----- 0. Default Store + Settings -----
+    # ----- 0. Stores + Settings -----
     print("Default store:")
     store = upsert_default_store()
+    print("Sandbox store:")
+    test_store = upsert_test_store()
 
     # ----- 1. Superuser from environment -----
     admin_email = os.environ.get("DJANGO_SUPERUSER_EMAIL")
@@ -133,9 +170,12 @@ def main():
     else:
         print("Superuser: skipping — DJANGO_SUPERUSER_* env vars not all set.")
 
-    # ----- 2. Demo users (mirrors backend/create_demo_users.py) -----
-    print("Demo users:")
-    demo_users = [
+    # ----- 2. Public demo / sandbox users (LIVE in the test store) -----
+    # These accounts are advertised publicly (demouser, admin@gmail.com) and
+    # MUST live in their own store so any writes they do don't bleed into
+    # the real CFA I-410 data, and vice versa.
+    print("Public demo users (sandbox store):")
+    sandbox_users = [
         {
             "email": "demouser@gmail.com",
             "username": "demouser",
@@ -149,28 +189,40 @@ def main():
             "email": "admin@gmail.com",
             "username": "demo_admin",
             "password": "admin",
-            "first_name": "Store",
+            "first_name": "Sandbox",
             "last_name": "Manager",
             "role": "manager",
             "is_demo_user": True,
             "is_admin": True,
         },
-        {
-            "email": "store@cfasattracker.com",
-            "username": "storemanager",
-            "password": "password123",
-            "first_name": "Store",
-            "last_name": "Manager",
-            "role": "manager",
-            "is_demo_user": False,
-        },
     ]
-    for u in demo_users:
-        upsert_user(**u, store=store, company_id=DEFAULT_STORE_NUMBER)
+    for u in sandbox_users:
+        created_user = upsert_user(
+            **u, store=test_store, company_id=TEST_STORE_NUMBER,
+        )
+        # First-time migration: move them off the real store if they were
+        # created before the split.
+        _ensure_user_in_store(created_user, test_store)
 
-    # ----- 3. Per-store operational data (FOH tasks, shift tags, etc.) -----
-    print("Per-store seed data:")
+    # ----- 3. Real store-manager seed (lives in DEFAULT store) -----
+    print("Real-store users:")
+    upsert_user(
+        email="store@cfasattracker.com",
+        username="storemanager",
+        password="password123",
+        first_name="Store",
+        last_name="Manager",
+        role="manager",
+        is_demo_user=False,
+        store=store,
+        company_id=DEFAULT_STORE_NUMBER,
+    )
+
+    # ----- 4. Per-store operational data for BOTH stores -----
+    print("Per-store seed data (real store):")
     seed_all_for_store(store)
+    print("Per-store seed data (sandbox store):")
+    seed_all_for_store(test_store)
 
     print("Initialization complete.")
 
